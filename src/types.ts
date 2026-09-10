@@ -1,12 +1,13 @@
 export type TabType = 
   | 'overview'
   | 'stores'
+  | 'transactions'
   | 'loyalty'
   | 'vouchers'
   | 'members'
-  | 'audit'
   | 'campaigns'
-  | 'support';
+  | 'support'
+  | 'audit';
 
 export type CashierTabType = 'cashier' | 'members' | 'transactions' | 'settings';
 
@@ -19,31 +20,52 @@ export interface AuditLog {
   actorRole: 'HO_ADMIN' | 'CASHIER' | 'SYSTEM';
   action: string;
   details: string;
-  module: 'LOYALTY' | 'VOUCHERS' | 'MEMBERS' | 'TRANSACTIONS' | 'SETTINGS';
+  module: 'LOYALTY' | 'VOUCHERS' | 'MEMBERS' | 'TRANSACTIONS' | 'SETTINGS' | 'SUPPORT_TICKETS' | 'SECURITY';
 }
 
 export interface SupportTicket {
   id: string;
-  memberId: string;
-  memberName: string;
+  source: 'MEMBER' | 'CASHIER';
+  memberId?: string;
+  memberName?: string;
+  memberPhone?: string;
+  storeId?: string;
+  storeName?: string;
+  cashierName?: string;
   subject: string;
+  category: 'MISSING_POINTS' | 'VOUCHER_CLAIM' | 'DATA_CORRECTION' | 'POS_HARDWARE' | 'DISPUTE' | 'OTHER';
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   createdAt: string;
   updatedAt: string;
-  messages: { sender: 'MEMBER' | 'AGENT'; text: string; timestamp: string }[];
+  assignedTo?: string;
+  receiptNo?: string;
+  resolutionNotes?: string;
+  adjustmentMade?: {
+    pointsDelta: number;
+    timestamp: string;
+    adminName: string;
+    note: string;
+  };
+  messages: { sender: 'MEMBER' | 'CASHIER' | 'AGENT' | 'SYSTEM'; text: string; timestamp: string }[];
 }
 
 export interface Campaign {
   id: string;
   name: string;
-  type: 'EMAIL' | 'SMS' | 'PUSH';
+  headline?: string;
+  type: 'POPUP_BANNER' | 'PUSH' | 'SMS' | 'EMAIL';
   status: 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'COMPLETED';
   targetAudience: 'ALL' | 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK' | 'INACTIVE';
   content: string;
+  bannerImage?: string;
+  badgeText?: string;
+  voucherCode?: string;
   scheduledAt?: string;
   sentCount: number;
   openCount?: number;
+  clickCount?: number;
+  showAsPopupOnApp: boolean;
 }
 
 export interface Member {

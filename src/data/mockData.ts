@@ -1350,3 +1350,171 @@ export const initialLoyaltyConfig = {
   enableStrictVoucherSingleUse: true,
   enableCashierManualOverride: true,
 };
+
+export const initialSupportTickets: any[] = [
+  {
+    id: 'TKT-1049',
+    source: 'MEMBER',
+    memberId: 'mbr_01',
+    memberName: 'Budi Santoso',
+    memberPhone: '081234567890',
+    storeName: 'Puri Jakarta',
+    receiptNo: 'INV-20260820-PUR-001',
+    subject: 'Poin belanja dari struk transaksi kemarin belum bertambah',
+    category: 'MISSING_POINTS',
+    status: 'OPEN',
+    priority: 'HIGH',
+    createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+    assignedTo: 'Dimas (Support HO)',
+    messages: [
+      {
+        sender: 'MEMBER',
+        text: 'Halo admin, saya belanja jam Alexandre Christie kemarin di Watch Club Puri senilai Rp 2.500.000, tapi poin saya belum masuk ke aplikasi.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 35).toISOString()
+      }
+    ]
+  },
+  {
+    id: 'TKT-1048',
+    source: 'CASHIER',
+    storeId: 'str_02',
+    storeName: 'Level 21 Bali',
+    cashierName: 'Rian Kasir',
+    subject: 'Scanner toko gagal membaca QR kartu digital pelanggan',
+    category: 'POS_HARDWARE',
+    status: 'IN_PROGRESS',
+    priority: 'MEDIUM',
+    createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    assignedTo: 'Bambang (IT & Store Systems)',
+    messages: [
+      {
+        sender: 'CASHIER',
+        text: 'Mesin barcode scanner optik di kasir 2 Level 21 Bali tidak mendeteksi QR kartu aplikasi member, mohon petunjuk reset atau remote IT.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString()
+      },
+      {
+        sender: 'AGENT',
+        text: 'Halo Rian, silakan cabut kabel USB scanner 10 detik lalu tancapkan kembali ke port USB belakang PC POS.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString()
+      }
+    ]
+  },
+  {
+    id: 'TKT-1045',
+    source: 'MEMBER',
+    memberId: 'mbr_02',
+    memberName: 'Siti Rahma',
+    memberPhone: '081398765432',
+    storeName: 'Kota Kasablanka Jakarta',
+    subject: 'Kendala klaim voucher diskon ulang tahun member Gold',
+    category: 'VOUCHER_CLAIM',
+    status: 'RESOLVED',
+    priority: 'HIGH',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    assignedTo: 'Sarah (Customer Care Specialist)',
+    resolutionNotes: 'Kompensasi voucher dan +500 Pts telah disalurkan langsung.',
+    adjustmentMade: {
+      pointsDelta: 500,
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      adminName: 'Sarah',
+      note: 'Kompensasi voucher ulang tahun'
+    },
+    messages: [
+      {
+        sender: 'MEMBER',
+        text: 'Kupon ulang tahun saya tidak bisa di-scan saat di kasir Kokas.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
+      },
+      {
+        sender: 'AGENT',
+        text: 'Sudah kami bantu perpanjang masa aktif voucher dan kami tambahkan bonus 500 Poin loyalty langsung ke akun Ibu Siti.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
+      }
+    ]
+  }
+];
+
+export const initialCampaigns: any[] = [
+  {
+    id: 'CMP-001',
+    name: 'Mega Anniversary Watch Club 2026',
+    headline: 'Diskon Spesial Hingga 25% Seluruh Koleksi Premium!',
+    type: 'POPUP_BANNER',
+    status: 'ACTIVE',
+    targetAudience: 'ALL',
+    content: 'Nikmati penawaran eksklusif perayaan ulang tahun Watch Club di seluruh gerai resmi di Indonesia. Tunjukkan kode promo ini di kasir saat pembayaran.',
+    badgeText: '🔥 PROMO ANNIVERSARY EKSKLUSIF',
+    voucherCode: 'WATCHCLUB-ANNIV',
+    showAsPopupOnApp: true,
+    sentCount: 18200,
+    openCount: 11450,
+    clickCount: 4890
+  },
+  {
+    id: 'CMP-002',
+    name: 'Eksklusif Platinum & Diamond Private Sale',
+    headline: 'Koleksi Swiss Made Terbaru Khusus Member VIP',
+    type: 'POPUP_BANNER',
+    status: 'ACTIVE',
+    targetAudience: 'PLATINUM',
+    content: 'Undangan khusus bagi member Platinum & Diamond untuk menikmati preview koleksi jam tangan mewah terbaru dengan cashback poin ganda.',
+    badgeText: '💎 VIP PRIVATE SALE',
+    voucherCode: 'VIP-GOLD-100K',
+    showAsPopupOnApp: true,
+    sentCount: 3200,
+    openCount: 2450,
+    clickCount: 1680
+  }
+];
+
+export const initialAuditLogs: any[] = [
+  { 
+    id: 'AL-901', 
+    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(), 
+    actorName: 'Dimas (HO Admin)', 
+    actorRole: 'HO_ADMIN', 
+    action: 'MANUAL_POINT_COMPENSATION', 
+    details: 'Disalurkan +500 Pts via Support Ticket TKT-1049 ke member MBR-9381 (Budi Santoso). Alasan: Kompensasi kendala sistem kasir.', 
+    module: 'SUPPORT_TICKETS' 
+  },
+  { 
+    id: 'AL-902', 
+    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), 
+    actorName: 'Superadmin HO (PIK)', 
+    actorRole: 'HO_ADMIN', 
+    action: 'LOYALTY_RULE_UPDATE', 
+    details: 'Mengubah rasio perolehan poin menjadi Rp 1.000 / 1 Pts untuk tier Platinum.', 
+    module: 'LOYALTY' 
+  },
+  { 
+    id: 'AL-903', 
+    timestamp: new Date(Date.now() - 1000 * 60 * 95).toISOString(), 
+    actorName: 'Superadmin HO (PIK)', 
+    actorRole: 'HO_ADMIN', 
+    action: 'VOUCHER_PUBLISHED', 
+    details: 'Menerbitkan kupon diskon baru "SUMMER20" (Potongan 20% Min. Belanja Rp 1.500.000, Kuota 500 klaim).', 
+    module: 'VOUCHERS' 
+  },
+  { 
+    id: 'AL-904', 
+    timestamp: new Date(Date.now() - 1000 * 60 * 160).toISOString(), 
+    actorName: 'System Loyalty Engine', 
+    actorRole: 'SYSTEM', 
+    action: 'AUTO_TIER_PROMOTION', 
+    details: 'Menaikkan tier member MBR-1029 dari GOLD ke PLATINUM otomatis setelah total belanja melampaui Rp 20.000.000.', 
+    module: 'MEMBERS' 
+  },
+  { 
+    id: 'AL-905', 
+    timestamp: new Date(Date.now() - 1000 * 60 * 240).toISOString(), 
+    actorName: 'Kasir Puri (Rizal)', 
+    actorRole: 'CASHIER', 
+    action: 'CASHIER_LOGIN_SHIFT', 
+    details: 'Membuka shift kasir di Store ID: PUR (Watch Club - Puri Jakarta), IP: 182.253.11.89.', 
+    module: 'SECURITY' 
+  }
+];
+

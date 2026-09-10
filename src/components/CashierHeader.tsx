@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Store, Sun, Moon } from 'lucide-react';
+import { Store, Sun, Moon, LifeBuoy } from 'lucide-react';
 
 interface HeaderProps {
   cashierName: string | null;
   storeName: string;
+  onOpenSupportModal?: () => void;
 }
 
 export const CashierHeader: React.FC<HeaderProps> = ({
   cashierName,
-  storeName
+  storeName,
+  onOpenSupportModal
 }) => {
   const [timeStr, setTimeStr] = useState('00:00:00');
   const [dateStr, setDateStr] = useState('-- --- ----');
-  const [shiftStr, setShiftStr] = useState('Shift --');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -32,13 +33,6 @@ export const CashierHeader: React.FC<HeaderProps> = ({
       
       const dateOptions: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       setDateStr(now.toLocaleDateString('id-ID', dateOptions));
-
-      const currentHour = now.getHours();
-      let currentShift = "Shift Malam";
-      if (currentHour >= 6 && currentHour < 14) currentShift = "Shift Pagi";
-      else if (currentHour >= 14 && currentHour < 22) currentShift = "Shift Siang";
-      
-      setShiftStr(currentShift);
     };
 
     const interval = setInterval(updateClock, 1000);
@@ -75,8 +69,7 @@ export const CashierHeader: React.FC<HeaderProps> = ({
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 transition-colors">
               <span>{dateStr}</span> &nbsp;•&nbsp; 
-              <span className="w-14 inline-block font-mono">{timeStr}</span> &nbsp;•&nbsp; 
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{shiftStr}</span>
+              <span className="font-mono">{timeStr}</span>
             </p>
           </div>
         </div>
@@ -88,6 +81,18 @@ export const CashierHeader: React.FC<HeaderProps> = ({
           <Store className="w-4 h-4 text-emerald-600 dark:text-emerald-400 mr-2" />
           <span>{storeName}</span>
         </div>
+
+        {/* Report to HO Support Button */}
+        {onOpenSupportModal && (
+          <button 
+            onClick={onOpenSupportModal}
+            title="Laporkan Kendala Kasir/Teknis ke HO"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors border border-amber-300 dark:border-amber-700 cursor-pointer"
+          >
+            <LifeBuoy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span className="hidden sm:inline">Lapor HO</span>
+          </button>
+        )}
 
         {/* Theme Toggle Button (Light/Dark) */}
         <button 

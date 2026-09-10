@@ -30,6 +30,7 @@ interface OverviewTabProps {
   transactions: Transaction[];
   vouchers: Voucher[];
   loyaltyConfig: LoyaltyConfig;
+  isSkeletonLoading?: boolean;
   onNavigateToStores: () => void;
   onNavigateToMembers: () => void;
   onNavigateToVouchers: () => void;
@@ -43,6 +44,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   transactions,
   vouchers,
   loyaltyConfig,
+  isSkeletonLoading = false,
   onNavigateToStores,
   onNavigateToMembers,
   onNavigateToVouchers,
@@ -51,12 +53,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleRefresh = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-  };
+  const isCurrentlyLoading = isLoading || isSkeletonLoading;
 
   // Aggregate stats
   const totalRevenueToday = stores.reduce((acc, s) => acc + s.todayRevenue, 0);
@@ -76,13 +73,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   // Top 5 Performing Stores
   const topStores = [...stores].sort((a, b) => b.todayRevenue - a.todayRevenue).slice(0, 5);
 
-  if (isLoading) {
+  if (isCurrentlyLoading) {
     return (
       <div className="space-y-8 animate-fadeIn">
-        <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200">
-          <div className="h-5 w-44 bg-slate-200 rounded animate-pulse" />
-          <div className="h-9 w-32 bg-slate-200 rounded-xl animate-pulse" />
-        </div>
         <div className="rounded-3xl bg-slate-900 p-8 text-white shadow-xl border border-slate-800 animate-pulse space-y-4">
           <div className="h-6 w-48 bg-slate-800 rounded-full" />
           <div className="h-8 w-72 bg-slate-800 rounded-xl" />
@@ -124,21 +117,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   return (
     <div className="space-y-8 animate-fadeIn">
-      {/* Skeleton Trigger Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white px-5 py-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-          <Sparkles className="w-4 h-4 text-amber-500" />
-          <span>Live Data Synchronization Active (+40 Stores Connected)</span>
-        </div>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Simulate Skeleton Fetch / Refresh</span>
-        </button>
-      </div>
       {/* Welcome Banner with Quick Summary */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 p-8 text-white shadow-xl border border-slate-800">
         <div className="absolute right-0 top-0 h-full w-1/3 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_70%)] pointer-events-none" />

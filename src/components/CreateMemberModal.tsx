@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, UserPlus, Phone, User, Mail, Calendar, AlertCircle, Store } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, UserPlus, Phone, User, Mail, Calendar, AlertCircle, Store, Mars, Venus } from 'lucide-react';
 import { Member } from '../types';
 
 export const OFFICIAL_STORES = [
@@ -50,10 +50,11 @@ interface CreateMemberModalProps {
   onClose: () => void;
   onCreateMember: (member: Partial<Member>) => Promise<void>;
   defaultStore?: string;
+  isStoreLocked?: boolean;
 }
 
 export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
-  isOpen, onClose, onCreateMember, defaultStore = 'Puri Jakarta'
+  isOpen, onClose, onCreateMember, defaultStore = 'Puri Jakarta', isStoreLocked = true
 }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -63,6 +64,15 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
   const [registeredStore, setRegisteredStore] = useState(defaultStore);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Otomatis sinkronisasi toko pendaftaran dengan profil akun toko yang sedang login
+  useEffect(() => {
+    if (defaultStore) {
+      setRegisteredStore(defaultStore);
+    }
+  }, [defaultStore, isOpen]);
+
+  const storeList = Array.from(new Set([defaultStore, ...OFFICIAL_STORES].filter(Boolean)));
 
   if (!isOpen) return null;
 
@@ -137,7 +147,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
                 onChange={(e) => setName(e.target.value)}
                 required
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-sm"
-                placeholder="Contoh: Anton Wijaya"
+                placeholder="Contoh: Andi Pratama"
               />
             </div>
           </div>
@@ -152,7 +162,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
                 onChange={(e) => setPhone(e.target.value)}
                 required
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-sm"
-                placeholder="081903987051"
+                placeholder="08123456789"
               />
             </div>
           </div>
@@ -166,7 +176,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-sm"
-                placeholder="anton.wijaya@gmail.com"
+                placeholder="andi.pratama@gmail.com"
               />
             </div>
           </div>
@@ -185,45 +195,60 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Toko Pendaftaran (Store) *</label>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              Toko Pendaftaran (Store) *
+            </label>
             <div className="relative">
-              <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <select
-                value={registeredStore}
-                onChange={(e) => setRegisteredStore(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-sm"
-              >
-                {OFFICIAL_STORES.map((store) => (
-                  <option key={store} value={store}>{store}</option>
-                ))}
-              </select>
+              <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+              {isStoreLocked ? (
+                <input
+                  type="text"
+                  value={registeredStore}
+                  readOnly
+                  disabled
+                  tabIndex={-1}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 cursor-not-allowed font-medium select-none pointer-events-none"
+                />
+              ) : (
+                <select
+                  value={registeredStore}
+                  onChange={(e) => setRegisteredStore(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                >
+                  {storeList.map((store) => (
+                    <option key={store} value={store}>{store}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Jenis Kelamin</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Jenis Kelamin</label>
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => setGender('Pria')}
-                className={`py-2 text-sm font-medium rounded-lg border transition-colors ${
+                className={`py-2.5 px-3 text-sm font-semibold rounded-xl border transition-all flex items-center justify-center gap-2 ${
                   gender === 'Pria'
-                    ? 'bg-slate-900 dark:bg-emerald-600 text-white border-slate-900 dark:border-emerald-600'
-                    : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/70 dark:text-blue-200 dark:border-blue-600 shadow-xs ring-1 ring-blue-300'
+                    : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-blue-50/70 hover:text-blue-800 hover:border-blue-200'
                 }`}
               >
-                Pria
+                <Mars className={`w-4 h-4 ${gender === 'Pria' ? 'text-blue-700 dark:text-blue-300' : 'text-blue-400'}`} />
+                <span>Pria</span>
               </button>
               <button
                 type="button"
                 onClick={() => setGender('Wanita')}
-                className={`py-2 text-sm font-medium rounded-lg border transition-colors ${
+                className={`py-2.5 px-3 text-sm font-semibold rounded-xl border transition-all flex items-center justify-center gap-2 ${
                   gender === 'Wanita'
-                    ? 'bg-slate-900 dark:bg-emerald-600 text-white border-slate-900 dark:border-emerald-600'
-                    : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-pink-100 text-pink-900 border-pink-300 dark:bg-pink-950/70 dark:text-pink-200 dark:border-pink-600 shadow-xs ring-1 ring-pink-300'
+                    : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-pink-50/70 hover:text-pink-800 hover:border-pink-200'
                 }`}
               >
-                Wanita
+                <Venus className={`w-4 h-4 ${gender === 'Wanita' ? 'text-pink-700 dark:text-pink-300' : 'text-pink-400'}`} />
+                <span>Wanita</span>
               </button>
             </div>
           </div>

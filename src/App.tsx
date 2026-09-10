@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { Member, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch } from './types';
-import { initialStores, initialMembers, initialVouchers, initialTransactions, initialLoyaltyConfig } from './data/mockData';
+import { Member, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch, SupportTicket, Campaign, AuditLog } from './types';
+import { 
+  initialStores, 
+  initialMembers, 
+  initialVouchers, 
+  initialTransactions, 
+  initialLoyaltyConfig,
+  initialSupportTickets,
+  initialCampaigns,
+  initialAuditLogs
+} from './data/mockData';
 import { calculateTier } from './lib/loyalty';
 
 // HO Components
@@ -15,6 +24,7 @@ import { AuditTrailTab } from './components/AuditTrailTab';
 import { CampaignsTab } from './components/CampaignsTab';
 import { SupportTicketsTab } from './components/SupportTicketsTab';
 import { StoresSettingsTab } from './components/StoresSettingsTab';
+import { NationalTransactionsTab } from './components/NationalTransactionsTab';
 import { QuickStoreSwitchModal } from './components/QuickStoreSwitchModal';
 import { CreateVoucherModal } from './components/CreateVoucherModal';
 import { CreateMemberModal } from './components/CreateMemberModal';
@@ -26,6 +36,7 @@ import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
 import { PortalSwitcher } from './components/PortalSwitcher';
 import { StoreTransactionsModal } from './components/StoreTransactionsModal';
+import { NationalActivityNotifications } from './components/NationalActivityNotifications';
 
 export default function App() {
   const navigate = useNavigate();
@@ -35,6 +46,9 @@ export default function App() {
   const [cashierName, setCashierName] = useState('Kasir Puri');
   const [cashierStoreName, setCashierStoreName] = useState<string>('Puri Jakarta');
   const [loggedInMemberId, setLoggedInMemberId] = useState<string | null>(null);
+
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   
   const [stores, setStores] = useState<StoreBranch[]>(() => {
     try {
@@ -91,6 +105,42 @@ export default function App() {
     return initialLoyaltyConfig;
   });
 
+  // Support Tickets State with LocalStorage Persistence
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
+    try {
+      const saved = localStorage.getItem('wtc_tickets');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return initialSupportTickets;
+  });
+
+  // Campaigns & Comms State with LocalStorage Persistence
+  const [campaigns, setCampaigns] = useState<Campaign[]>(() => {
+    try {
+      const saved = localStorage.getItem('wtc_campaigns');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return initialCampaigns;
+  });
+
+  // System Audit Logs State
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+    try {
+      const saved = localStorage.getItem('wtc_audit_logs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return initialAuditLogs;
+  });
+
   const [loading, setLoading] = useState(false);
 
   const [isQuickLauncherOpen, setIsQuickLauncherOpen] = useState(false);
@@ -102,9 +152,169 @@ export default function App() {
   const [isStoreTransactionsModalOpen, setIsStoreTransactionsModalOpen] = useState(false);
   const [selectedStoreForTrx, setSelectedStoreForTrx] = useState<StoreBranch | null>(null);
 
+  // Navigate directly to dedicated National Transactions tab (No popup!)
   const handleOpenStoreTransactions = (store: StoreBranch | null) => {
     setSelectedStoreForTrx(store);
-    setIsStoreTransactionsModalOpen(true);
+    setActiveTab('transactions');
+  };
+
+  // Support Ticket Handlers
+  const handleUpdateTicket = (updated: SupportTicket) => {
+    setSupportTickets(prev => {
+      const next = prev.map(t => t.id === updated.id ? updated : t);
+      try { localStorage.setItem('wtc_tickets', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleDirectPointAdjustment = async (memberId: string, pointsDelta: number, note: string, ticketId: string) => {
+    const member = members.find(m => m.id === memberId || m.membershipId === memberId || m.phone === memberId);
+    if (!member) return false;
+
+    const newPoints = Math.max(0, (member.points || 0) + pointsDelta);
+    const newLifetime = pointsDelta > 0 ? (member.lifetimePoints || 0) + pointsDelta : (member.lifetimePoints || 0);
+    const updatedMember: Member = {
+      ...member,
+      points: newPoints,
+      lifetimePoints: newLifetime,
+      tier: calculateTier(newPoints)
+    };
+
+    const savedTrx: Transaction = {
+      id: 'tx_' + Date.now(),
+      receiptNo: 'ADJ-' + ticketId + '-' + Date.now().toString().slice(-4),
+      memberId: member.id,
+      memberName: member.name,
+      memberPhone: member.phone,
+      storeId: 'S-HQ',
+      storeName: 'Head Office (Customer Care)',
+      cashierName: 'Superadmin HO',
+      type: 'MANUAL_ADJUSTMENT',
+      amount: 0,
+      pointsDelta: pointsDelta,
+      timestamp: new Date().toISOString(),
+      notes: `Penyelesaian Tiket ${ticketId}: ${note}`
+    };
+
+    setMembers(prev => {
+      const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
+      try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    setTransactions(prev => {
+      const next = [savedTrx, ...prev];
+      try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    // Record system audit log
+    const auditEntry: AuditLog = {
+      id: 'AL-' + Date.now().toString().slice(-4),
+      timestamp: new Date().toISOString(),
+      actorName: 'Superadmin HO',
+      actorRole: 'HO_ADMIN',
+      action: 'MANUAL_POINT_COMPENSATION',
+      details: `Penyelesaian ${ticketId}: Disalurkan ${pointsDelta > 0 ? '+' : ''}${pointsDelta} Pts ke ${member.name} (${member.membershipId}). Catatan: ${note}`,
+      module: 'SUPPORT_TICKETS'
+    };
+
+    setAuditLogs(prev => {
+      const next = [auditEntry, ...prev];
+      try { localStorage.setItem('wtc_audit_logs', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    return true;
+  };
+
+  const handleMemberSubmitTicket = (newTicket: Omit<SupportTicket, 'id' | 'createdAt' | 'updatedAt' | 'messages' | 'status'> & { initialMessage: string }) => {
+    const ticketId = 'TKT-' + Math.floor(1050 + Math.random() * 8900);
+    const now = new Date().toISOString();
+    const created: SupportTicket = {
+      id: ticketId,
+      source: newTicket.source,
+      memberId: newTicket.memberId,
+      memberName: newTicket.memberName,
+      memberPhone: newTicket.memberPhone,
+      storeId: newTicket.storeId,
+      storeName: newTicket.storeName,
+      subject: newTicket.subject,
+      category: newTicket.category,
+      status: 'OPEN',
+      priority: newTicket.priority || 'HIGH',
+      createdAt: now,
+      updatedAt: now,
+      receiptNo: newTicket.receiptNo,
+      messages: [
+        {
+          sender: 'MEMBER',
+          text: newTicket.initialMessage,
+          timestamp: now
+        }
+      ]
+    };
+
+    setSupportTickets(prev => {
+      const next = [created, ...prev];
+      try { localStorage.setItem('wtc_tickets', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    // Audit log
+    const auditEntry: AuditLog = {
+      id: 'AL-' + Date.now().toString().slice(-4),
+      timestamp: now,
+      actorName: `${newTicket.memberName || 'Member'} (${newTicket.memberPhone || '-'})`,
+      actorRole: 'SYSTEM',
+      action: 'SUPPORT_TICKET_CREATED',
+      details: `Tiket baru ${ticketId} diajukan oleh Member: "${newTicket.subject}" (Kategori: ${newTicket.category}, Toko: ${newTicket.storeName || '-'}).`,
+      module: 'SUPPORT_TICKETS'
+    };
+    setAuditLogs(prev => {
+      const next = [auditEntry, ...prev];
+      try { localStorage.setItem('wtc_audit_logs', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleAddCampaign = (campaign: Campaign) => {
+    setCampaigns(prev => {
+      const next = [campaign, ...prev];
+      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    const auditEntry: AuditLog = {
+      id: 'AL-' + Date.now().toString().slice(-4),
+      timestamp: new Date().toISOString(),
+      actorName: 'Superadmin HO',
+      actorRole: 'HO_ADMIN',
+      action: 'CAMPAIGN_PUBLISHED',
+      details: `Kampanye promosi baru diterbitkan: "${campaign.name}" (Popup Web App: ${campaign.showAsPopupOnApp ? 'Ya' : 'Tidak'}).`,
+      module: 'VOUCHERS'
+    };
+    setAuditLogs(prev => {
+      const next = [auditEntry, ...prev];
+      try { localStorage.setItem('wtc_audit_logs', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleToggleCampaignStatus = (id: string) => {
+    setCampaigns(prev => {
+      const next = prev.map(c => c.id === id ? { ...c, status: c.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' } : c);
+      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleDeleteCampaign = (id: string) => {
+    setCampaigns(prev => {
+      const next = prev.filter(c => c.id !== id);
+      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const handleUpdateMember = async (updatedMember: Member) => {
@@ -211,6 +421,46 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const handleRefreshData = async () => {
+    setIsRefreshingData(true);
+    try {
+      const [trxRes, memRes, storeRes, vouchRes, confRes] = await Promise.all([
+        fetch('/api/transactions').catch(() => null),
+        fetch('/api/members').catch(() => null),
+        fetch('/api/stores').catch(() => null),
+        fetch('/api/vouchers').catch(() => null),
+        fetch('/api/loyalty-config').catch(() => null),
+      ]);
+
+      if (trxRes && trxRes.ok) {
+        const data = await trxRes.json();
+        if (Array.isArray(data) && data.length > 0) setTransactions(data);
+      }
+      if (memRes && memRes.ok) {
+        const data = await memRes.json();
+        if (Array.isArray(data) && data.length > 0) setMembers(data);
+      }
+      if (storeRes && storeRes.ok) {
+        const data = await storeRes.json();
+        if (Array.isArray(data) && data.length > 0) setStores(data);
+      }
+      if (vouchRes && vouchRes.ok) {
+        const data = await vouchRes.json();
+        if (Array.isArray(data) && data.length > 0) setVouchers(data);
+      }
+      if (confRes && confRes.ok) {
+        const data = await confRes.json();
+        if (data && !data.error) setLoyaltyConfig(data);
+      }
+    } catch (e) {
+      console.warn("Manual refresh failed to reach server:", e);
+    }
+
+    setTimeout(() => {
+      setIsRefreshingData(false);
+    }, 1100);
+  };
+
   // Toggle floating portal switcher (dinonaktifkan sementara sesuai permintaan pengguna)
   const SHOW_PORTAL_SWITCHER = false;
 
@@ -270,6 +520,9 @@ export default function App() {
             stores={stores}
             transactions={transactions}
             onBackToHO={() => navigate('/')}
+            campaigns={campaigns}
+            tickets={supportTickets}
+            onSubmitTicket={handleMemberSubmitTicket}
           />
         ) : (
           <MemberLogin 
@@ -321,7 +574,10 @@ export default function App() {
                 onSearch={() => {}}
                 onOpenCreateVoucher={() => setIsCreateVoucherOpen(true)}
                 onOpenManualAdjust={() => setIsPointAdjustOpen(true)}
-                onRefreshData={() => window.location.reload()}
+                onRefreshData={handleRefreshData}
+                isRefreshing={isRefreshingData}
+                onOpenNotifications={() => setIsNotificationsOpen(true)}
+                unreadNotificationsCount={transactions.length > 0 ? 8 : 4}
               />
 
               <div className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -332,6 +588,7 @@ export default function App() {
                     transactions={transactions}
                     vouchers={vouchers}
                     loyaltyConfig={loyaltyConfig}
+                    isSkeletonLoading={isRefreshingData}
                     onNavigateToStores={() => handleOpenStoreTransactions(null)}
                     onNavigateToMembers={() => setActiveTab('members')}
                     onNavigateToVouchers={() => setActiveTab('vouchers')}
@@ -395,14 +652,35 @@ export default function App() {
                     }}
                   />
                 )}
+                {activeTab === 'transactions' && (
+                  <NationalTransactionsTab 
+                    stores={stores}
+                    transactions={transactions}
+                    members={members}
+                    initialSelectedStore={selectedStoreForTrx}
+                    onSelectStore={(store) => setSelectedStoreForTrx(store)}
+                  />
+                )}
                 {activeTab === 'audit' && (
-                  <AuditTrailTab />
+                  <AuditTrailTab logs={auditLogs} />
                 )}
                 {activeTab === 'campaigns' && (
-                  <CampaignsTab />
+                  <CampaignsTab 
+                    campaigns={campaigns}
+                    onAddCampaign={handleAddCampaign}
+                    onToggleCampaignStatus={handleToggleCampaignStatus}
+                    onDeleteCampaign={handleDeleteCampaign}
+                    vouchers={vouchers}
+                  />
                 )}
                 {activeTab === 'support' && (
-                  <SupportTicketsTab />
+                  <SupportTicketsTab 
+                    tickets={supportTickets}
+                    onUpdateTicket={handleUpdateTicket}
+                    onDirectPointAdjustment={handleDirectPointAdjustment}
+                    members={members}
+                    stores={stores}
+                  />
                 )}
               </div>
             </main>
@@ -417,6 +695,8 @@ export default function App() {
             <CreateMemberModal
               isOpen={isCreateMemberOpen}
               onClose={() => setIsCreateMemberOpen(false)}
+              defaultStore={cashierStoreName || 'Puri Jakarta'}
+              isStoreLocked={false}
               onCreateMember={async (newMember) => {
                 let created: Member = {
                   id: newMember.id || 'mem_' + Date.now(),
@@ -617,6 +897,21 @@ export default function App() {
               transactions={transactions}
               members={members}
               onSelectStore={(store) => setSelectedStoreForTrx(store)}
+            />
+
+            {/* MODAL NOTIFIKASI AKTIVITAS SELURUH TOKO DI INDONESIA */}
+            <NationalActivityNotifications
+              isOpen={isNotificationsOpen}
+              onClose={() => setIsNotificationsOpen(false)}
+              stores={stores}
+              transactions={transactions}
+              members={members}
+              onSelectStore={(store) => {
+                setIsNotificationsOpen(false);
+                handleOpenStoreTransactions(store);
+              }}
+              onRefreshData={handleRefreshData}
+              isRefreshing={isRefreshingData}
             />
           </div>
         ) : (

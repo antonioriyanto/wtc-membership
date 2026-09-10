@@ -271,6 +271,8 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       <CreateMemberModal
         isOpen={isCreateMemberOpen}
         onClose={() => setIsCreateMemberOpen(false)}
+        defaultStore={currentStore?.name || 'Puri Jakarta'}
+        isStoreLocked={true}
         onCreateMember={async (newMember) => {
           let created: Member = {
             id: newMember.id || 'mem_' + Date.now(),

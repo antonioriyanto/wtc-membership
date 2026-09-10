@@ -387,7 +387,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
                 <tr>
                   <td colSpan={6} className="py-10 text-center text-slate-400 dark:text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-1.5">
-                      <p className="font-semibold text-slate-600 dark:text-slate-300">Belum ada aktivitas transaksi di cabang {currentStore?.name || 'ini'} pada shift ini.</p>
+                      <p className="font-semibold text-slate-600 dark:text-slate-300">Belum ada aktivitas transaksi di cabang {currentStore?.name || 'ini'}.</p>
                       <p className="text-xs text-slate-400">Transaksi baru yang diproses kasir di cabang ini akan langsung tercatat dan terlihat di sini.</p>
                     </div>
                   </td>

@@ -54,11 +54,6 @@ export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, st
             <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Store: {storeName}</p>
           </div>
 
-          <div className="py-4 border-b border-slate-200 dark:border-slate-700">
-            <h4 className="text-[0.95rem] text-slate-900 dark:text-white font-semibold mb-1">Shift Aktif</h4>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Shift Siang (14:00 - 22:00 WIB)</p>
-          </div>
-
           <div className="py-4">
             <div className="mb-3">
               <h4 className="text-[0.95rem] text-slate-900 dark:text-white font-semibold mb-1 flex items-center gap-1.5">

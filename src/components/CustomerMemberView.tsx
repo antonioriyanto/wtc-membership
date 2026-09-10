@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Member, Voucher, StoreBranch, Transaction } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Member, Voucher, StoreBranch, Transaction, Campaign, SupportTicket } from '../types';
 import { 
   CreditCard, 
   Award, 
@@ -17,7 +17,16 @@ import {
   MessageCircle,
   Camera,
   LogOut,
-  Building
+  Building,
+  HelpCircle,
+  Megaphone,
+  Sparkles,
+  Check,
+  Copy,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Send
 } from 'lucide-react';
 import { WatchClubLogo } from './WatchClubLogo';
 
@@ -26,6 +35,9 @@ interface CustomerMemberViewProps {
   vouchers: Voucher[];
   stores: StoreBranch[];
   transactions?: Transaction[];
+  campaigns?: Campaign[];
+  tickets?: SupportTicket[];
+  onSubmitTicket?: (ticket: Omit<SupportTicket, 'id' | 'createdAt' | 'updatedAt' | 'messages'> & { messageText: string }) => void;
   onBackToHO: () => void;
 }
 
@@ -34,6 +46,9 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   vouchers,
   stores,
   transactions,
+  campaigns,
+  tickets,
+  onSubmitTicket,
   onBackToHO,
 }) => {
   const [activeTab, setActiveTab] = useState<'MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE'>('MEMBERSHIP');
@@ -41,6 +56,71 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedVoucherForQr, setSelectedVoucherForQr] = useState<Voucher | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
+
+  // Support tickets & campaigns state
+  const [activeCampaignModal, setActiveCampaignModal] = useState<Campaign | null>(null);
+  const [hasShownCampaignOnLoad, setHasShownCampaignOnLoad] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [supportModalTab, setSupportModalTab] = useState<'NEW' | 'HISTORY'>('NEW');
+  const [copiedVoucher, setCopiedVoucher] = useState(false);
+
+  // Form states for submitting new ticket
+  const [ticketCategory, setTicketCategory] = useState<SupportTicket['category']>('MISSING_POINTS');
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketStore, setTicketStore] = useState(stores[0]?.name || 'Puri Jakarta');
+  const [ticketReceipt, setTicketReceipt] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [ticketSuccessNotice, setTicketSuccessNotice] = useState<string | null>(null);
+
+  // Push-pop campaign detection
+  const activePromoCampaign = useMemo(() => {
+    if (!campaigns || campaigns.length === 0) return null;
+    return campaigns.find(c => 
+      c.status === 'ACTIVE' && 
+      (c.targetAudience === 'ALL' || c.targetAudience === member.tier)
+    ) || null;
+  }, [campaigns, member.tier]);
+
+  useEffect(() => {
+    if (!hasShownCampaignOnLoad && activePromoCampaign && activePromoCampaign.showAsPopupOnApp) {
+      setActiveCampaignModal(activePromoCampaign);
+      setHasShownCampaignOnLoad(true);
+    }
+  }, [activePromoCampaign, hasShownCampaignOnLoad]);
+
+  const myTickets = useMemo(() => {
+    if (!tickets) return [];
+    return tickets.filter(t => t.memberId === member.id || t.memberPhone === member.phone);
+  }, [tickets, member]);
+
+  const handleCreateTicketSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketSubject.trim() || !ticketMessage.trim()) return;
+
+    if (onSubmitTicket) {
+      onSubmitTicket({
+        source: 'MEMBER',
+        memberId: member.id,
+        memberName: member.name,
+        memberPhone: member.phone,
+        storeName: ticketStore,
+        receiptNo: ticketReceipt.trim() || undefined,
+        subject: ticketSubject.trim(),
+        category: ticketCategory,
+        status: 'OPEN',
+        priority: 'HIGH',
+        messageText: ticketMessage.trim()
+      });
+    }
+
+    setTicketSuccessNotice('Tiket Anda berhasil dikirim ke Tim Support HO. Kami akan segera meninjau kendala Anda!');
+    setTicketSubject('');
+    setTicketReceipt('');
+    setTicketMessage('');
+    setTimeout(() => {
+      setSupportModalTab('HISTORY');
+    }, 1200);
+  };
 
   let nextTierPoints = 5000;
   if (member.points >= 100000 || member.tier === 'BLACK') nextTierPoints = 100000; // maxed out
@@ -137,13 +217,53 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
           <div className="w-[110px] text-slate-900 flex justify-center">
             <WatchClubLogo />
           </div>
-          <div className="w-10 h-10 rounded-full border border-slate-300 bg-slate-200 flex justify-center items-center font-bold text-slate-500 overflow-hidden shrink-0">
-            {member.name.charAt(0).toUpperCase()}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                setTicketSuccessNotice(null);
+                setIsSupportModalOpen(true);
+              }}
+              title="Pusat Bantuan & Tiket Kendala"
+              className="relative w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-100 flex justify-center items-center text-slate-700 shadow-xs cursor-pointer transition-colors"
+            >
+              <HelpCircle className="w-5 h-5 text-blue-600" />
+              {myTickets.some(t => t.status === 'RESOLVED') && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white animate-pulse" />
+              )}
+            </button>
+            <div className="w-10 h-10 rounded-full border border-slate-300 bg-slate-200 flex justify-center items-center font-bold text-slate-500 overflow-hidden shrink-0">
+              {member.name.charAt(0).toUpperCase()}
+            </div>
           </div>
         </header>
 
         {activeTab === 'MEMBERSHIP' && (
           <div className="animate-fadeIn pb-5">
+            {/* ACTIVE CAMPAIGN PROMO STRIP (IF ANY) */}
+            {activePromoCampaign && (
+              <div 
+                onClick={() => setActiveCampaignModal(activePromoCampaign)}
+                className="mx-5 mt-2 p-3 rounded-2xl bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white shadow-md cursor-pointer hover:scale-[1.01] transition-transform flex items-center justify-between gap-3 border border-purple-600/40"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-purple-500/30 border border-purple-400/40 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-purple-300">
+                      {activePromoCampaign.badgeText || 'PROMO KHUSUS MEMBER'}
+                    </div>
+                    <div className="text-xs font-bold truncate text-white">
+                      {activePromoCampaign.headline || activePromoCampaign.name}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-1 bg-white/20 hover:bg-white/30 rounded-lg shrink-0 transition-colors">
+                  Klaim Promo →
+                </span>
+              </div>
+            )}
+
             <section className="px-5 pt-4 pb-1">
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">
                 Hello <span className="capitalize">{member.name.split(' ')[0]}</span>! Welcome to the Club!
@@ -475,6 +595,33 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   </button>
                 </form>
 
+                {/* HELP & SUPPORT TICKET SHORTCUT IN PROFILE */}
+                <div className="w-full max-w-[400px] mt-4 pt-4 border-t border-slate-100">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setTicketSuccessNotice(null);
+                      setIsSupportModalOpen(true);
+                    }}
+                    className="w-full p-3.5 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200 rounded-2xl flex items-center justify-between text-left transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                        <HelpCircle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-slate-900">Pusat Bantuan & Komplain Poin</div>
+                        <div className="text-[11px] text-slate-500">Ajukan keluhan atau cek status tiket Anda</div>
+                      </div>
+                    </div>
+                    {myTickets.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                        {myTickets.length} Tiket
+                      </span>
+                    )}
+                  </button>
+                </div>
+
                 <button type="button" onClick={onBackToHO} className="w-full max-w-[400px] bg-white hover:bg-red-50 text-red-600 border border-red-200 py-3 rounded-xl text-sm font-semibold transition-colors mt-3 flex justify-center items-center gap-2 cursor-pointer">
                   <LogOut className="w-4 h-4" /> Sign Out
                 </button>
@@ -565,6 +712,292 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               <p className="font-bold text-slate-900 m-0">
                 {selectedVoucherForQr ? 'Code:' : 'ID:'} <span className="font-mono ml-1 text-slate-700 tracking-wide">{selectedVoucherForQr ? selectedVoucherForQr.code : member.membershipId}</span>
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* 1. PUSH-POP CAMPAIGN BANNER MODAL */}
+        {activeCampaignModal && (
+          <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex justify-center items-center z-[10000] p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl text-center shadow-2xl w-full max-w-sm overflow-hidden relative animate-scaleUp border border-purple-200">
+              {/* BANNER HEADER */}
+              <div className="bg-gradient-to-br from-purple-700 via-indigo-800 to-slate-900 text-white p-6 relative">
+                <button 
+                  onClick={() => setActiveCampaignModal(null)}
+                  className="absolute top-3.5 right-3.5 bg-white/20 hover:bg-white/30 text-white rounded-full p-1.5 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-[10px] font-extrabold uppercase tracking-wider text-purple-200 mb-2.5">
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  {activeCampaignModal.badgeText || 'PROMO SPESIAL MEMBER'}
+                </div>
+                <h3 className="text-lg font-black leading-tight text-white">
+                  {activeCampaignModal.headline || activeCampaignModal.name}
+                </h3>
+              </div>
+
+              {/* BANNER BODY */}
+              <div className="p-5 text-xs text-slate-600 space-y-4">
+                <p className="leading-relaxed">
+                  {activeCampaignModal.content}
+                </p>
+
+                {activeCampaignModal.voucherCode && (
+                  <div className="p-3.5 bg-purple-50 rounded-2xl border border-dashed border-purple-300 space-y-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-purple-700">
+                      KODE VOUCHER PROMO
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="font-mono text-base font-black text-purple-950 bg-white px-3 py-1 rounded-lg border border-purple-200 shadow-xs">
+                        {activeCampaignModal.voucherCode}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (activeCampaignModal.voucherCode) {
+                            navigator.clipboard.writeText(activeCampaignModal.voucherCode);
+                            setCopiedVoucher(true);
+                            setTimeout(() => setCopiedVoucher(false), 2000);
+                          }
+                        }}
+                        className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold flex items-center gap-1 text-[11px] cursor-pointer transition-colors"
+                      >
+                        {copiedVoucher ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedVoucher ? 'Tersalin' : 'Salin'}</span>
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-purple-600">
+                      Tunjukkan kode ini saat pembayaran di kasir toko Watch Club.
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      setActiveCampaignModal(null);
+                      setActiveTab('REWARDS');
+                    }}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-colors cursor-pointer shadow-xs"
+                  >
+                    Gunakan & Lihat Rewards
+                  </button>
+                  <button
+                    onClick={() => setActiveCampaignModal(null)}
+                    className="w-full py-2 text-slate-400 hover:text-slate-600 font-semibold cursor-pointer"
+                  >
+                    Tutup Pengumuman
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. CUSTOMER SUPPORT & TICKETS MODAL */}
+        {isSupportModalOpen && (
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex justify-center items-center z-[10000] p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden relative animate-scaleUp border border-slate-200 text-xs">
+              {/* HEADER */}
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                    <HelpCircle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">Pusat Bantuan & Tiket Member</h3>
+                    <p className="text-[10px] text-slate-500">Terhubung langsung dengan Tim Support Head Office</p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setIsSupportModalOpen(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* TABS */}
+              <div className="flex border-b border-slate-100 bg-slate-50/70">
+                <button
+                  onClick={() => setSupportModalTab('NEW')}
+                  className={`flex-1 py-2.5 text-center font-bold text-xs border-b-2 transition-colors cursor-pointer ${
+                    supportModalTab === 'NEW' 
+                      ? 'border-blue-600 text-blue-700 bg-white' 
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  Ajukan Tiket Baru
+                </button>
+                <button
+                  onClick={() => setSupportModalTab('HISTORY')}
+                  className={`flex-1 py-2.5 text-center font-bold text-xs border-b-2 transition-colors cursor-pointer relative ${
+                    supportModalTab === 'HISTORY' 
+                      ? 'border-blue-600 text-blue-700 bg-white' 
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <span>Riwayat Tiket Saya</span>
+                  {myTickets.length > 0 && (
+                    <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 text-[10px] font-mono">
+                      {myTickets.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* MODAL CONTENT */}
+              <div className="p-5 overflow-y-auto flex-1 space-y-4">
+                {supportModalTab === 'NEW' ? (
+                  <form onSubmit={handleCreateTicketSubmit} className="space-y-3">
+                    {ticketSuccessNotice && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-bold text-xs flex items-center gap-2 animate-fadeIn">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>{ticketSuccessNotice}</span>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                        Kategori Masalah *
+                      </label>
+                      <select 
+                        value={ticketCategory}
+                        onChange={(e) => setTicketCategory(e.target.value as any)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none"
+                      >
+                        <option value="MISSING_POINTS">Poin Belanja Belum Masuk</option>
+                        <option value="VOUCHER_CLAIM">Kendala Klaim / Scan Voucher</option>
+                        <option value="DATA_CORRECTION">Koreksi Data / No. HP Akun</option>
+                        <option value="GENERAL_INQUIRY">Pertanyaan Umum Loyalty</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                        Toko Tempat Transaksi
+                      </label>
+                      <select
+                        value={ticketStore}
+                        onChange={(e) => setTicketStore(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:outline-none"
+                      >
+                        {stores.map(s => (
+                          <option key={s.id} value={s.name}>
+                            {s.name} ({s.city})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2">
+                        <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                          Judul Singkat Keluhan *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={ticketSubject}
+                          onChange={(e) => setTicketSubject(e.target.value)}
+                          placeholder="Contoh: Belanja kemarin poin belum bertambah"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                        />
+                      </div>
+
+                      <div className="col-span-2">
+                        <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                          Nomor Struk / Invoice (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          value={ticketReceipt}
+                          onChange={(e) => setTicketReceipt(e.target.value)}
+                          placeholder="Contoh: INV-20260820-PUR-001"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                        Rincian Keluhan / Pertanyaan *
+                      </label>
+                      <textarea
+                        required
+                        rows={3}
+                        value={ticketMessage}
+                        onChange={(e) => setTicketMessage(e.target.value)}
+                        placeholder="Jelaskan detail belanja Anda, jam berapa, atau kendala voucher..."
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Kirim Tiket ke Support HO</span>
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-3">
+                    {myTickets.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">
+                        <HelpCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                        <p className="font-bold text-slate-700">Belum ada riwayat tiket</p>
+                        <p className="text-[11px] text-slate-400">Jika mengalami kendala poin atau voucher, klik tab "Ajukan Tiket Baru".</p>
+                      </div>
+                    ) : (
+                      myTickets.map(t => (
+                        <div key={t.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                              {t.id}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              t.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' :
+                              t.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {t.status.replace('_', ' ')}
+                            </span>
+                          </div>
+
+                          <div className="font-bold text-slate-900">{t.subject}</div>
+
+                          {t.storeName && (
+                            <div className="text-[11px] text-slate-500">
+                              Cabang: <strong>{t.storeName}</strong> {t.receiptNo ? `• Struk: ${t.receiptNo}` : ''}
+                            </div>
+                          )}
+
+                          {/* POINT ADJUSTMENT HIGHLIGHT (IF APPLIED BY HO) */}
+                          {t.adjustmentMade && (
+                            <div className="p-2 bg-emerald-100/70 border border-emerald-300 rounded-xl text-emerald-900 font-bold text-[11px] flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>
+                                HO menyalurkan {t.adjustmentMade.pointsDelta > 0 ? `+${t.adjustmentMade.pointsDelta}` : t.adjustmentMade.pointsDelta} Pts ({t.adjustmentMade.note})
+                              </span>
+                            </div>
+                          )}
+
+                          {/* RECENT MESSAGE */}
+                          {t.messages.length > 0 && (
+                            <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-[11px] text-slate-700">
+                              <div className="font-bold text-blue-600 mb-0.5">
+                                {t.messages[t.messages.length - 1].sender === 'AGENT' ? (t.assignedTo || 'Tim Support HO') : 'Anda'}:
+                              </div>
+                              <p className="italic">"{t.messages[t.messages.length - 1].text}"</p>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

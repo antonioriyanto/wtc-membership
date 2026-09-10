@@ -9,7 +9,8 @@ import {
   ClipboardList,
   Megaphone,
   MessageSquare,
-  Store
+  Store,
+  Receipt
 } from 'lucide-react';
 import { TabType } from '../types';
 import { WatchClubLogo } from './WatchClubLogo';
@@ -20,6 +21,7 @@ interface SidebarProps {
   storesCount: number;
   membersCount: number;
   vouchersCount: number;
+  transactionsCount?: number;
   onOpenQuickLauncher: () => void;
 }
 
@@ -29,10 +31,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   storesCount,
   membersCount,
   vouchersCount,
+  transactionsCount,
   onOpenQuickLauncher
 }) => {
   const navItems: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string | number }[] = [
     { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
+    { id: 'transactions', label: 'Transaksi Toko Nasional', icon: Receipt, badge: transactionsCount },
     { id: 'stores', label: 'Store & Branch Settings', icon: Store, badge: storesCount },
     { id: 'members', label: 'Member CRM & Ledger', icon: Users, badge: membersCount },
     { id: 'loyalty', label: 'Loyalty & Tier Engine', icon: Award },

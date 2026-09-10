@@ -19,7 +19,9 @@ import {
   Mail, 
   MapPin, 
   Sparkles,
-  Award
+  Award,
+  Mars,
+  Venus
 } from 'lucide-react';
 import { TierBadge } from '../utils/tierBadge';
 
@@ -255,24 +257,26 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, gender: 'Pria' })}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
                         formData.gender === 'Pria'
-                          ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          ? 'bg-blue-100 text-blue-900 border-blue-300 shadow-xs ring-1 ring-blue-300'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-blue-50/70 hover:text-blue-800 hover:border-blue-200'
                       }`}
                     >
-                      Pria
+                      <Mars className={`w-3.5 h-3.5 ${formData.gender === 'Pria' ? 'text-blue-700' : 'text-blue-400'}`} />
+                      <span>Pria</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, gender: 'Wanita' })}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
                         formData.gender === 'Wanita'
-                          ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          ? 'bg-pink-100 text-pink-900 border-pink-300 shadow-xs ring-1 ring-pink-300'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-pink-50/70 hover:text-pink-800 hover:border-pink-200'
                       }`}
                     >
-                      Wanita
+                      <Venus className={`w-3.5 h-3.5 ${formData.gender === 'Wanita' ? 'text-pink-700' : 'text-pink-400'}`} />
+                      <span>Wanita</span>
                     </button>
                   </div>
                 </div>
