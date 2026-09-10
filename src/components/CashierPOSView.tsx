@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Member, Transaction, StoreBranch } from '../types';
+import { Member, Transaction, StoreBranch, Voucher } from '../types';
 import { calculateTier } from '../lib/loyalty';
 import { CashierSidebar } from './CashierSidebar';
 import { CashierHeader } from './CashierHeader';
@@ -15,6 +15,9 @@ interface CashierPOSViewProps {
   setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
   transactions: Transaction[];
   setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  vouchers?: Voucher[];
+  setVouchers?: React.Dispatch<React.SetStateAction<Voucher[]>>;
+  onVoucherRedeemed?: (voucherCode: string) => void;
   currentStore: StoreBranch;
   cashierName?: string;
   onSignOut?: () => void;
@@ -26,6 +29,9 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
   setMembers, 
   transactions, 
   setTransactions, 
+  vouchers,
+  setVouchers,
+  onVoucherRedeemed,
   currentStore, 
   cashierName = 'Kasir Puri',
   onSignOut,
@@ -142,9 +148,11 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       return;
     }
 
+    const cleanCode = voucherCode.trim().toUpperCase().replace(/^VOUCHER-/, '');
+
     let savedTrx: Transaction = {
       id: 'tx_' + Date.now(),
-      receiptNo: `VOUCHER-${voucherCode}`,
+      receiptNo: `VOUCHER-${cleanCode}`,
       memberId: member.id,
       memberName: member.name,
       memberPhone: member.phone,
@@ -154,8 +162,9 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       type: 'REDEEM',
       amount: 0,
       pointsDelta: -50,
+      voucherCode: cleanCode,
       timestamp: new Date().toISOString(),
-      notes: `Klaim voucher ${voucherCode}`
+      notes: `Klaim voucher ${cleanCode}`
     };
 
     let updatedMember: Member = {
@@ -165,18 +174,77 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       lastVisitDate: new Date().toISOString()
     };
 
+    // 1. Synchronize Voucher Quota (totalUsed & totalClaimed) in State & localStorage
+    if (setVouchers) {
+      setVouchers(prev => {
+        const next = prev.map(v => {
+          const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
+          if (vCode === cleanCode || v.code.trim().toUpperCase() === voucherCode.trim().toUpperCase()) {
+            const newUsed = (v.totalUsed || 0) + 1;
+            return {
+              ...v,
+              totalUsed: newUsed,
+              totalClaimed: Math.max(v.totalClaimed || 0, newUsed)
+            };
+          }
+          return v;
+        });
+        try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+        return next;
+      });
+    } else {
+      try {
+        const saved = localStorage.getItem('wtc_vouchers');
+        if (saved) {
+          const parsed: Voucher[] = JSON.parse(saved);
+          const next = parsed.map(v => {
+            const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
+            if (vCode === cleanCode || v.code.trim().toUpperCase() === voucherCode.trim().toUpperCase()) {
+              const newUsed = (v.totalUsed || 0) + 1;
+              return {
+                ...v,
+                totalUsed: newUsed,
+                totalClaimed: Math.max(v.totalClaimed || 0, newUsed)
+              };
+            }
+            return v;
+          });
+          localStorage.setItem('wtc_vouchers', JSON.stringify(next));
+        }
+      } catch {}
+    }
+
+    if (onVoucherRedeemed) {
+      onVoucherRedeemed(cleanCode);
+    }
+
+    // 2. Call backend /api/vouchers/redeem to increment database quota
+    try {
+      await fetch('/api/vouchers/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: cleanCode,
+          memberPhone: member.phone
+        })
+      });
+    } catch (e: any) {
+      console.warn("Backend /api/vouchers/redeem unavailable, quota updated locally:", e);
+    }
+
+    // 3. Call backend /api/transactions
     try {
       const res = await fetch('/api/transactions', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({
-          receiptNo: `VOUCHER-${voucherCode}`,
+          receiptNo: `VOUCHER-${cleanCode}`,
           memberId: member.id,
           storeId: currentStore?.id || currentStore?.code || 'PUR',
           storeName: currentStore?.name || 'Puri Jakarta',
           cashierName: cashierName || `Kasir ${currentStore?.name || 'Puri'}`,
           type: 'REDEEM',
-          voucherCode: voucherCode,
+          voucherCode: cleanCode,
           amount: 0,
           pointsDelta: -50
         }) 
@@ -191,17 +259,36 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       console.warn("Backend API unavailable, voucher redeemed locally:", e);
     }
 
+    // 4. Update Transactions & Members state
     setTransactions(prev => {
       const next = [savedTrx, ...prev];
       try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
       return next;
     });
+
     setMembers(prev => {
       const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
       try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
       return next;
     });
-    alert('Voucher berhasil diredeem!');
+
+    // 5. Append to Audit Trail
+    try {
+      const auditSaved = localStorage.getItem('wtc_audit_logs');
+      const auditList = auditSaved ? JSON.parse(auditSaved) : [];
+      auditList.unshift({
+        id: 'AL-' + Date.now().toString().slice(-4),
+        timestamp: new Date().toISOString(),
+        actorName: cashierName || `Kasir ${currentStore?.name || 'Toko'}`,
+        actorRole: 'CASHIER',
+        action: 'VOUCHER_REDEEMED',
+        details: `Klaim voucher ${cleanCode} berhasil untuk member ${member.name} (${member.phone}). Kuota penggunaan voucher otomatis bertambah di HO.`,
+        module: 'VOUCHERS'
+      });
+      localStorage.setItem('wtc_audit_logs', JSON.stringify(auditList));
+    } catch {}
+
+    alert(`Voucher ${cleanCode} berhasil diklaim & kuota telah diperbarui!`);
     setIsSubmitting(false);
   };
 

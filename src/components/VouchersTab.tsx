@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Voucher, StoreBranch } from '../types';
+import { Voucher, StoreBranch, Transaction } from '../types';
 import { 
   Ticket, 
   Plus, 
@@ -21,6 +21,7 @@ import {
 interface VouchersTabProps {
   vouchers: Voucher[];
   stores: StoreBranch[];
+  transactions?: Transaction[];
   onCreateVoucher: () => void;
   onEditVoucher?: (voucher: Voucher) => void;
   onToggleVoucherStatus: (voucherId: string) => void;
@@ -29,6 +30,7 @@ interface VouchersTabProps {
 export const VouchersTab: React.FC<VouchersTabProps> = ({
   vouchers,
   stores,
+  transactions = [],
   onCreateVoucher,
   onEditVoucher,
   onToggleVoucherStatus,
@@ -107,7 +109,19 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
       {/* Vouchers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredVouchers.map((voucher) => {
-          const usagePercent = Math.min(100, Math.round((voucher.totalUsed / voucher.maxUsageLimit) * 100));
+          const vClean = voucher.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
+          
+          // Reconcile with any matching transactions across stores
+          const matchingTrx = (transactions || []).filter(t => {
+            const isRedeem = t.type === 'REDEEM' || t.receiptNo?.toUpperCase().startsWith('VOUCHER-') || (t.notes && t.notes.toLowerCase().includes('voucher'));
+            if (!isRedeem) return false;
+            const tCode = (t.voucherCode || t.receiptNo || '').replace(/^VOUCHER-/i, '').trim().toUpperCase();
+            return tCode === vClean || vClean.includes(tCode) || (tCode && voucher.code.trim().toUpperCase().includes(tCode));
+          });
+
+          const effectiveUsed = Math.max(voucher.totalUsed || 0, matchingTrx.length);
+          const effectiveClaimed = Math.max(voucher.totalClaimed || 0, effectiveUsed);
+          const usagePercent = Math.min(100, Math.round((effectiveUsed / (voucher.maxUsageLimit || 1)) * 100));
 
           return (
             <div
@@ -195,7 +209,7 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                 {/* Progress bar of redemptions */}
                 <div className="space-y-1.5 my-3">
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Terpakai: <strong>{voucher.totalUsed}</strong> / {voucher.maxUsageLimit}</span>
+                    <span className="text-slate-500 font-medium">Terpakai: <strong>{effectiveUsed}</strong> / {voucher.maxUsageLimit}</span>
                     <span className="font-bold text-slate-700">{usagePercent}%</span>
                   </div>
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -231,7 +245,7 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                 </div>
 
                 <span className="text-[11px] text-slate-400 font-medium">
-                  {voucher.totalClaimed} Diklaim
+                  {effectiveClaimed} Diklaim
                 </span>
               </div>
             </div>

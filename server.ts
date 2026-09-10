@@ -6,7 +6,7 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { db } from './src/db/index.ts';
 import { stores, members, vouchers, transactions, auditLogs, loyaltyConfig, campaigns, supportTickets } from './src/db/schema.ts';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, or, ilike } from 'drizzle-orm';
 import { logger } from './src/lib/logger.ts';
 import rateLimit from 'express-rate-limit';
 import { getAuth } from 'firebase-admin/auth';
@@ -312,8 +312,14 @@ app.post('/api/vouchers/redeem', async (req, res) => {
     if (!code) {
       return res.status(400).json({ error: 'Kode voucher wajib diisi' });
     }
-    const cleanCode = String(code).trim().toUpperCase();
-    const found = await db.select().from(vouchers).where(eq(vouchers.code, cleanCode)).limit(1);
+    const cleanCode = String(code).trim().toUpperCase().replace(/^VOUCHER-/, '');
+    const found = await db.select().from(vouchers).where(
+      or(
+        eq(vouchers.code, cleanCode),
+        eq(vouchers.code, `VOUCHER-${cleanCode}`),
+        ilike(vouchers.code, cleanCode)
+      )
+    ).limit(1);
     if (found.length === 0) {
       return res.status(404).json({ error: 'Kode voucher tidak ditemukan' });
     }
@@ -436,6 +442,32 @@ app.post('/api/transactions', transactionLimiter, async (req, res) => {
 
       const newTransactionRows = await tx.insert(transactions).values(newTrxData).returning();
       const newTransaction = newTransactionRows[0];
+
+      // 5.b. If transaction is a voucher redeem or has voucherCode, update voucher quota in database
+      if (type === 'REDEEM' || data.voucherCode) {
+        const rawCode = String(data.voucherCode || data.receiptNo || '').trim().toUpperCase();
+        const vCode = rawCode.replace(/^VOUCHER-/, '');
+        if (vCode) {
+          try {
+            const vFound = await tx.select().from(vouchers).where(
+              or(
+                eq(vouchers.code, vCode),
+                eq(vouchers.code, `VOUCHER-${vCode}`),
+                ilike(vouchers.code, vCode)
+              )
+            ).limit(1);
+            if (vFound.length > 0) {
+              const v = vFound[0];
+              await tx.update(vouchers).set({
+                totalUsed: (v.totalUsed || 0) + 1,
+                totalClaimed: Math.max(v.totalClaimed || 0, (v.totalUsed || 0) + 1)
+              }).where(eq(vouchers.id, v.id));
+            }
+          } catch (vErr) {
+            logger.warn({ vErr }, 'Could not increment voucher totalUsed in transaction:');
+          }
+        }
+      }
 
       // 6. Audit Log
       await tx.insert(auditLogs).values({
