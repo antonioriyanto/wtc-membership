@@ -5,11 +5,13 @@
   "rewrites": [
     {
       "source": "/member",
-      "destination": "https://point.watchclub.co.id/member"
+      "destination": "https://point.watchclub.co.id/member",
+      "external": true
     },
     {
       "source": "/member/:path*",
-      "destination": "https://point.watchclub.co.id/member/:path*"
+      "destination": "https://point.watchclub.co.id/member/:path*",
+      "external": true
     },
     {
       "source": "/(.*)",
