@@ -63,7 +63,8 @@ const transactionLimiter = rateLimit({
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Setup Multer for image uploads
 const uploadDir = path.join(process.cwd(), 'public', 'uploads');
@@ -76,19 +77,35 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
+    const cleanExt = path.extname(file.originalname) || '.jpg';
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    cb(null, uniqueSuffix + cleanExt);
   }
 });
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
+});
 
-// API Endpoint for image upload
-app.post('/api/upload', upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  // Return the path that the frontend can use to load the image
-  res.json({ url: `/uploads/${req.file.filename}` });
+// API Endpoint for image upload with comprehensive error catching
+app.post('/api/upload', (req, res) => {
+  upload.single('image')(req, res, (err: any) => {
+    if (err) {
+      logger.error({ err }, 'Multer upload error:');
+      return res.status(400).json({ 
+        error: err.message || 'Gagal memproses unggahan file gambar' 
+      });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Tidak ada berkas gambar yang dipilih' });
+    }
+    // Return the path that the frontend can use to load the image
+    res.json({ 
+      url: `/uploads/${req.file.filename}`,
+      filename: req.file.filename,
+      size: req.file.size
+    });
+  });
 });
 
 // Serve the uploads directory statically

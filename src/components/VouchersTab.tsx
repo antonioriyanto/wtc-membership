@@ -13,7 +13,9 @@ import {
   ChevronDown,
   Info,
   Copy,
-  Check
+  Check,
+  Edit3,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface VouchersTabProps {
@@ -154,23 +156,24 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                       <span className="font-mono text-white font-bold bg-black/50 px-2 py-0.5 rounded">
                         {voucher.code}
                       </span>
-                      <button
-                        onClick={() => handleCopyCode(voucher.code)}
-                        className="text-slate-200 hover:text-white flex items-center gap-1 text-[11px] transition-colors bg-black/20 px-2 py-1 rounded"
-                      >
-                        {copiedCode === voucher.code ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-400" />
-                            <span className="text-emerald-400">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Copy Code</span>
-                          </>
-                        )}
-                      </button>
-                <button onClick={() => onEditVoucher?.(voucher)} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Edit Image</button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleCopyCode(voucher.code)}
+                          className="text-slate-200 hover:text-white flex items-center gap-1 text-[11px] transition-colors bg-black/30 hover:bg-black/40 px-2 py-1 rounded-lg"
+                        >
+                          {copiedCode === voucher.code ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span className="text-emerald-400 font-semibold">Tersalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Salin</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -178,13 +181,13 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                 {/* Details & Limits */}
                 <div className="space-y-2 text-xs text-slate-600 my-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Min. Spend:</span>
+                    <span className="text-slate-400">Min. Belanja:</span>
                     <span className="font-semibold text-slate-800">
-                      {voucher.minPurchase > 0 ? `Rp ${(voucher.minPurchase).toLocaleString('id-ID')}` : 'No Min Spend'}
+                      {voucher.minPurchase > 0 ? `Rp ${(voucher.minPurchase).toLocaleString('id-ID')}` : 'Tanpa Min. Belanja'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Valid Until:</span>
+                    <span className="text-slate-400">Batas Berlaku:</span>
                     <span className="font-semibold text-slate-800">{voucher.validUntil}</span>
                   </div>
                 </div>
@@ -192,7 +195,7 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                 {/* Progress bar of redemptions */}
                 <div className="space-y-1.5 my-3">
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Used: <strong>{voucher.totalUsed}</strong> / {voucher.maxUsageLimit}</span>
+                    <span className="text-slate-500 font-medium">Terpakai: <strong>{voucher.totalUsed}</strong> / {voucher.maxUsageLimit}</span>
                     <span className="font-bold text-slate-700">{usagePercent}%</span>
                   </div>
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -205,17 +208,30 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
               </div>
 
               {/* Action */}
-              <div className="border-t border-slate-100 pt-4 flex items-center justify-between">
-                <button
-                  onClick={() => onToggleVoucherStatus(voucher.id)}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900"
-                >
-                  {voucher.status === 'ACTIVE' ? 'Pause Campaign' : 'Resume Campaign'}
-                </button>
-                <button onClick={() => onEditVoucher?.(voucher)} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Edit Image</button>
+              <div className="border-t border-slate-100 pt-3.5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onToggleVoucherStatus(voucher.id)}
+                    className={`text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors ${
+                      voucher.status === 'ACTIVE' 
+                        ? 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200' 
+                        : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                    }`}
+                  >
+                    {voucher.status === 'ACTIVE' ? 'Jeda Voucher' : 'Aktifkan'}
+                  </button>
 
-                <span className="text-[11px] text-slate-400">
-                  {voucher.totalClaimed} Claimed
+                  <button 
+                    onClick={() => onEditVoucher?.(voucher)} 
+                    className="text-xs font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit & Gambar</span>
+                  </button>
+                </div>
+
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {voucher.totalClaimed} Diklaim
                 </span>
               </div>
             </div>

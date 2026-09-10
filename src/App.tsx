@@ -362,9 +362,34 @@ export default function App() {
                   <VouchersTab 
                     vouchers={vouchers} 
                     stores={stores}
-                    onCreateVoucher={() => setIsCreateVoucherOpen(true)}
-                    onEditVoucher={(v) => setEditingVoucher(v)}
-                    onToggleVoucherStatus={() => {}} // Stub
+                    onCreateVoucher={() => {
+                      setEditingVoucher(null);
+                      setIsCreateVoucherOpen(true);
+                    }}
+                    onEditVoucher={(v) => {
+                      setEditingVoucher(v);
+                      setIsCreateVoucherOpen(true);
+                    }}
+                    onToggleVoucherStatus={async (voucherId) => {
+                      const target = vouchers.find(v => v.id === voucherId);
+                      if (!target) return;
+                      const nextStatus = target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+                      const updated = { ...target, status: nextStatus as any };
+                      try {
+                        await fetch(`/api/vouchers/${voucherId}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ status: nextStatus })
+                        });
+                      } catch (err) {
+                        console.warn('API error updating voucher status:', err);
+                      }
+                      setVouchers(prev => {
+                        const next = prev.map(v => v.id === voucherId ? updated : v);
+                        try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+                        return next;
+                      });
+                    }}
                   />
                 )}
                 {activeTab === 'audit' && (
@@ -434,37 +459,71 @@ export default function App() {
             
             <CreateVoucherModal 
               isOpen={isCreateVoucherOpen} 
-              onClose={() => setIsCreateVoucherOpen(false)} 
+              onClose={() => {
+                setIsCreateVoucherOpen(false);
+                setEditingVoucher(null);
+              }} 
               stores={stores}
-              onCreateVoucher={async (newVoucher) => {
-                let created: Voucher = {
-                  ...newVoucher,
-                  id: newVoucher.id || 'vch_' + Date.now(),
-                  code: (newVoucher.code || 'VOUCH-' + Date.now()).toUpperCase(),
-                  totalClaimed: Number(newVoucher.totalClaimed) || 0,
-                  totalUsed: Number(newVoucher.totalUsed) || 0,
-                  status: newVoucher.status || 'ACTIVE'
-                } as Voucher;
+              existingVoucher={editingVoucher}
+              onCreateVoucher={async (voucherData) => {
+                if (editingVoucher) {
+                  let updated: Voucher = {
+                    ...editingVoucher,
+                    ...voucherData,
+                  };
 
-                try {
-                  const res = await fetch('/api/vouchers', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newVoucher)
-                  });
-                  if (res.ok) {
-                    const serverCreated = await res.json();
-                    if (serverCreated && serverCreated.id) created = serverCreated;
+                  try {
+                    const res = await fetch(`/api/vouchers/${editingVoucher.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(voucherData)
+                    });
+                    if (res.ok) {
+                      const serverUpdated = await res.json();
+                      if (serverUpdated && serverUpdated.id) updated = serverUpdated;
+                    }
+                  } catch (err) {
+                    console.warn("Backend API unavailable, updated voucher locally:", err);
                   }
-                } catch (err) {
-                  console.warn("Backend API unavailable, saved voucher locally:", err);
-                }
 
-                setVouchers(prev => {
-                  const next = [created, ...prev.filter(v => v.id !== created.id)];
-                  try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
-                  return next;
-                });
+                  setVouchers(prev => {
+                    const next = prev.map(v => v.id === updated.id ? updated : v);
+                    try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+                    return next;
+                  });
+                  setEditingVoucher(null);
+                  setIsCreateVoucherOpen(false);
+                } else {
+                  let created: Voucher = {
+                    ...voucherData,
+                    id: voucherData.id || 'vch_' + Date.now(),
+                    code: (voucherData.code || 'VOUCH-' + Date.now()).toUpperCase(),
+                    totalClaimed: Number(voucherData.totalClaimed) || 0,
+                    totalUsed: Number(voucherData.totalUsed) || 0,
+                    status: voucherData.status || 'ACTIVE'
+                  } as Voucher;
+
+                  try {
+                    const res = await fetch('/api/vouchers', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(voucherData)
+                    });
+                    if (res.ok) {
+                      const serverCreated = await res.json();
+                      if (serverCreated && serverCreated.id) created = serverCreated;
+                    }
+                  } catch (err) {
+                    console.warn("Backend API unavailable, saved voucher locally:", err);
+                  }
+
+                  setVouchers(prev => {
+                    const next = [created, ...prev.filter(v => v.id !== created.id)];
+                    try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+                    return next;
+                  });
+                  setIsCreateVoucherOpen(false);
+                }
               }}
             />
             <ManualPointAdjustmentModal 
