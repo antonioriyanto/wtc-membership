@@ -600,6 +600,11 @@ export default function App() {
               membersCount={members.length}
               vouchersCount={vouchers.length}
               onOpenQuickLauncher={() => setIsQuickLauncherOpen(true)}
+              onLogout={() => {
+                setAdminAuthenticated(false);
+                try { localStorage.removeItem('wtc_admin_auth'); } catch {}
+                navigate('/');
+              }}
             />
 
             <main className="flex-1 flex flex-col h-full overflow-hidden relative z-0">

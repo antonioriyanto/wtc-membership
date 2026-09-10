@@ -10,7 +10,8 @@ import {
   Megaphone,
   MessageSquare,
   Store,
-  Receipt
+  Receipt,
+  LogOut
 } from 'lucide-react';
 import { TabType } from '../types';
 import { WatchClubLogo } from './WatchClubLogo';
@@ -23,6 +24,7 @@ interface SidebarProps {
   vouchersCount: number;
   transactionsCount?: number;
   onOpenQuickLauncher: () => void;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -32,7 +34,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   membersCount,
   vouchersCount,
   transactionsCount,
-  onOpenQuickLauncher
+  onOpenQuickLauncher,
+  onLogout
 }) => {
   const navItems: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string | number }[] = [
     { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
@@ -115,6 +118,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
         </button>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm text-rose-300 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/30 transition-all text-left group mt-2"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 rounded-lg bg-rose-500/20 text-rose-400">
+                <LogOut className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-rose-200">Keluar Dashboard</div>
+                <div className="text-[10px] text-rose-400/80">Logout HO Admin</div>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-rose-400 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        )}
       </div>
       <div className="p-4 border-t border-slate-800/80 bg-slate-950/60">
         <div className="flex items-center justify-between gap-3">

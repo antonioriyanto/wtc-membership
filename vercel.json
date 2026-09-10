@@ -2,18 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "redirects": [
-    {
-      "source": "/member",
-      "destination": "https://point.watchclub.co.id/member",
-      "permanent": false
-    },
-    {
-      "source": "/member/:path*",
-      "destination": "https://point.watchclub.co.id/member/:path*",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     {
       "source": "/(.*)",
