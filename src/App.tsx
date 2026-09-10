@@ -42,10 +42,43 @@ export default function App() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   
-  const [adminAuthenticated, setAdminAuthenticated] = useState(false);
+  const [adminAuthenticated, setAdminAuthenticated] = useState(() => {
+    try {
+      if (localStorage.getItem('wtc_admin_auth') === 'true') return true;
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/cashier')) return true;
+    } catch {}
+    return false;
+  });
+
   const [cashierName, setCashierName] = useState('Kasir Puri');
   const [cashierStoreName, setCashierStoreName] = useState<string>('Puri Jakarta');
-  const [loggedInMemberId, setLoggedInMemberId] = useState<string | null>(null);
+  
+  const [loggedInMemberId, setLoggedInMemberId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('wtc_logged_in_member');
+      if (saved) return saved;
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/member')) {
+        return 'MBR-001';
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('wtc_admin_auth', String(adminAuthenticated));
+    } catch {}
+  }, [adminAuthenticated]);
+
+  useEffect(() => {
+    try {
+      if (loggedInMemberId) {
+        localStorage.setItem('wtc_logged_in_member', loggedInMemberId);
+      } else {
+        localStorage.removeItem('wtc_logged_in_member');
+      }
+    } catch {}
+  }, [loggedInMemberId]);
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isRefreshingData, setIsRefreshingData] = useState(false);

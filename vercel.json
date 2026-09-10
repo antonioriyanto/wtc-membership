@@ -4,6 +4,14 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/member",
+      "destination": "https://point.watchclub.co.id/member"
+    },
+    {
+      "source": "/member/:path*",
+      "destination": "https://point.watchclub.co.id/member/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
