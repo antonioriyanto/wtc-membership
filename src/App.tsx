@@ -24,6 +24,7 @@ import { ManualPointAdjustmentModal } from './components/ManualPointAdjustmentMo
 import { CashierPOSView } from './components/CashierPOSView';
 import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
+import { PortalSwitcher } from './components/PortalSwitcher';
 
 export default function App() {
   const navigate = useNavigate();
@@ -159,6 +160,21 @@ export default function App() {
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleSwitchPortal = (portal: 'HO' | 'CASHIER' | 'MEMBER') => {
+    if (portal === 'HO') {
+      setAdminAuthenticated(true);
+      navigate('/');
+    } else if (portal === 'CASHIER') {
+      setAdminAuthenticated(true);
+      navigate('/cashier');
+    } else if (portal === 'MEMBER') {
+      if (!loggedInMemberId && members.length > 0) {
+        setLoggedInMemberId(members[0].id);
+      }
+      navigate('/member');
+    }
+  };
 
   if (loading) {
     return <div className="flex h-screen items-center justify-center bg-slate-50"><p className="text-slate-500 animate-pulse">Connecting to Database...</p></div>;
@@ -476,6 +492,9 @@ export default function App() {
         )
       } />
       </Routes>
+
+      {/* FLOATING PORTAL SWITCHER (HO - KASIR - CUSTOMER) */}
+      <PortalSwitcher onSwitch={handleSwitchPortal} />
     </>
   );
 }
