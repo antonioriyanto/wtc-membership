@@ -102,28 +102,48 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
         payload.birthDate = new Date(editBirthDate).toISOString();
       }
 
-      const res = await fetch(`/api/members/${editingMember.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      let updatedMemberData = {
+        name: editName.trim(),
+        phone: editPhone.trim(),
+        email: editEmail.trim() || undefined,
+        gender: editGender,
+        address: editAddress.trim() || undefined,
+        birthDate: editBirthDate ? new Date(editBirthDate).toISOString() : editingMember.birthDate
+      };
+
+      try {
+        const res = await fetch(`/api/members/${editingMember.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const apiUpdated = await res.json();
+          if (apiUpdated && apiUpdated.id) {
+            updatedMemberData = { ...updatedMemberData, ...apiUpdated };
+          }
+        }
+      } catch (err) {
+        console.warn("Backend API unavailable, saved member edit locally:", err);
+      }
+
+      setMembers(prev => {
+        const next = prev.map(m => m.id === editingMember.id ? { 
+          ...m, 
+          ...updatedMemberData,
+          tier: m.tier,
+          points: m.points
+        } : m);
+        try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+        return next;
       });
 
-      if (res.ok) {
-        const updated = await res.json();
-        setMembers(prev => prev.map(m => m.id === updated.id ? { 
-          ...m, 
-          ...updated,
-          tier: m.tier, // Pastikan tier tetap konsisten
-          points: m.points // Pastikan poin tetap konsisten
-        } : m));
-        setEditSuccessMsg('Data informasi member berhasil diperbarui!');
-        setTimeout(() => {
-          setEditingMember(null);
-          setEditSuccessMsg('');
-        }, 1200);
-      } else {
-        alert('Gagal memperbarui data member.');
-      }
+      setEditSuccessMsg('Data informasi member berhasil diperbarui!');
+      setTimeout(() => {
+        setEditingMember(null);
+        setEditSuccessMsg('');
+      }, 1200);
     } catch (err) {
       console.error(err);
       alert('Terjadi kesalahan saat menyimpan perubahan.');

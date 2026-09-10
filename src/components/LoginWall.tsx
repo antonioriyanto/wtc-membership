@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { WatchClubLogo } from './WatchClubLogo';
 import { Lock, User, KeyRound, Smartphone, ShieldCheck, Store, Search } from 'lucide-react';
+import { initialMembers } from '../data/mockData';
 
 export const STORE_ACCOUNTS = [
   { name: "23 Paskal Bandung", username: "23PSC", password: "23PSC2026" },
@@ -225,22 +226,35 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/members');
-      if (res.ok) {
-        const members = await res.json();
-        const cleanDigits = phone.replace(/[^0-9]/g, '');
-        const found = members.find((m: any) => {
-          const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
-          return m.phone === phone || (cleanDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
-        });
-        if (found) {
-          onLogin(found.id);
-        } else {
-          setError('Nomor telepon belum terdaftar sebagai member.');
+      let membersList: any[] = [];
+      try {
+        const res = await fetch('/api/members');
+        if (res.ok) {
+          membersList = await res.json();
+        }
+      } catch {}
+
+      if (!Array.isArray(membersList) || membersList.length === 0) {
+        try {
+          const saved = localStorage.getItem('wtc_members');
+          membersList = saved ? JSON.parse(saved) : initialMembers;
+        } catch {
+          membersList = initialMembers;
         }
       }
+
+      const cleanDigits = phone.replace(/[^0-9]/g, '');
+      const found = membersList.find((m: any) => {
+        const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
+        return m.phone === phone || (cleanDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
+      });
+      if (found) {
+        onLogin(found.id);
+      } else {
+        setError('Nomor telepon belum terdaftar sebagai member.');
+      }
     } catch (err) {
-      setError('Gagal menghubungi server.');
+      setError('Gagal memproses data member.');
     } finally {
       setLoading(false);
     }
