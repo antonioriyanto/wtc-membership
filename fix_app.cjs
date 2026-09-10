@@ -1,14 +1,36 @@
 const fs = require('fs');
-try { fs.renameSync('src/components/Sidebar.tsx', 'src/components/CashierSidebar.tsx'); } catch(e) {}
-try { fs.renameSync('src/components/Header.tsx', 'src/components/CashierHeader.tsx'); } catch(e) {}
-try { fs.renameSync('src/components/MembersTab.tsx', 'src/components/CashierMembersTab.tsx'); } catch(e) {}
-try { fs.renameSync('src/components/TransactionsTab.tsx', 'src/components/CashierTransactionsTab.tsx'); } catch(e) {}
-try { fs.renameSync('src/components/SettingsTab.tsx', 'src/components/CashierSettingsTab.tsx'); } catch(e) {}
 
-['src/components/CashierSidebar.tsx', 'src/components/CashierHeader.tsx', 'src/components/CashierMembersTab.tsx', 'src/components/CashierTransactionsTab.tsx', 'src/components/CashierSettingsTab.tsx'].forEach(file => {
-  if (fs.existsSync(file)) {
-    let content = fs.readFileSync(file, 'utf8');
-    content = content.replace(/TabType/g, 'CashierTabType');
-    fs.writeFileSync(file, content);
-  }
-});
+let content = fs.readFileSync('src/App.tsx', 'utf-8');
+
+// The white screen is usually a React crash. 
+// Let's check for any missing imports, specifically the ones we added in previous fixes (doc, setDoc, writeBatch, auth, db, etc).
+// The issue is likely `auth`, `googleProvider`, or `db` not being imported at the top level, 
+// OR the Google Sign in logic dynamically importing it inside a component (which can be problematic).
+
+// Let's ensure Firebase is imported properly at the top.
+if (!content.includes("import { auth, googleProvider }")) {
+  content = content.replace(
+    /import \{ db \} from '\.\/lib\/firebase';/,
+    `import { db, auth, googleProvider } from './lib/firebase';`
+  );
+}
+
+// Let's check if the fix_google_auth.cjs introduced a syntax error
+// It replaced:
+// const newMember = {
+//   id: user.uid,
+//   ...
+// };
+// With:
+// const shortUid = ...
+
+// The dynamic import inside the onClick handler in App.tsx might be causing a crash if Vercel strips it or it fails to resolve.
+// Let's change the dynamic import to a static one or just use the already imported auth.
+
+content = content.replace(
+  /const \{ signInWithPopup \} = await import\('firebase\/auth'\);\n\s*const \{ auth, googleProvider, db \} = await import\('\.\/lib\/firebase'\);\n\s*const \{ doc, getDoc, setDoc, serverTimestamp \} = await import\('firebase\/firestore'\);/,
+  `const { signInWithPopup } = await import('firebase/auth');
+                const { getDoc, serverTimestamp } = await import('firebase/firestore');`
+);
+
+fs.writeFileSync('src/App.tsx', content);

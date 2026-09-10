@@ -14,7 +14,7 @@ import {
 } from './data/mockData';
 import { setupFirestoreListeners, seedFirestoreIfEmpty } from './lib/syncFirestore';
 import { doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-import { db } from './lib/firebase';
+import { db, auth, googleProvider } from './lib/firebase';
 
 // HO Components
 import { Sidebar } from './components/Sidebar';
@@ -496,8 +496,7 @@ export default function App() {
             onRegisterGoogle={async () => {
               try {
                 const { signInWithPopup } = await import('firebase/auth');
-                const { auth, googleProvider, db } = await import('./lib/firebase');
-                const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+                const { getDoc, serverTimestamp } = await import('firebase/firestore');
                 
                 const result = await signInWithPopup(auth, googleProvider);
                 const user = result.user;
