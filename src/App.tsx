@@ -211,6 +211,9 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Toggle floating portal switcher (dinonaktifkan sementara sesuai permintaan pengguna)
+  const SHOW_PORTAL_SWITCHER = false;
+
   const handleSwitchPortal = (portal: 'HO' | 'CASHIER' | 'MEMBER') => {
     if (portal === 'HO') {
       setAdminAuthenticated(true);
@@ -622,8 +625,8 @@ export default function App() {
       } />
       </Routes>
 
-      {/* FLOATING PORTAL SWITCHER (HO - KASIR - CUSTOMER) */}
-      <PortalSwitcher onSwitch={handleSwitchPortal} />
+      {/* FLOATING PORTAL SWITCHER (HO - KASIR - CUSTOMER) - Sementara disembunyikan */}
+      {SHOW_PORTAL_SWITCHER && <PortalSwitcher onSwitch={handleSwitchPortal} />}
     </>
   );
 }
