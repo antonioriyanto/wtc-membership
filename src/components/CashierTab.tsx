@@ -1,18 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Plus, Barcode, Camera, ShoppingCart, List, Tag, CheckCircle, AlertTriangle } from 'lucide-react';
-import { Member, Transaction } from '../types';
+import { Member, Transaction, StoreBranch } from '../types';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { TierBadge } from '../utils/tierBadge';
 
 interface CashierTabProps {
   isSubmitting?: boolean;
   members: Member[];
   transactions: Transaction[];
+  currentStore?: StoreBranch;
   onAddPoints: (memberId: string, amount: number, receiptNo: string) => void;
   onRedeemVoucher: (memberId: string, voucherCode: string) => void;
   onOpenCreateMember: () => void;
 }
 
-export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, onAddPoints, onRedeemVoucher, onOpenCreateMember, isSubmitting }) => {
+export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, currentStore, onAddPoints, onRedeemVoucher, onOpenCreateMember, isSubmitting }) => {
   const [searchInput, setSearchInput] = useState('');
   const [activeMember, setActiveMember] = useState<Member | null>(null);
   
@@ -176,10 +178,15 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, o
       
       {/* 1. AREA PENCARIAN MEMBER */}
       <div className="bg-white dark:bg-slate-800 rounded-[20px] p-6 shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
-        <div className="text-base font-bold mb-5 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-3">
-          <span className="flex items-center gap-2 text-slate-900 dark:text-white">
-            <Search className="w-4 h-4 text-emerald-500" /> 1. Cari Member
-          </span>
+        <div className="flex flex-wrap justify-between items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-700 pb-3">
+          <div>
+            <span className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+              <Search className="w-4 h-4 text-emerald-500" /> 1. Cari & Deteksi Member
+            </span>
+            <p className="text-[0.75rem] text-slate-500 dark:text-slate-400 mt-0.5">
+              Tersinkronisasi 40 toko nasional &bull; Member dari cabang manapun dapat dilayani
+            </p>
+          </div>
           <button 
             onClick={onOpenCreateMember} 
             className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
@@ -220,7 +227,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, o
               <Camera className="w-5 h-5" />
             </button>
           </div>
-          <small className="text-slate-500 dark:text-slate-400 text-[0.75rem] mt-1.5 block">*Tekan Enter atau klik 'Cari' setelah mengetik No HP / ID Member.</small>
+          <small className="text-slate-500 dark:text-slate-400 text-[0.75rem] mt-1.5 block">*Tekan Enter atau klik 'Cari' setelah mengetik No HP / ID Member (Mencakup member seluruh 40 cabang toko).</small>
         </div>
 
         {activeMember && (
@@ -232,13 +239,12 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, o
               <div>
                 <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight">{activeMember.name}</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mb-1">{activeMember.phone} &bull; {activeMember.membershipId}</p>
-                <span className={`text-[0.7rem] font-bold px-2 py-0.5 rounded text-white ${
-                  activeMember.tier === 'GOLD' ? 'bg-gradient-to-r from-amber-400 to-amber-600' :
-                  activeMember.tier === 'PLATINUM' ? 'bg-gradient-to-r from-slate-600 to-slate-900' :
-                  'bg-gradient-to-r from-slate-400 to-slate-500'
-                }`}>
-                  {activeMember.tier} TIER
-                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <TierBadge tier={activeMember.tier} size="sm" />
+                  <span className="text-[0.7rem] text-slate-600 dark:text-slate-300 font-medium bg-slate-200/80 dark:bg-slate-800 px-2 py-0.5 rounded">
+                    Toko Terdaftar: <strong>{activeMember.registeredStore || 'Puri Jakarta'}</strong>
+                  </span>
+                </div>
               </div>
             </div>
             <div className="text-right flex flex-col items-end gap-1">
@@ -327,13 +333,20 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, o
 
       {/* 3. AREA RIWAYAT TRANSAKSI TERKINI */}
       <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-[20px] shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          <div className="text-base font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-            <List className="w-4 h-4 text-emerald-500" /> Aktivitas Transaksi Terkini (Shift Ini)
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex flex-wrap justify-between items-center gap-3">
+          <div>
+            <div className="text-base font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+              <List className="w-4 h-4 text-emerald-500" /> Aktivitas Transaksi Terkini ({currentStore?.name || 'Cabang Ini'})
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Hanya menampilkan aktivitas transaksi yang diproses di kasir cabang <strong>{currentStore?.name || 'ini'}</strong>.
+            </p>
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            Menampilkan {Math.min(5, transactions.length)} transaksi terbaru
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-3 py-1 font-semibold rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              {transactions.length} Transaksi Khusus Toko Ini
+            </span>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px] text-left border-collapse">
@@ -372,8 +385,11 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, o
               ))}
               {transactions.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500">
-                    Belum ada transaksi di shift ini.
+                  <td colSpan={6} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                    <div className="flex flex-col items-center justify-center gap-1.5">
+                      <p className="font-semibold text-slate-600 dark:text-slate-300">Belum ada aktivitas transaksi di cabang {currentStore?.name || 'ini'} pada shift ini.</p>
+                      <p className="text-xs text-slate-400">Transaksi baru yang diproses kasir di cabang ini akan langsung tercatat dan terlihat di sini.</p>
+                    </div>
                   </td>
                 </tr>
               )}

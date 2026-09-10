@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Member, Transaction } from '../types';
 import { Search, FileDown, Eye, PenLine, Plus, ChevronDown, FileSpreadsheet, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { TierBadge } from '../utils/tierBadge';
 
 interface MembersTabProps {
   members: Member[];
@@ -190,16 +191,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({ members, onOpenCreateMem
                   <td className="py-3.5 px-5 text-slate-600 font-mono text-xs">{m.phone}</td>
                   <td className="py-3.5 px-5 text-slate-600 text-xs">{m.email || '-'}</td>
                   <td className="py-3.5 px-5">
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                      m.tier === 'BLACK' ? 'bg-black text-white' :
-                      m.tier === 'DIAMOND' ? 'bg-cyan-100 text-cyan-800' :
-                      m.tier === 'PLATINUM' ? 'bg-slate-900 text-white' :
-                      m.tier === 'GOLD' ? 'bg-amber-100 text-amber-800' :
-                      m.tier === 'BLUE' ? 'bg-blue-100 text-blue-800' :
-                      'bg-slate-100 text-slate-700'
-                    }`}>
-                      {m.tier}
-                    </span>
+                    <TierBadge tier={m.tier} size="sm" showSuffix={false} />
                   </td>
                   <td className="py-3.5 px-5 font-bold text-emerald-600">{(m.points || 0).toLocaleString('id-ID')} Pts</td>
                   <td className="py-3.5 px-5 text-xs font-medium text-slate-600">{m.registeredStore || 'Puri Jakarta'}</td>

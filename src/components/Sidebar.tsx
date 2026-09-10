@@ -48,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center justify-between gap-3 mb-3">
           <WatchClubLogo className="w-36" />
           <span className="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-md">
-            HO Central
+            HO PIK
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -119,8 +119,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               HO
             </div>
             <div className="overflow-hidden">
-              <div className="text-xs font-bold text-slate-200 truncate">Director & Head Office</div>
-              <div className="text-[11px] text-slate-400 truncate">Wisma BNI 46 • HO Central</div>
+              <div className="text-xs font-bold text-slate-200 truncate">Head Office</div>
+              <div className="text-[11px] text-slate-400 truncate">HO PIK</div>
             </div>
           </div>
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20" title="Full Super Admin Authorization"></div>

@@ -13,14 +13,17 @@ import {
   MessageSquare,
   AlertTriangle
 } from 'lucide-react';
+import { TierBadge } from '../utils/tierBadge';
 
 interface LoyaltyRulesTabProps {
   config: LoyaltyConfig;
-  onSaveConfig: (newConfig: LoyaltyConfig) => void;
+  setConfig?: (newConfig: LoyaltyConfig) => void;
+  onSaveConfig?: (newConfig: LoyaltyConfig) => void;
 }
 
 export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
   config,
+  setConfig,
   onSaveConfig,
 }) => {
   const [formData, setFormData] = useState<LoyaltyConfig>({ ...config });
@@ -38,7 +41,8 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveConfig(formData);
+    if (onSaveConfig) onSaveConfig(formData);
+    if (setConfig) setConfig(formData);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 4000);
   };
@@ -142,21 +146,41 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Member Tiers & VIP Point Multipliers</h3>
-                <p className="text-xs text-slate-500">Configure point thresholds to reach Gold and Platinum status</p>
+                <p className="text-xs text-slate-500">Configure point thresholds and earning multipliers across all 6 member tiers (Blue, Silver, Gold, Platinum, Diamond, Black)</p>
               </div>
             </div>
 
             <div className="space-y-4">
+              {/* Blue Rule */}
+              <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <TierBadge tier="BLUE" size="md" />
+                  <div className="text-xs text-sky-950/80 mt-1">Starting level for all new registered shoppers (Entry Tier)</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-xs font-semibold text-sky-900">
+                    0 - {((formData.silverThreshold || 5000) - 1).toLocaleString('id-ID')} Pts
+                  </div>
+                  <div className="text-xs font-bold text-sky-950 bg-white px-3 py-1.5 rounded-xl border border-sky-200 shadow-xs">
+                    1.0x Rate
+                  </div>
+                </div>
+              </div>
+
               {/* Silver Rule */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold text-xs">
-                    SILVER TIER
-                  </span>
-                  <div className="text-xs text-slate-500 mt-1">Starting level for all new registered shoppers</div>
+                  <TierBadge tier="SILVER" size="md" />
+                  <div className="text-xs text-slate-500 mt-1">Regular shoppers with introductory spending</div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-xs font-semibold text-slate-600">0 - {formData.goldThreshold - 1} Pts</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs font-semibold text-slate-600">Min. Points:</div>
+                  <input
+                    type="number"
+                    value={formData.silverThreshold ?? 5000}
+                    onChange={(e) => handleChange('silverThreshold', parseInt(e.target.value) || 5000)}
+                    className="w-24 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800"
+                  />
                   <div className="text-xs font-bold text-slate-900 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
                     1.0x Rate
                   </div>
@@ -166,9 +190,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
               {/* Gold Rule */}
               <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-bold text-xs">
-                    GOLD TIER
-                  </span>
+                  <TierBadge tier="GOLD" size="md" />
                   <div className="text-xs text-amber-900/80 mt-1">Frequent watch collectors and repeat buyers</div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -193,9 +215,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
               {/* Platinum Rule */}
               <div className="p-4 rounded-2xl bg-slate-100 text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-300">
                 <div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-slate-300 text-slate-800 font-bold text-xs">
-                    PLATINUM TIER
-                  </span>
+                  <TierBadge tier="PLATINUM" size="md" />
                   <div className="text-xs text-slate-500 mt-1">Prestige club members</div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -220,9 +240,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
               {/* Diamond Rule */}
               <div className="p-4 rounded-2xl bg-cyan-50/70 border border-cyan-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-cyan-500 text-white font-bold text-xs">
-                    DIAMOND TIER
-                  </span>
+                  <TierBadge tier="DIAMOND" size="md" />
                   <div className="text-xs text-cyan-900/80 mt-1">VIP Luxury watch clientele</div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -247,9 +265,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
               {/* Black Rule */}
               <div className="p-4 rounded-2xl bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
                 <div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-slate-400 to-slate-200 text-slate-950 font-bold text-xs">
-                    BLACK TIER
-                  </span>
+                  <TierBadge tier="BLACK" size="md" />
                   <div className="text-xs text-slate-300 mt-1">Exclusive ultra luxury tier</div>
                 </div>
                 <div className="flex items-center gap-3">

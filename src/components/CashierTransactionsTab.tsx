@@ -172,14 +172,14 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Buku Besar Transaksi (Ledger)
+              Riwayat Transaksi & Buku Besar ({currentStoreName || 'Cabang Ini'})
             </h2>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-              Live Real-Time
+              Khusus Toko Ini
             </span>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Pantau seluruh riwayat perolehan poin dan penukaran voucher di seluruh toko Watch Club Indonesia.
+            Menampilkan aktivitas dan riwayat transaksi khusus kasir cabang <strong>{currentStoreName || 'ini'}</strong>.
           </p>
         </div>
       </div>
@@ -197,7 +197,7 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
                 {totalAllTransactions.toLocaleString('id-ID')}
               </h3>
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-0.5">
-                Total Transaksi (Semua Store)
+                Total Transaksi ({currentStoreName || 'Toko Ini'})
               </p>
             </div>
           </div>
@@ -254,19 +254,10 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
               />
             </div>
 
-            {/* Store Filter */}
-            <div className="flex items-center gap-1.5 w-full sm:w-auto">
-              <Store className="w-4 h-4 text-slate-400 hidden sm:inline" />
-              <select 
-                value={storeFilter}
-                onChange={e => setStoreFilter(e.target.value)}
-                className="w-full sm:w-auto px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-sm bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer font-medium"
-              >
-                <option value="all">Semua Store (Seluruh Cabang)</option>
-                {storeNames.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+            {/* Store Badge indicator */}
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold shrink-0">
+              <Store className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Toko: {currentStoreName || 'Cabang Aktif'}</span>
             </div>
 
             {/* Transaction Type Filter */}

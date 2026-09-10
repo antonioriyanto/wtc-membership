@@ -34,6 +34,27 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateMemberOpen, setIsCreateMemberOpen] = useState(false);
 
+  // Filter transactions specifically for this cashier's store
+  const storeTransactions = React.useMemo(() => {
+    if (!currentStore) return transactions;
+    const curName = (currentStore.name || '').toLowerCase().trim();
+    const curCode = (currentStore.code || '').toLowerCase().trim();
+    const curId = (currentStore.id || '').toLowerCase().trim();
+
+    return transactions.filter(t => {
+      const tName = (t.storeName || '').toLowerCase().trim();
+      const tId = (t.storeId || '').toLowerCase().trim();
+
+      if (tName && (tName === curName || curName.includes(tName) || tName.includes(curName))) {
+        return true;
+      }
+      if (tId && (tId === curId || tId === curCode)) {
+        return true;
+      }
+      return false;
+    });
+  }, [transactions, currentStore]);
+
   const handleAddPoints = async (memberId: string, amount: number, receiptNo: string) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -47,8 +68,9 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
         body: JSON.stringify({
           receiptNo,
           memberId: member.id,
-          storeId: currentStore?.id || 'store-1',
-          cashierName: cashierName || 'Kasir Puri',
+          storeId: currentStore?.id || currentStore?.code || 'PUR',
+          storeName: currentStore?.name || 'Puri Jakarta',
+          cashierName: cashierName || `Kasir ${currentStore?.name || 'Puri'}`,
           type: 'EARN',
           amount: amount
         }) 
@@ -86,9 +108,9 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
         body: JSON.stringify({
           receiptNo: `VOUCHER-${voucherCode}`,
           memberId: member.id,
-          storeId: currentStore?.id || 'store-1',
+          storeId: currentStore?.id || currentStore?.code || 'PUR',
           storeName: currentStore?.name || 'Puri Jakarta',
-          cashierName: cashierName || 'Kasir Puri',
+          cashierName: cashierName || `Kasir ${currentStore?.name || 'Puri'}`,
           type: 'REDEEM',
           voucherCode: voucherCode,
           amount: 0,
@@ -135,9 +157,11 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
 
         <div className="p-4 sm:p-6 lg:p-8 flex-1 max-w-7xl w-full mx-auto">
           {activeTab === 'cashier' && (
-            <CashierTab isSubmitting={isSubmitting}
+            <CashierTab 
+              isSubmitting={isSubmitting}
               members={members}
-              transactions={transactions}
+              transactions={storeTransactions}
+              currentStore={currentStore}
               onAddPoints={handleAddPoints}
               onRedeemVoucher={handleRedeemVoucher}
               onOpenCreateMember={() => setIsCreateMemberOpen(true)}
@@ -148,13 +172,14 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
             <CashierMembersTab
               members={members}
               setMembers={setMembers}
+              currentStore={currentStore}
               onOpenCreateMember={() => setIsCreateMemberOpen(true)}
             />
           )}
 
           {activeTab === 'transactions' && (
             <CashierTransactionsTab 
-              transactions={transactions}
+              transactions={storeTransactions}
               currentStoreName={currentStore?.name || 'Puri Jakarta'}
             />
           )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Member, Transaction } from '../types';
 import { X, Crown, Award, Phone, Mail, MapPin, Calendar, CreditCard, SlidersHorizontal, ShieldCheck } from 'lucide-react';
+import { TierBadge, getTierStyle } from '../utils/tierBadge';
 
 interface MemberDetailsModalProps {
   isOpen: boolean;
@@ -28,14 +29,14 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-2xl font-bold flex items-center justify-center text-base shadow-md ${
-              member.tier === 'BLACK' ? 'bg-black text-white' :
-              member.tier === 'DIAMOND' ? 'bg-cyan-100 text-cyan-800' :
-              member.tier === 'PLATINUM' ? 'bg-slate-900 text-amber-300' :
-              member.tier === 'GOLD' ? 'bg-amber-100 text-amber-900' :
-              member.tier === 'BLUE' ? 'bg-blue-100 text-blue-800' :
-              'bg-slate-100 text-slate-700'
-            }`}>
+            <div 
+              className="w-12 h-12 rounded-2xl font-bold flex items-center justify-center text-base shadow-md border"
+              style={{
+                background: getTierStyle(member.tier).background,
+                color: getTierStyle(member.tier).textColor,
+                borderColor: getTierStyle(member.tier).borderColor
+              }}
+            >
               {initials}
             </div>
             <div>
@@ -43,16 +44,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-slate-500 font-mono">ID: {member.membershipId}</span>
                 <span className="text-slate-300">•</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  member.tier === 'BLACK' ? 'bg-black text-white border border-slate-700' :
-                  member.tier === 'DIAMOND' ? 'bg-cyan-100 text-cyan-900 border border-cyan-200' :
-                  member.tier === 'PLATINUM' ? 'bg-slate-900 text-amber-300 border border-slate-700' :
-                  member.tier === 'GOLD' ? 'bg-amber-100 text-amber-900' :
-                  member.tier === 'BLUE' ? 'bg-blue-100 text-blue-800' :
-                  'bg-slate-100 text-slate-700'
-                }`}>
-                  {member.tier} TIER
-                </span>
+                <TierBadge tier={member.tier} size="sm" />
               </div>
             </div>
           </div>

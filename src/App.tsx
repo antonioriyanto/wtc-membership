@@ -23,7 +23,6 @@ import { ManualPointAdjustmentModal } from './components/ManualPointAdjustmentMo
 import { CashierPOSView } from './components/CashierPOSView';
 import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
-import { PreviewSwitcher } from './components/PreviewSwitcher';
 
 export default function App() {
   const navigate = useNavigate();
@@ -143,7 +142,7 @@ export default function App() {
                 email: 'user' + Date.now() + '@gmail.com',
                 joinDate: new Date().toISOString().split('T')[0],
                 points: 0,
-                tier: 'SILVER',
+                tier: 'BLUE',
                 totalSpent: 0,
                 registeredStore: 'Puri Jakarta',
                 lastStoreVisited: 'Puri Jakarta'
@@ -338,7 +337,6 @@ export default function App() {
         )
       } />
       </Routes>
-      <PreviewSwitcher />
     </>
   );
 }

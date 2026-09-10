@@ -89,7 +89,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
         points: 0,
         lifetimePoints: 0,
         totalSpend: 0,
-        tier: 'DIAMOND',
+        tier: 'BLUE',
         status: 'ACTIVE'
       });
       setName('');
