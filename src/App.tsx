@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Member, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch, SupportTicket, Campaign, AuditLog } from './types';
 import { useCustomDialog } from './components/CustomDialogProvider';
@@ -12,7 +12,9 @@ import {
   initialCampaigns,
   initialAuditLogs
 } from './data/mockData';
-import { calculateTier } from './lib/loyalty';
+import { setupFirestoreListeners, seedFirestoreIfEmpty } from './lib/syncFirestore';
+import { doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { db } from './lib/firebase';
 
 // HO Components
 import { Sidebar } from './components/Sidebar';
@@ -92,7 +94,7 @@ export default function App() {
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isRefreshingData, setIsRefreshingData] = useState(false);
-  
+
   const [stores, setStores] = useState<StoreBranch[]>(() => {
     try {
       const saved = localStorage.getItem('wtc_stores');
@@ -136,6 +138,43 @@ export default function App() {
     } catch {}
     return initialTransactions;
   });
+
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('wtc_read_notifs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+    } catch {}
+    return new Set();
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('wtc_read_notifs', JSON.stringify(Array.from(readNotificationIds)));
+    } catch {}
+  }, [readNotificationIds]);
+
+  const unreadNotificationsCount = useMemo(() => {
+    const allIds: string[] = [];
+    transactions.forEach(tx => allIds.push(`tx-act-${tx.id}`));
+    members.slice(0, 15).forEach(mem => allIds.push(`mem-act-${mem.id}`));
+    ['nw-act-1', 'nw-act-2', 'nw-act-3', 'nw-act-4', 'nw-act-5', 'nw-act-6', 'nw-act-7', 'nw-act-8'].forEach(id => allIds.push(id));
+    return allIds.filter(id => !readNotificationIds.has(id)).length;
+  }, [transactions, members, readNotificationIds]);
+
+  const handleMarkAsRead = (id: string) => {
+    setReadNotificationIds(prev => new Set([...prev, id]));
+  };
+
+  const handleMarkAllAsRead = () => {
+    const allIds: string[] = [];
+    transactions.forEach(tx => allIds.push(`tx-act-${tx.id}`));
+    members.slice(0, 15).forEach(mem => allIds.push(`mem-act-${mem.id}`));
+    ['nw-act-1', 'nw-act-2', 'nw-act-3', 'nw-act-4', 'nw-act-5', 'nw-act-6', 'nw-act-7', 'nw-act-8'].forEach(id => allIds.push(id));
+    setReadNotificationIds(new Set(allIds));
+  };
 
   const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfig>(() => {
     try {
@@ -202,195 +241,25 @@ export default function App() {
   };
 
   // Support Ticket Handlers
-  const handleUpdateTicket = (updated: SupportTicket) => {
-    setSupportTickets(prev => {
-      const next = prev.map(t => t.id === updated.id ? updated : t);
-      try { localStorage.setItem('wtc_tickets', JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
-
-  const handleDirectPointAdjustment = async (memberId: string, pointsDelta: number, note: string, ticketId: string) => {
-    const member = members.find(m => m.id === memberId || m.membershipId === memberId || m.phone === memberId);
-    if (!member) return false;
-
-    const newPoints = Math.max(0, (member.points || 0) + pointsDelta);
-    const newLifetime = pointsDelta > 0 ? (member.lifetimePoints || 0) + pointsDelta : (member.lifetimePoints || 0);
-    const updatedMember: Member = {
-      ...member,
-      points: newPoints,
-      lifetimePoints: newLifetime,
-      tier: calculateTier(newPoints)
-    };
-
-    const savedTrx: Transaction = {
-      id: 'tx_' + Date.now(),
-      receiptNo: 'ADJ-' + ticketId + '-' + Date.now().toString().slice(-4),
-      memberId: member.id,
-      memberName: member.name,
-      memberPhone: member.phone,
-      storeId: 'S-HQ',
-      storeName: 'Head Office (Customer Care)',
-      cashierName: 'Superadmin HO',
-      type: 'MANUAL_ADJUSTMENT',
-      amount: 0,
-      pointsDelta: pointsDelta,
-      timestamp: new Date().toISOString(),
-      notes: `Penyelesaian Tiket ${ticketId}: ${note}`
-    };
-
-    setMembers(prev => {
-      const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
-      try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
-      return next;
-    });
-
-    setTransactions(prev => {
-      const next = [savedTrx, ...prev];
-      try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
-      return next;
-    });
-
-    // Record system audit log
-    const auditEntry: AuditLog = {
-      id: 'AL-' + Date.now().toString().slice(-4),
-      timestamp: new Date().toISOString(),
-      actorName: 'Superadmin HO',
-      actorRole: 'HO_ADMIN',
-      action: 'MANUAL_POINT_COMPENSATION',
-      details: `Penyelesaian ${ticketId}: Disalurkan ${pointsDelta > 0 ? '+' : ''}${pointsDelta} Pts ke ${member.name} (${member.membershipId}). Catatan: ${note}`,
-      module: 'SUPPORT_TICKETS'
-    };
-
-    setAuditLogs(prev => {
-      const next = [auditEntry, ...prev];
-      try { localStorage.setItem('wtc_audit_logs', JSON.stringify(next)); } catch {}
-      return next;
-    });
-
-    return true;
-  };
-
-  const handleMemberSubmitTicket = (newTicket: Omit<SupportTicket, 'id' | 'createdAt' | 'updatedAt' | 'messages' | 'status'> & { initialMessage: string }) => {
-    const ticketId = 'TKT-' + Math.floor(1050 + Math.random() * 8900);
-    const now = new Date().toISOString();
-    const created: SupportTicket = {
-      id: ticketId,
-      source: newTicket.source,
-      memberId: newTicket.memberId,
-      memberName: newTicket.memberName,
-      memberPhone: newTicket.memberPhone,
-      storeId: newTicket.storeId,
-      storeName: newTicket.storeName,
-      subject: newTicket.subject,
-      category: newTicket.category,
-      status: 'OPEN',
-      priority: newTicket.priority || 'HIGH',
-      createdAt: now,
-      updatedAt: now,
-      receiptNo: newTicket.receiptNo,
-      messages: [
-        {
-          sender: 'MEMBER',
-          text: newTicket.initialMessage,
-          timestamp: now
-        }
-      ]
-    };
-
-    setSupportTickets(prev => {
-      const next = [created, ...prev];
-      try { localStorage.setItem('wtc_tickets', JSON.stringify(next)); } catch {}
-      return next;
-    });
-
-    // Audit log
-    const auditEntry: AuditLog = {
-      id: 'AL-' + Date.now().toString().slice(-4),
-      timestamp: now,
-      actorName: `${newTicket.memberName || 'Member'} (${newTicket.memberPhone || '-'})`,
-      actorRole: 'SYSTEM',
-      action: 'SUPPORT_TICKET_CREATED',
-      details: `Tiket baru ${ticketId} diajukan oleh Member: "${newTicket.subject}" (Kategori: ${newTicket.category}, Toko: ${newTicket.storeName || '-'}).`,
-      module: 'SUPPORT_TICKETS'
-    };
-    setAuditLogs(prev => {
-      const next = [auditEntry, ...prev];
-      try { localStorage.setItem('wtc_audit_logs', JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
-
-  const handleAddCampaign = (campaign: Campaign) => {
-    setCampaigns(prev => {
-      const next = [campaign, ...prev];
-      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
-      return next;
-    });
-
-    const auditEntry: AuditLog = {
-      id: 'AL-' + Date.now().toString().slice(-4),
-      timestamp: new Date().toISOString(),
-      actorName: 'Superadmin HO',
-      actorRole: 'HO_ADMIN',
-      action: 'CAMPAIGN_PUBLISHED',
-      details: `Kampanye promosi baru diterbitkan: "${campaign.name}" (Popup Web App: ${campaign.showAsPopupOnApp ? 'Ya' : 'Tidak'}).`,
-      module: 'VOUCHERS'
-    };
-    setAuditLogs(prev => {
-      const next = [auditEntry, ...prev];
-      try { localStorage.setItem('wtc_audit_logs', JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
-
-  const handleToggleCampaignStatus = (id: string) => {
-    setCampaigns(prev => {
-      const next = prev.map(c => c.id === id ? { ...c, status: c.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' } : c);
-      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
-
-  const handleDeleteCampaign = (id: string) => {
-    setCampaigns(prev => {
-      const next = prev.filter(c => c.id !== id);
-      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
-      return next;
-    });
+  const handleUpdateTicket = async (updated: SupportTicket) => {
+    try {
+      await setDoc(doc(db, 'support', updated.id), updated);
+    } catch(err) {}
   };
 
   const handleUpdateMember = async (updatedMember: Member) => {
-    setMembers(prev => {
-      const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
-      try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
-      return next;
-    });
-
     try {
-      await fetch(`/api/members/${updatedMember.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedMember)
-      });
+      await setDoc(doc(db, 'members', updatedMember.id), updatedMember);
     } catch (err) {
-      console.warn("Could not sync member update to server:", err);
+      console.warn("Could not sync member update to Firestore:", err);
     }
   };
 
   const handleDeleteMember = async (memberId: string) => {
-    setMembers(prev => {
-      const next = prev.filter(m => m.id !== memberId);
-      try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
-      return next;
-    });
-
     try {
-      await fetch(`/api/members/${memberId}`, {
-        method: 'DELETE'
-      });
+      await deleteDoc(doc(db, 'members', memberId));
     } catch (err) {
-      console.warn("Could not sync member delete to server:", err);
+      console.warn("Could not sync member delete to Firestore:", err);
     }
   };
 
@@ -402,103 +271,40 @@ export default function App() {
     handleUpdateMember(updatedMember);
   };
 
-  // Synchronize loyalty config changes to localStorage
+  // Synchronize loyalty config changes to Firestore
   useEffect(() => {
     try {
       localStorage.setItem('wtc_loyalty_config', JSON.stringify(loyaltyConfig));
+      setDoc(doc(db, 'config', 'loyalty'), loyaltyConfig).catch(() => {});
     } catch {}
   }, [loyaltyConfig]);
 
   useEffect(() => {
-    async function loadData() {
+    let unsubscribe = () => {};
+    async function initFirestore() {
       try {
-        const [storesRes, memRes, vouchRes, trxRes, confRes] = await Promise.all([
-          fetch('/api/stores').catch(() => null),
-          fetch('/api/members').catch(() => null),
-          fetch('/api/vouchers').catch(() => null),
-          fetch('/api/transactions').catch(() => null),
-          fetch('/api/config').catch(() => null)
-        ]);
-
-        if (storesRes && storesRes.ok) {
-          const dbStores = await storesRes.json();
-          if (Array.isArray(dbStores) && dbStores.length > 0) {
-            setStores(dbStores);
-            try { localStorage.setItem('wtc_stores', JSON.stringify(dbStores)); } catch {}
-          }
-        }
-        if (memRes && memRes.ok) {
-          const dbMembers = await memRes.json();
-          if (Array.isArray(dbMembers) && dbMembers.length > 0) {
-            setMembers(dbMembers);
-            try { localStorage.setItem('wtc_members', JSON.stringify(dbMembers)); } catch {}
-          }
-        }
-        if (vouchRes && vouchRes.ok) {
-          const dbVouchers = await vouchRes.json();
-          if (Array.isArray(dbVouchers) && dbVouchers.length > 0) {
-            setVouchers(dbVouchers);
-            try { localStorage.setItem('wtc_vouchers', JSON.stringify(dbVouchers)); } catch {}
-          }
-        }
-        if (trxRes && trxRes.ok) {
-          const dbTrx = await trxRes.json();
-          if (Array.isArray(dbTrx) && dbTrx.length > 0) {
-            setTransactions(dbTrx);
-            try { localStorage.setItem('wtc_transactions', JSON.stringify(dbTrx)); } catch {}
-          }
-        }
-        if (confRes && confRes.ok) {
-          const dbConf = await confRes.json();
-          if (dbConf && !dbConf.error) {
-            setLoyaltyConfig(dbConf);
-            try { localStorage.setItem('wtc_loyalty_config', JSON.stringify(dbConf)); } catch {}
-          }
-        }
+        await seedFirestoreIfEmpty();
+        unsubscribe = setupFirestoreListeners({
+          setStores,
+          setMembers,
+          setVouchers,
+          setTransactions,
+          setSupportTickets,
+          setCampaigns,
+          setAuditLogs,
+          setLoyaltyConfig
+        });
       } catch (err) {
-        console.warn("Backend database unreachable, continuing with local persistence:", err);
+        console.warn("Firestore initialization failed, continuing with local persistence:", err);
       }
     }
-    loadData();
-    const interval = setInterval(loadData, 10000);
-    return () => clearInterval(interval);
+    initFirestore();
+    return () => unsubscribe();
   }, []);
 
   const handleRefreshData = async () => {
     setIsRefreshingData(true);
-    try {
-      const [trxRes, memRes, storeRes, vouchRes, confRes] = await Promise.all([
-        fetch('/api/transactions').catch(() => null),
-        fetch('/api/members').catch(() => null),
-        fetch('/api/stores').catch(() => null),
-        fetch('/api/vouchers').catch(() => null),
-        fetch('/api/loyalty-config').catch(() => null),
-      ]);
-
-      if (trxRes && trxRes.ok) {
-        const data = await trxRes.json();
-        if (Array.isArray(data) && data.length > 0) setTransactions(data);
-      }
-      if (memRes && memRes.ok) {
-        const data = await memRes.json();
-        if (Array.isArray(data) && data.length > 0) setMembers(data);
-      }
-      if (storeRes && storeRes.ok) {
-        const data = await storeRes.json();
-        if (Array.isArray(data) && data.length > 0) setStores(data);
-      }
-      if (vouchRes && vouchRes.ok) {
-        const data = await vouchRes.json();
-        if (Array.isArray(data) && data.length > 0) setVouchers(data);
-      }
-      if (confRes && confRes.ok) {
-        const data = await confRes.json();
-        if (data && !data.error) setLoyaltyConfig(data);
-      }
-    } catch (e) {
-      console.warn("Manual refresh failed to reach server:", e);
-    }
-
+    // Realtime listeners already handle this, but we keep the visual feedback
     setTimeout(() => {
       setIsRefreshingData(false);
     }, 1100);
@@ -577,31 +383,41 @@ export default function App() {
           />
         ) : (
           <MemberLogin 
+            members={members}
             onLogin={(id) => setLoggedInMemberId(id)} 
             onRegisterGoogle={async () => {
-              // Create mock Google user
-              const newMember = {
-                id: 'mem_' + Date.now(),
-                name: 'Google User',
-                phone: '0812' + Math.floor(Math.random() * 1000000),
-                email: 'user' + Date.now() + '@gmail.com',
-                joinDate: new Date().toISOString().split('T')[0],
-                points: 0,
-                tier: 'BLUE',
-                totalSpent: 0,
-                registeredStore: 'Puri Jakarta',
-                lastStoreVisited: 'Puri Jakarta'
-              };
               try {
-                await fetch('/api/members', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(newMember)
-                });
-                setMembers([...members, newMember as any]);
-                setLoggedInMemberId(newMember.id);
-              } catch (e) {
-                console.error(e);
+                const { signInWithPopup } = await import('firebase/auth');
+                const { auth, googleProvider, db } = await import('./lib/firebase');
+                const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+                
+                const result = await signInWithPopup(auth, googleProvider);
+                const user = result.user;
+                
+                const userRef = doc(db, 'members', user.uid);
+                const userSnap = await getDoc(userRef);
+                
+                if (!userSnap.exists()) {
+                  const newMember = {
+                    id: user.uid,
+                    name: user.displayName || 'Google User',
+                    phone: user.phoneNumber || '', 
+                    email: user.email || '',
+                    joinDate: new Date().toISOString().split('T')[0],
+                    points: 0,
+                    tier: 'BLUE',
+                    totalSpent: 0,
+                    registeredStore: 'Online',
+                    lastStoreVisited: 'Online',
+                    createdAt: new Date().toISOString()
+                  };
+                  await setDoc(userRef, newMember);
+                }
+                
+                setLoggedInMemberId(user.uid);
+              } catch (e: any) {
+                console.error("Google Sign-In Error", e);
+                showAlert('Gagal login dengan Google: ' + e.message, 'Login Gagal', 'error');
               }
             }} 
           />
@@ -633,7 +449,7 @@ export default function App() {
                 onRefreshData={handleRefreshData}
                 isRefreshing={isRefreshingData}
                 onOpenNotifications={() => setIsNotificationsOpen(true)}
-                unreadNotificationsCount={transactions.length > 0 ? 8 : 4}
+                unreadNotificationsCount={unreadNotificationsCount}
               />
 
               <div className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -694,19 +510,10 @@ export default function App() {
                       const nextStatus = target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
                       const updated = { ...target, status: nextStatus as any };
                       try {
-                        await fetch(`/api/vouchers/${voucherId}`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ status: nextStatus })
-                        });
+                        await setDoc(doc(db, 'vouchers', voucherId), updated);
                       } catch (err) {
                         console.warn('API error updating voucher status:', err);
                       }
-                      setVouchers(prev => {
-                        const next = prev.map(v => v.id === voucherId ? updated : v);
-                        try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
-                        return next;
-                      });
                     }}
                     isSkeletonLoading={isRefreshingData}
                   />
@@ -781,24 +588,10 @@ export default function App() {
                 };
 
                 try {
-                  const res = await fetch('/api/members', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newMember)
-                  });
-                  if (res.ok) {
-                    const serverCreated = await res.json();
-                    if (serverCreated && serverCreated.id) created = serverCreated;
-                  }
+                  await setDoc(doc(db, 'members', created.id), created);
                 } catch (err) {
                   console.warn("Backend API unavailable, saved member locally:", err);
                 }
-
-                setMembers(prev => {
-                  const next = [created, ...prev.filter(m => m.id !== created.id)];
-                  try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
-                  return next;
-                });
               }}
             />
             
@@ -818,24 +611,8 @@ export default function App() {
                   };
 
                   try {
-                    const res = await fetch(`/api/vouchers/${editingVoucher.id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(voucherData)
-                    });
-                    if (res.ok) {
-                      const serverUpdated = await res.json();
-                      if (serverUpdated && serverUpdated.id) updated = serverUpdated;
-                    }
-                  } catch (err) {
-                    console.warn("Backend API unavailable, updated voucher locally:", err);
-                  }
-
-                  setVouchers(prev => {
-                    const next = prev.map(v => v.id === updated.id ? updated : v);
-                    try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
-                    return next;
-                  });
+                    await setDoc(doc(db, 'vouchers', updated.id), updated);
+                  } catch (err) {}
                   setEditingVoucher(null);
                   setIsCreateVoucherOpen(false);
                 } else {
@@ -849,24 +626,8 @@ export default function App() {
                   } as Voucher;
 
                   try {
-                    const res = await fetch('/api/vouchers', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(voucherData)
-                    });
-                    if (res.ok) {
-                      const serverCreated = await res.json();
-                      if (serverCreated && serverCreated.id) created = serverCreated;
-                    }
-                  } catch (err) {
-                    console.warn("Backend API unavailable, saved voucher locally:", err);
-                  }
-
-                  setVouchers(prev => {
-                    const next = [created, ...prev.filter(v => v.id !== created.id)];
-                    try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
-                    return next;
-                  });
+                    await setDoc(doc(db, 'vouchers', created.id), created);
+                  } catch (err) {}
                   setIsCreateVoucherOpen(false);
                 }
               }}
@@ -911,40 +672,13 @@ export default function App() {
                 };
 
                 try {
-                  const res = await fetch('/api/transactions', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({
-                      memberId: member.id,
-                      storeId: 'S-HQ',
-                      storeName: 'Head Office',
-                      cashierName: 'Superadmin',
-                      type: 'MANUAL_ADJUSTMENT',
-                      amount: 0,
-                      pointsDelta: pointsDelta,
-                      notes: reason
-                    }) 
-                  });
-
-                  if (res.ok) {
-                    const data = await res.json();
-                    if (data.transaction) savedTrx = data.transaction;
-                    if (data.member) Object.assign(updatedMember, data.member);
-                  }
+                  const batch = writeBatch(db);
+                  batch.set(doc(db, 'transactions', savedTrx.id), savedTrx);
+                  batch.set(doc(db, 'members', updatedMember.id), updatedMember);
+                  await batch.commit();
                 } catch (e: any) {
                   console.warn("Backend API unavailable, applied adjustment locally:", e);
                 }
-
-                setTransactions(prev => {
-                  const next = [savedTrx, ...prev];
-                  try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
-                  return next;
-                });
-                setMembers(prev => {
-                  const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
-                  try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
-                  return next;
-                });
                 showAlert('Penyesuaian poin berhasil disimpan!', 'Poin Berhasil Disesuaikan', 'success');
                 setIsAdjustingPoints(false);
               }}
@@ -974,6 +708,9 @@ export default function App() {
               }}
               onRefreshData={handleRefreshData}
               isRefreshing={isRefreshingData}
+              readIds={readNotificationIds}
+              onMarkAsRead={handleMarkAsRead}
+              onMarkAllAsRead={handleMarkAllAsRead}
             />
           </div>
         ) : (

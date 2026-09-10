@@ -52,6 +52,9 @@ interface NationalActivityNotificationsProps {
   onSelectStore?: (store: StoreBranch) => void;
   onRefreshData?: () => void;
   isRefreshing?: boolean;
+  readIds?: Set<string>;
+  onMarkAsRead?: (id: string) => void;
+  onMarkAllAsRead?: () => void;
 }
 
 export const NationalActivityNotifications: React.FC<NationalActivityNotificationsProps> = ({
@@ -62,13 +65,14 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
   members,
   onSelectStore,
   onRefreshData,
-  isRefreshing = false
+  isRefreshing = false,
+  readIds,
+  onMarkAsRead,
+  onMarkAllAsRead
 }) => {
-  const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
-  const [selectedType, setSelectedType] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [onlyUnread, setOnlyUnread] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'ALL' | 'UNREAD'>('ALL');
+  const [internalReadIds, setInternalReadIds] = useState<Set<string>>(new Set());
+  const effectiveReadIds = readIds !== undefined ? readIds : internalReadIds;
   const [selectedActivity, setSelectedActivity] = useState<StoreActivityItem | null>(null);
 
   // Generate a nationwide real-time activity stream combining transactions, members, and nationwide store events
@@ -102,7 +106,7 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
         pointsDelta: tx.pointsDelta,
         timestamp: tx.timestamp,
         timeAgo: idx === 0 ? 'Baru saja' : idx < 3 ? `${idx * 4} menit lalu` : `${idx * 15} menit lalu`,
-        isRead: readIds.has(`tx-act-${tx.id}`),
+        isRead: effectiveReadIds.has(`tx-act-${tx.id}`),
         notes: tx.notes || `Diproses kasir ${tx.cashierName}`
       });
     });
@@ -123,7 +127,7 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
         memberPhone: mem.phone,
         timestamp: mem.joinDate,
         timeAgo: `${(idx + 1) * 22} menit lalu`,
-        isRead: readIds.has(`mem-act-${mem.id}`),
+        isRead: effectiveReadIds.has(`mem-act-${mem.id}`),
         notes: `Toko pendaftaran: ${mem.registeredStore} • Status: ${mem.status}`
       });
     });
@@ -270,335 +274,187 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
     nationwideFeed.forEach(item => {
       list.push({
         ...item,
-        isRead: readIds.has(item.id)
+        isRead: effectiveReadIds.has(item.id)
       });
     });
 
     return list;
-  }, [transactions, members, stores, readIds]);
+  }, [transactions, members, stores, effectiveReadIds]);
 
   // Filter logic
   const filteredActivities = useMemo(() => {
-    return activityList.filter(item => {
-      if (onlyUnread && item.isRead) return false;
+    let filtered = activityList;
 
-      if (selectedRegion !== 'ALL') {
-        const regLower = item.storeRegion.toLowerCase();
-        if (selectedRegion === 'JABODETABEK' && !regLower.includes('jabodetabek')) return false;
-        if (selectedRegion === 'JAWA_BALI' && !(regLower.includes('jawa') || regLower.includes('bali'))) return false;
-        if (selectedRegion === 'KALIMANTAN' && !regLower.includes('kalimantan')) return false;
-        if (selectedRegion === 'SULAWESI' && !regLower.includes('sulawesi')) return false;
-        if (selectedRegion === 'SUMATERA' && !regLower.includes('sumatera')) return false;
-      }
+    if (activeTab === 'UNREAD') {
+      filtered = filtered.filter(a => !a.isRead);
+    }
 
-      if (selectedType !== 'ALL') {
-        if (selectedType === 'EARN' && item.type !== 'EARN_POINTS') return false;
-        if (selectedType === 'REDEEM' && item.type !== 'REDEEM_VOUCHER') return false;
-        if (selectedType === 'MEMBER' && item.type !== 'NEW_MEMBER') return false;
-        if (selectedType === 'TIER' && item.type !== 'TIER_UPGRADE') return false;
-      }
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchStore = item.storeName.toLowerCase().includes(q);
-        const matchMember = (item.memberName || '').toLowerCase().includes(q);
-        const matchCity = item.storeCity.toLowerCase().includes(q);
-        const matchReceipt = (item.receiptNo || '').toLowerCase().includes(q);
-        const matchDesc = item.description.toLowerCase().includes(q);
-        if (!matchStore && !matchMember && !matchCity && !matchReceipt && !matchDesc) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [activityList, selectedRegion, selectedType, searchQuery, onlyUnread]);
+    return filtered;
+  }, [activityList, activeTab]);
 
   const unreadCount = useMemo(() => {
     return activityList.filter(a => !a.isRead).length;
   }, [activityList]);
 
   const markAllAsRead = () => {
-    const allIds = new Set(activityList.map(a => a.id));
-    setReadIds(allIds);
+    if (onMarkAllAsRead) {
+      onMarkAllAsRead();
+    } else {
+      const allIds = new Set(activityList.map(a => a.id));
+      setInternalReadIds(allIds);
+    }
   };
 
   const markAsRead = (id: string) => {
-    setReadIds(prev => new Set([...prev, id]));
+    if (onMarkAsRead) {
+      onMarkAsRead(id);
+    } else {
+      setInternalReadIds(prev => new Set([...prev, id]));
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-      {/* DRAWER CONTAINER */}
-      <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 overflow-hidden">
-        
-        {/* DRAWER HEADER */}
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <Bell className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white leading-none">Aktivitas Toko Nasional</h3>
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Live 40+ Cabang
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                Seluruh pembaruan transaksi, voucher, & member di Indonesia secara real-time
-              </p>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity cursor-pointer" 
+        onClick={onClose}
+      />
 
+      {/* Drawer */}
+      <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden transform transition-transform animate-slideInRight">
+        
+        {/* HEADER */}
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-slate-900">Notifikasi Nasional</h3>
+            {unreadCount > 0 && (
+              <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700">
+                {unreadCount} Baru
+              </span>
+            )}
+          </div>
+          
           <div className="flex items-center gap-2">
-            {onRefreshData && (
+            {unreadCount > 0 && (
               <button
-                type="button"
-                onClick={onRefreshData}
-                disabled={isRefreshing}
-                title="Segarkan Aktivitas"
-                className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors border border-slate-700 cursor-pointer disabled:opacity-50"
+                onClick={markAllAsRead}
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 mr-2 cursor-pointer transition-colors"
               >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-amber-400' : ''}`} />
+                Tandai semua dibaca
               </button>
             )}
             <button
-              type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors border border-slate-700 cursor-pointer"
+              className="p-2 -mr-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* NATIONWIDE METRICS STRIP */}
-        <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 flex items-center justify-between text-xs text-slate-600 shrink-0 overflow-x-auto gap-4">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-emerald-600" />
-            <span><strong>{stores.length} Cabang</strong> Terhubung</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="w-4 h-4 text-blue-600" />
-            <span><strong>{transactions.length}</strong> Transaksi Aktif</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Crown className="w-4 h-4 text-amber-600" />
-            <span><strong>{members.length}</strong> Total Member</span>
-          </div>
-          {unreadCount > 0 ? (
-            <button
-              onClick={markAllAsRead}
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 ml-auto cursor-pointer whitespace-nowrap"
-            >
-              <CheckCheck className="w-3.5 h-3.5" />
-              Tandai Semua Dibaca ({unreadCount})
-            </button>
-          ) : (
-            <span className="text-xs text-slate-400 font-medium ml-auto flex items-center gap-1 whitespace-nowrap">
-              <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
-              Semua terbaca
-            </span>
-          )}
-        </div>
-
-        {/* FILTERS & SEARCH CONTROLS */}
-        <div className="p-4 border-b border-slate-200 bg-white space-y-3 shrink-0">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari toko (e.g. Bali, Surabaya, Medan), nama member, atau struk..."
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition-colors"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Region filter pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">Wilayah:</span>
-            {[
-              { id: 'ALL', label: 'Semua Wilayah' },
-              { id: 'JABODETABEK', label: 'Jabodetabek' },
-              { id: 'JAWA_BALI', label: 'Jawa & Bali' },
-              { id: 'KALIMANTAN', label: 'Kalimantan' },
-              { id: 'SULAWESI', label: 'Sulawesi' },
-              { id: 'SUMATERA', label: 'Sumatera' }
-            ].map(reg => (
-              <button
-                key={reg.id}
-                onClick={() => setSelectedRegion(reg.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  selectedRegion === reg.id
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {reg.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Type filter & unread toggle */}
-          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
-            <div className="flex items-center gap-1.5 overflow-x-auto">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">Kategori:</span>
-              {[
-                { id: 'ALL', label: 'Semua' },
-                { id: 'EARN', label: 'Transaksi' },
-                { id: 'REDEEM', label: 'Voucher' },
-                { id: 'MEMBER', label: 'Member Baru' },
-                { id: 'TIER', label: 'Tier Upgrade' }
-              ].map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setSelectedType(t.id)}
-                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                    selectedType === t.id
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none shrink-0 font-medium">
-              <input
-                type="checkbox"
-                checked={onlyUnread}
-                onChange={(e) => setOnlyUnread(e.target.checked)}
-                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
-              />
-              <span>Belum dibaca</span>
-            </label>
-          </div>
+        {/* TABS */}
+        <div className="px-5 flex gap-6 border-b border-slate-100 bg-white">
+          <button
+            onClick={() => setActiveTab('ALL')}
+            className={`py-3 text-sm font-semibold transition-colors border-b-2 cursor-pointer ${
+              activeTab === 'ALL'
+                ? 'border-emerald-600 text-emerald-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Semua
+          </button>
+          <button
+            onClick={() => setActiveTab('UNREAD')}
+            className={`py-3 text-sm font-semibold transition-colors border-b-2 cursor-pointer ${
+              activeTab === 'UNREAD'
+                ? 'border-emerald-600 text-emerald-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Belum Dibaca
+          </button>
         </div>
 
         {/* NOTIFICATION FEED LIST */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-slate-100/60">
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-3">
           {filteredActivities.length === 0 ? (
-            <div className="py-16 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 p-8">
-              <Bell className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-              <p className="font-semibold text-slate-700 text-sm">Tidak ada aktivitas yang sesuai</p>
-              <p className="text-xs text-slate-400 mt-1">Coba ubah filter wilayah atau kata kunci pencarian toko.</p>
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCheck className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="font-semibold text-slate-800">Semua aktivitas telah dibaca</p>
+              <p className="text-sm text-slate-500 mt-1">Tidak ada notifikasi baru untuk saat ini.</p>
             </div>
           ) : (
-            filteredActivities.map((act) => {
-              const isEarn = act.type === 'EARN_POINTS';
-              const isRedeem = act.type === 'REDEEM_VOUCHER';
-              const isNewMember = act.type === 'NEW_MEMBER';
-              const isTier = act.type === 'TIER_UPGRADE';
+            <div className="space-y-2">
+              {filteredActivities.map((act) => {
+                const isEarn = act.type === 'EARN_POINTS';
+                const isRedeem = act.type === 'REDEEM_VOUCHER';
+                const isNewMember = act.type === 'NEW_MEMBER';
+                const isTier = act.type === 'TIER_UPGRADE';
+                
+                return (
+                  <div
+                    key={act.id}
+                    onClick={() => {
+                      markAsRead(act.id);
+                      setSelectedActivity(act);
+                    }}
+                    className={`p-4 rounded-xl transition-all cursor-pointer relative group flex gap-3.5 ${
+                      act.isRead
+                        ? 'bg-white hover:bg-slate-100/50 border border-transparent'
+                        : 'bg-white shadow-sm border border-emerald-100'
+                    }`}
+                  >
+                    {!act.isRead && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-emerald-500 rounded-r-md" />
+                    )}
 
-              return (
-                <div
-                  key={act.id}
-                  onClick={() => {
-                    markAsRead(act.id);
-                    setSelectedActivity(act);
-                  }}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer relative group ${
-                    act.isRead
-                      ? 'bg-white hover:bg-slate-50/80 border-slate-200 text-slate-700'
-                      : 'bg-white border-amber-300/80 shadow-xs ring-1 ring-amber-400/20'
-                  }`}
-                >
-                  {!act.isRead && (
-                    <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-amber-500" />
-                  )}
-
-                  <div className="flex items-start gap-3.5">
-                    {/* Icon based on activity type */}
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                      isEarn ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
-                      isRedeem ? 'bg-amber-50 text-amber-600 border border-amber-200' :
-                      isNewMember ? 'bg-blue-50 text-blue-600 border border-blue-200' :
-                      isTier ? 'bg-purple-50 text-purple-600 border border-purple-200' :
-                      'bg-slate-100 text-slate-700 border border-slate-200'
+                    {/* Simple Icon */}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                      isEarn ? 'bg-emerald-100 text-emerald-600' :
+                      isRedeem ? 'bg-amber-100 text-amber-600' :
+                      isNewMember ? 'bg-blue-100 text-blue-600' :
+                      isTier ? 'bg-purple-100 text-purple-600' :
+                      'bg-slate-200 text-slate-600'
                     }`}>
-                      {isEarn && <ShoppingBag className="w-4 h-4" />}
-                      {isRedeem && <Gift className="w-4 h-4" />}
-                      {isNewMember && <UserPlus className="w-4 h-4" />}
-                      {isTier && <Crown className="w-4 h-4" />}
-                      {act.type === 'STORE_STATUS' && <Building2 className="w-4 h-4" />}
+                      {isEarn && <ShoppingBag className="w-5 h-5" />}
+                      {isRedeem && <Gift className="w-5 h-5" />}
+                      {isNewMember && <UserPlus className="w-5 h-5" />}
+                      {isTier && <Crown className="w-5 h-5" />}
+                      {act.type === 'STORE_STATUS' && <Store className="w-5 h-5" />}
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="font-bold text-xs text-slate-900 leading-tight">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className={`font-semibold text-sm leading-snug truncate pr-2 ${act.isRead ? 'text-slate-700' : 'text-slate-900'}`}>
                           {act.title}
                         </span>
-                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-slate-100 text-slate-600 flex items-center gap-1">
-                          <MapPin className="w-2.5 h-2.5 text-slate-400" />
-                          {act.storeCity} ({act.storeRegion})
+                        <span className={`text-[11px] whitespace-nowrap shrink-0 mt-0.5 ${act.isRead ? 'text-slate-400' : 'text-emerald-600 font-medium'}`}>
+                          {act.timeAgo}
                         </span>
                       </div>
 
-                      <p className="text-xs text-slate-600 leading-snug">
+                      <p className={`text-xs leading-snug line-clamp-2 ${act.isRead ? 'text-slate-500' : 'text-slate-600'}`}>
                         {act.description}
                       </p>
 
-                      {/* Sub metadata */}
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400">
-                        <span className="flex items-center gap-1 font-medium text-slate-500">
-                          <Store className="w-3 h-3 text-slate-400" />
-                          {act.storeName}
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {act.timeAgo}
-                        </span>
-                        {act.pointsDelta !== undefined && (
-                          <>
-                            <span>•</span>
-                            <span className={`font-bold ${act.pointsDelta >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                              {act.pointsDelta >= 0 ? `+${act.pointsDelta}` : act.pointsDelta} Pts
-                            </span>
-                          </>
-                        )}
-                        <span className="ml-auto text-emerald-600 opacity-0 group-hover:opacity-100 font-semibold flex items-center gap-0.5 transition-opacity">
-                          Detail <ChevronRight className="w-3 h-3" />
-                        </span>
+                      <div className="flex items-center gap-1.5 mt-2 text-[11px] font-medium text-slate-500">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        <span className="truncate">{act.storeName}, {act.storeCity}</span>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
-
-        {/* FOOTER */}
-        <div className="px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-between text-xs text-slate-500 shrink-0">
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            Watch Club National Real-Time Activity Network
-          </span>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors cursor-pointer"
-          >
-            Tutup
-          </button>
-        </div>
-
       </div>
 
       {/* DETAIL MODAL FOR SELECTED ACTIVITY */}

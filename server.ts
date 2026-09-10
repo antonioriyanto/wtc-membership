@@ -590,6 +590,115 @@ app.get('/api/support', async (req, res) => {
   }
 });
 
+app.post('/api/stores', async (req, res) => {
+  try {
+    const data = { ...req.body };
+    if (!data.id || !data.name) {
+      return res.status(400).json({ error: 'Store ID and Name are required.' });
+    }
+    await db.insert(stores).values(data).onConflictDoUpdate({
+      target: stores.id,
+      set: data
+    });
+    const updated = await db.select().from(stores).where(eq(stores.id, data.id));
+    res.json(updated[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
+app.put('/api/stores/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = { ...req.body };
+    await db.update(stores).set(data).where(eq(stores.id, id));
+    const updated = await db.select().from(stores).where(eq(stores.id, id));
+    res.json(updated[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
+app.delete('/api/stores/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.delete(stores).where(eq(stores.id, id));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
+app.post('/api/support', async (req, res) => {
+  try {
+    const data = { ...req.body };
+    if (data.id && (typeof data.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.id))) {
+      delete data.id;
+    }
+    if (data.createdAt) data.createdAt = new Date(data.createdAt);
+    if (data.updatedAt) data.updatedAt = new Date(data.updatedAt);
+    const [inserted] = await db.insert(supportTickets).values(data).returning();
+    res.json(inserted || data);
+  } catch (err: any) {
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
+app.put('/api/support/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = { ...req.body };
+    if (data.updatedAt) data.updatedAt = new Date(data.updatedAt);
+    await db.update(supportTickets).set(data).where(eq(supportTickets.id, id));
+    const updated = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
+    res.json(updated[0] || data);
+  } catch (err: any) {
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
+app.post('/api/campaigns', async (req, res) => {
+  try {
+    const data = { ...req.body };
+    if (data.id && (typeof data.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.id))) {
+      delete data.id;
+    }
+    if (data.scheduledAt) data.scheduledAt = new Date(data.scheduledAt);
+    const [inserted] = await db.insert(campaigns).values(data).returning();
+    res.json(inserted || data);
+  } catch (err: any) {
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
+app.post('/api/audit', async (req, res) => {
+  try {
+    const data = { ...req.body };
+    if (data.id && (typeof data.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.id))) {
+      delete data.id;
+    }
+    if (data.timestamp) data.timestamp = new Date(data.timestamp);
+    const [inserted] = await db.insert(auditLogs).values(data).returning();
+    res.json(inserted || data);
+  } catch (err: any) {
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
+app.put('/api/config', async (req, res) => {
+  try {
+    const data = { ...req.body };
+    data.id = 'default';
+    await db.insert(loyaltyConfig).values(data).onConflictDoUpdate({
+      target: loyaltyConfig.id,
+      set: data
+    });
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
 async function seedInitialData() {
   try {
     // 1. Seed Stores

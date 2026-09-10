@@ -87,7 +87,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSaveStore = (e: React.FormEvent) => {
+  const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.mallName) return;
 
@@ -112,9 +112,38 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
         operatingHours: formData.operatingHours || '10:00 - 22:00 WIB',
         description: formData.description || 'Official Watch Club boutique.'
       };
-      setStores([created, ...stores]);
+      try {
+        const res = await fetch('/api/stores', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(created)
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setStores([saved, ...stores.filter(s => s.id !== saved.id)]);
+        } else {
+          setStores([created, ...stores]);
+        }
+      } catch {
+        setStores([created, ...stores]);
+      }
     } else if (mode === 'edit' && editingStoreId) {
-      setStores(stores.map(s => s.id === editingStoreId ? { ...s, ...formData } as StoreBranch : s));
+      const updatedData = { ...stores.find(s => s.id === editingStoreId), ...formData };
+      try {
+        const res = await fetch(`/api/stores/${editingStoreId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedData)
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setStores(stores.map(s => s.id === editingStoreId ? saved : s));
+        } else {
+          setStores(stores.map(s => s.id === editingStoreId ? updatedData as StoreBranch : s));
+        }
+      } catch {
+        setStores(stores.map(s => s.id === editingStoreId ? updatedData as StoreBranch : s));
+      }
     }
 
     setMode('list');
@@ -127,7 +156,12 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
     showConfirm(
       `Hapus cabang store ${storeObj?.name || id} secara permanen? Tindakan ini tidak dapat dibatalkan.`,
       'Konfirmasi Hapus Cabang',
-      () => setStores(stores.filter(s => s.id !== id)),
+      async () => {
+        try {
+          await fetch(`/api/stores/${id}`, { method: 'DELETE' });
+        } catch {}
+        setStores(stores.filter(s => s.id !== id));
+      },
       'Ya, Hapus',
       'Batal'
     );
