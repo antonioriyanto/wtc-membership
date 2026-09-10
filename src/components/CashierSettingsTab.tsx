@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Monitor, Sliders, LogOut, Moon, Check, Key, HelpCircle, Smartphone } from 'lucide-react';
+import { useCustomDialog } from './CustomDialogProvider';
 
 interface SettingsTabProps {
   cashierName: string | null;
@@ -8,6 +9,7 @@ interface SettingsTabProps {
 }
 
 export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, storeName, onSignOut }) => {
+  const { showAlert } = useCustomDialog();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
@@ -126,7 +128,7 @@ export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, st
                 <p className="text-sm text-slate-500 dark:text-slate-400">Atur ulang jika scanner kamera tidak muncul.</p>
               </div>
               <button 
-                onClick={() => alert('Izin kamera telah diatur ulang. Silakan izinkan akses saat membuka scanner.')}
+                onClick={() => showAlert('Izin kamera telah diatur ulang. Silakan izinkan akses saat membuka scanner.', 'Akses Kamera', 'success')}
                 className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 Reset Akses

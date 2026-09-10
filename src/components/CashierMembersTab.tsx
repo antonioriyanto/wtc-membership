@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Member, StoreBranch } from '../types';
+import { useCustomDialog } from './CustomDialogProvider';
 import { 
   Users, 
   UserPlus, 
@@ -35,6 +36,7 @@ interface MembersTabProps {
 }
 
 export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembers, currentStore, onOpenCreateMember }) => {
+  const { showAlert } = useCustomDialog();
   const [searchInput, setSearchInput] = useState('');
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
@@ -146,7 +148,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
       }, 1200);
     } catch (err) {
       console.error(err);
-      alert('Terjadi kesalahan saat menyimpan perubahan.');
+      showAlert('Terjadi kesalahan saat menyimpan perubahan.', 'Kesalahan', 'error');
     } finally {
       setIsSavingEdit(false);
     }
@@ -172,7 +174,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
 
   const handleExportExcel = () => {
     if (filteredMembers.length === 0) {
-      alert('Belum ada data member untuk diekspor.');
+      showAlert('Belum ada data member untuk diekspor.', 'Perhatian', 'warning');
       return;
     }
     const data = prepareMembersExportData();
@@ -200,7 +202,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
 
   const handleExportCSV = () => {
     if (filteredMembers.length === 0) {
-      alert('Belum ada data member untuk diekspor.');
+      showAlert('Belum ada data member untuk diekspor.', 'Perhatian', 'warning');
       return;
     }
 

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Member, Voucher, StoreBranch, Transaction, Campaign, SupportTicket } from '../types';
+import { useCustomDialog } from './CustomDialogProvider';
 import { 
   CreditCard, 
   Award, 
@@ -51,6 +52,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   onSubmitTicket,
   onBackToHO,
 }) => {
+  const { showAlert } = useCustomDialog();
   const [activeTab, setActiveTab] = useState<'MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE'>('MEMBERSHIP');
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -100,7 +102,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const handleCreateTicketSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (hasUnresolvedTicket) {
-      alert('Anda masih memiliki tiket kendala yang sedang berlangsung (Open / In Progress). Harap tunggu hingga tiket sebelumnya diselesaikan (Resolved) oleh Tim Support HO sebelum mengajukan tiket baru.');
+      showAlert('Anda masih memiliki tiket kendala yang sedang berlangsung (Open / In Progress). Harap tunggu hingga tiket sebelumnya diselesaikan (Resolved) oleh Tim Support HO sebelum mengajukan tiket baru.', 'Tiket Aktif Ditemukan', 'warning');
       return;
     }
     if (!ticketSubject.trim() || !ticketMessage.trim()) return;

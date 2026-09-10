@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Transaction } from '../types';
+import { useCustomDialog } from './CustomDialogProvider';
 import { 
   Receipt, 
   ArrowUp, 
@@ -27,6 +28,7 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
   transactions,
   currentStoreName
 }) => {
+  const { showAlert } = useCustomDialog();
   const [searchInput, setSearchInput] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [storeFilter, setStoreFilter] = useState('all');
@@ -105,7 +107,7 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
 
   const handleExportExcel = () => {
     if (filteredTransactions.length === 0) {
-      alert('Belum ada data transaksi yang sesuai filter untuk diekspor.');
+      showAlert('Belum ada data transaksi yang sesuai filter untuk diekspor.', 'Perhatian', 'warning');
       return;
     }
     const data = prepareExportData();
@@ -135,7 +137,7 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
 
   const handleExportCSV = () => {
     if (filteredTransactions.length === 0) {
-      alert('Belum ada data transaksi untuk diekspor.');
+      showAlert('Belum ada data transaksi untuk diekspor.', 'Perhatian', 'warning');
       return;
     }
 

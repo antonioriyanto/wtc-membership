@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StoreBranch } from '../types';
+import { useCustomDialog } from './CustomDialogProvider';
 import { Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, CheckCircle, AlertTriangle, ArrowLeft, Save, Receipt, Layers } from 'lucide-react';
 
 interface StoresSettingsTabProps {
@@ -10,6 +11,7 @@ interface StoresSettingsTabProps {
 }
 
 export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, setStores, onViewTransactions, isSkeletonLoading = false }) => {
+  const { showConfirm } = useCustomDialog();
   if (isSkeletonLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -121,9 +123,14 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
   };
 
   const handleDeleteStore = (id: string) => {
-    if (confirm('Are you sure you want to delete this store branch? This action cannot be undone.')) {
-      setStores(stores.filter(s => s.id !== id));
-    }
+    const storeObj = stores.find(s => s.id === id);
+    showConfirm(
+      `Hapus cabang store ${storeObj?.name || id} secara permanen? Tindakan ini tidak dapat dibatalkan.`,
+      'Konfirmasi Hapus Cabang',
+      () => setStores(stores.filter(s => s.id !== id)),
+      'Ya, Hapus',
+      'Batal'
+    );
   };
 
   return (

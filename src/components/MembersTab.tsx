@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Member, Transaction, StoreBranch, MemberTier } from '../types';
+import { useCustomDialog } from './CustomDialogProvider';
 import { 
   Search, 
   FileDown, 
@@ -51,6 +52,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
   onOpenPointAdjust,
   isSkeletonLoading = false
 }) => { 
+  const { showAlert, showConfirm } = useCustomDialog();
   if (isSkeletonLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -189,7 +191,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
 
   const handleExportExcel = () => {
     if (sortedMembers.length === 0) {
-      alert('Belum ada data member untuk diekspor.');
+      showAlert('Belum ada data member untuk diekspor.', 'Perhatian', 'warning');
       return;
     }
     const data = prepareExportData();
@@ -215,7 +217,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
 
   const handleExportCSV = () => {
     if (sortedMembers.length === 0) {
-      alert('Belum ada data member untuk diekspor.');
+      showAlert('Belum ada data member untuk diekspor.', 'Perhatian', 'warning');
       return;
     }
     const headers = ['ID Member', 'Nama Lengkap', 'Nomor HP', 'Email', 'Tanggal Lahir', 'Level Tier', 'Total Poin', 'Total Belanja', 'Store Terdaftar', 'Status'];
@@ -587,9 +589,13 @@ export const MembersTab: React.FC<MembersTabProps> = ({
                         {/* DELETE BUTTON */}
                         <button
                           onClick={() => {
-                            if (window.confirm(`Hapus akun member ${m.name} (${m.membershipId}) secara permanen?`)) {
-                              handleDeleteMember(m.id);
-                            }
+                            showConfirm(
+                              `Hapus akun member ${m.name} (${m.membershipId}) secara permanen?`,
+                              'Konfirmasi Hapus Member',
+                              () => handleDeleteMember(m.id),
+                              'Ya, Hapus Permanen',
+                              'Batal'
+                            );
                           }}
                           className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                           title="Hapus Akun Member"

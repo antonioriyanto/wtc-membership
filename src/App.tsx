@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Member, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch, SupportTicket, Campaign, AuditLog } from './types';
+import { useCustomDialog } from './components/CustomDialogProvider';
 import { 
   initialStores, 
   initialMembers, 
@@ -40,6 +41,7 @@ import { NationalActivityNotifications } from './components/NationalActivityNoti
 
 export default function App() {
   const navigate = useNavigate();
+  const { showAlert } = useCustomDialog();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   
   const [adminAuthenticated, setAdminAuthenticated] = useState(() => {
@@ -943,7 +945,7 @@ export default function App() {
                   try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
                   return next;
                 });
-                alert('Penyesuaian poin berhasil disimpan!');
+                showAlert('Penyesuaian poin berhasil disimpan!', 'Poin Berhasil Disesuaikan', 'success');
                 setIsAdjustingPoints(false);
               }}
             />

@@ -9,6 +9,7 @@ import { CashierTransactionsTab } from './CashierTransactionsTab';
 import { CashierSettingsTab } from './CashierSettingsTab';
 import { CashierTabType } from '../types';
 import { CreateMemberModal } from './CreateMemberModal';
+import { useCustomDialog } from './CustomDialogProvider';
 
 interface CashierPOSViewProps {
   members: Member[];
@@ -37,6 +38,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
   onSignOut,
   onSwitchPerspective
 }) => {
+  const { showAlert } = useCustomDialog();
   const [activeTab, setActiveTab] = useState<CashierTabType>('cashier');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateMemberOpen, setIsCreateMemberOpen] = useState(false);
@@ -135,7 +137,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
       return next;
     });
-    alert(`Transaksi berhasil! +${savedTrx.pointsDelta} Poin ditambahkan ke ${updatedMember.name}.`);
+    showAlert(`Transaksi berhasil! +${savedTrx.pointsDelta} Poin ditambahkan ke ${updatedMember.name}.`, 'Transaksi Berhasil', 'success');
     setIsSubmitting(false);
   };
 
@@ -288,7 +290,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       localStorage.setItem('wtc_audit_logs', JSON.stringify(auditList));
     } catch {}
 
-    alert(`Voucher ${cleanCode} berhasil diklaim & kuota telah diperbarui!`);
+    showAlert(`Voucher ${cleanCode} berhasil diklaim & kuota telah diperbarui!`, 'Klaim Voucher Berhasil', 'success');
     setIsSubmitting(false);
   };
 
