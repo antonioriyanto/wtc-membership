@@ -107,6 +107,48 @@ export default function App() {
     setIsStoreTransactionsModalOpen(true);
   };
 
+  const handleUpdateMember = async (updatedMember: Member) => {
+    setMembers(prev => {
+      const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
+      try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    try {
+      await fetch(`/api/members/${updatedMember.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedMember)
+      });
+    } catch (err) {
+      console.warn("Could not sync member update to server:", err);
+    }
+  };
+
+  const handleDeleteMember = async (memberId: string) => {
+    setMembers(prev => {
+      const next = prev.filter(m => m.id !== memberId);
+      try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    try {
+      await fetch(`/api/members/${memberId}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.warn("Could not sync member delete to server:", err);
+    }
+  };
+
+  const handleToggleSuspendMember = async (memberId: string) => {
+    const target = members.find(m => m.id === memberId);
+    if (!target) return;
+    const newStatus = target.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+    const updatedMember = { ...target, status: newStatus as 'ACTIVE' | 'SUSPENDED' };
+    handleUpdateMember(updatedMember);
+  };
+
   // Synchronize loyalty config changes to localStorage
   useEffect(() => {
     try {
@@ -304,8 +346,13 @@ export default function App() {
                 {activeTab === 'members' && (
                   <MembersTab 
                     members={members}
+                    stores={stores}
                     transactions={transactions}
                     onOpenCreateMember={() => setIsCreateMemberOpen(true)}
+                    onUpdateMember={handleUpdateMember}
+                    onDeleteMember={handleDeleteMember}
+                    onToggleSuspendMember={handleToggleSuspendMember}
+                    onOpenPointAdjust={() => setIsPointAdjustOpen(true)}
                   />
                 )}
                 {activeTab === 'loyalty' && (

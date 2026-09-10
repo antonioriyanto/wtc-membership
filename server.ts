@@ -192,9 +192,21 @@ app.post('/api/members', async (req, res) => {
 
 app.put('/api/members/:id', async (req, res) => {
   try {
-    const { name, email, phone, gender, address, birthDate, status, registeredStore } = req.body;
+    const { 
+      name, 
+      email, 
+      phone, 
+      gender, 
+      address, 
+      birthDate, 
+      status, 
+      registeredStore,
+      tier,
+      points,
+      lifetimePoints,
+      totalSpend
+    } = req.body;
     
-    // Only allow specific non-financial fields to be updated via this endpoint
     const updateData: any = {};
     if (name !== undefined) updateData.name = String(name).trim();
     if (email !== undefined) updateData.email = String(email).trim() || null;
@@ -203,6 +215,10 @@ app.put('/api/members/:id', async (req, res) => {
     if (address !== undefined) updateData.address = String(address).trim() || null;
     if (status !== undefined) updateData.status = status;
     if (registeredStore !== undefined) updateData.registeredStore = registeredStore;
+    if (tier !== undefined) updateData.tier = tier;
+    if (points !== undefined) updateData.points = Number(points);
+    if (lifetimePoints !== undefined) updateData.lifetimePoints = Number(lifetimePoints);
+    if (totalSpend !== undefined) updateData.totalSpend = Number(totalSpend);
     
     if (birthDate) {
       updateData.birthDate = new Date(birthDate);
@@ -220,6 +236,23 @@ app.put('/api/members/:id', async (req, res) => {
     }
   } catch (err: any) {
     logger.error({ err }, 'PUT /api/members/:id error:');
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
+  }
+});
+
+app.delete('/api/members/:id', async (req, res) => {
+  try {
+    const deleted = await db.delete(members)
+      .where(eq(members.id, req.params.id))
+      .returning();
+      
+    if (deleted.length > 0) {
+      res.json({ success: true, member: deleted[0] });
+    } else {
+      res.status(404).json({ error: "Member not found" });
+    }
+  } catch (err: any) {
+    logger.error({ err }, 'DELETE /api/members/:id error:');
     res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
   }
 });
@@ -421,40 +454,6 @@ app.put('/api/vouchers/:id', async (req, res) => {
       res.status(404).json({ error: "Voucher not found" });
     }
   } catch (err: any) {
-    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
-  }
-});
-
-app.put('/api/members/:id', async (req, res) => {
-  try {
-    const { name, email, phone, gender, address, birthDate, status, registeredStore } = req.body;
-    
-    // Only allow specific non-financial fields to be updated via this endpoint
-    const updateData: any = {};
-    if (name !== undefined) updateData.name = String(name).trim();
-    if (email !== undefined) updateData.email = String(email).trim() || null;
-    if (phone !== undefined) updateData.phone = String(phone).trim();
-    if (gender !== undefined) updateData.gender = gender;
-    if (address !== undefined) updateData.address = String(address).trim() || null;
-    if (status !== undefined) updateData.status = status;
-    if (registeredStore !== undefined) updateData.registeredStore = registeredStore;
-    
-    if (birthDate) {
-      updateData.birthDate = new Date(birthDate);
-    }
-    
-    const updated = await db.update(members)
-      .set(updateData)
-      .where(eq(members.id, req.params.id))
-      .returning();
-      
-    if (updated.length > 0) {
-      res.json(updated[0]);
-    } else {
-      res.status(404).json({ error: "Member not found" });
-    }
-  } catch (err: any) {
-    logger.error({ err }, 'PUT /api/members/:id error:');
     res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message });
   }
 });

@@ -52,6 +52,7 @@ export interface Member {
   name: string;
   phone: string;
   email: string;
+  password?: string;
   tier: MemberTier;
   points: number;
   lifetimePoints: number;
