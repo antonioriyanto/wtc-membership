@@ -25,6 +25,7 @@ import { CashierPOSView } from './components/CashierPOSView';
 import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
 import { PortalSwitcher } from './components/PortalSwitcher';
+import { StoreTransactionsModal } from './components/StoreTransactionsModal';
 
 export default function App() {
   const navigate = useNavigate();
@@ -98,6 +99,13 @@ export default function App() {
   const [isPointAdjustOpen, setIsPointAdjustOpen] = useState(false);
   const [isAdjustingPoints, setIsAdjustingPoints] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
+  const [isStoreTransactionsModalOpen, setIsStoreTransactionsModalOpen] = useState(false);
+  const [selectedStoreForTrx, setSelectedStoreForTrx] = useState<StoreBranch | null>(null);
+
+  const handleOpenStoreTransactions = (store: StoreBranch | null) => {
+    setSelectedStoreForTrx(store);
+    setIsStoreTransactionsModalOpen(true);
+  };
 
   // Synchronize loyalty config changes to localStorage
   useEffect(() => {
@@ -279,15 +287,19 @@ export default function App() {
                     transactions={transactions}
                     vouchers={vouchers}
                     loyaltyConfig={loyaltyConfig}
-                    onNavigateToStores={() => setActiveTab('stores')}
+                    onNavigateToStores={() => handleOpenStoreTransactions(null)}
                     onNavigateToMembers={() => setActiveTab('members')}
                     onNavigateToVouchers={() => setActiveTab('vouchers')}
                     onOpenManualAdjust={() => setIsPointAdjustOpen(true)}
-                    onSelectStore={() => {}}
+                    onSelectStore={(store) => handleOpenStoreTransactions(store)}
                   />
                 )}
                 {activeTab === 'stores' && (
-                  <StoresSettingsTab stores={stores} setStores={setStores} />
+                  <StoresSettingsTab 
+                    stores={stores} 
+                    setStores={setStores} 
+                    onViewTransactions={(store) => handleOpenStoreTransactions(store)} 
+                  />
                 )}
                 {activeTab === 'members' && (
                   <MembersTab 
@@ -485,6 +497,17 @@ export default function App() {
                 alert('Penyesuaian poin berhasil disimpan!');
                 setIsAdjustingPoints(false);
               }}
+            />
+
+            {/* MODAL TRANSAKSI NASIONAL & CABANG TOKO */}
+            <StoreTransactionsModal 
+              isOpen={isStoreTransactionsModalOpen}
+              onClose={() => setIsStoreTransactionsModalOpen(false)}
+              selectedStore={selectedStoreForTrx}
+              stores={stores}
+              transactions={transactions}
+              members={members}
+              onSelectStore={(store) => setSelectedStoreForTrx(store)}
             />
           </div>
         ) : (

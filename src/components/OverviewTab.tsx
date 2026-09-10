@@ -263,11 +263,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <p className="text-xs text-slate-500 mt-0.5">Real-time revenue, customer throughput, and points generated per branch</p>
             </div>
             <button
+              id="view-all-stores-transactions-btn"
               onClick={onNavigateToStores}
-              className="text-xs font-semibold text-slate-900 hover:text-amber-600 flex items-center gap-1 transition-colors"
+              title="Lihat seluruh transaksi dari 41 toko di Indonesia"
+              className="text-xs font-semibold text-slate-900 hover:text-amber-600 flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-amber-50 transition-all border border-transparent hover:border-amber-200"
             >
               <span>View All +40 Stores</span>
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 text-amber-600" />
             </button>
           </div>
 
@@ -279,7 +281,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               return (
                 <div 
                   key={store.id}
+                  id={`top-store-row-${store.id}`}
                   onClick={() => onSelectStore(store)}
+                  title={`Klik untuk melihat seluruh transaksi cabang ${store.name}`}
                   className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/80 p-3 rounded-2xl transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-4 flex-1">
@@ -311,11 +315,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0 pl-12 sm:pl-0">
-                    <div className="text-sm font-bold text-slate-900">
+                  <div className="text-right shrink-0 pl-12 sm:pl-0 flex flex-col items-end">
+                    <div className="text-sm font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
                       Rp {store.todayRevenue.toLocaleString('id-ID')}
                     </div>
                     <div className="text-[11px] text-slate-400">Daily Volume</div>
+                    <span className="text-[10px] text-amber-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 mt-0.5">
+                      Lihat Transaksi →
+                    </span>
                   </div>
                 </div>
               );

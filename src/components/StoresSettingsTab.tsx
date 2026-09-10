@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { StoreBranch } from '../types';
-import { Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, CheckCircle, AlertTriangle, ArrowLeft, Save } from 'lucide-react';
+import { Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, CheckCircle, AlertTriangle, ArrowLeft, Save, Receipt, Layers } from 'lucide-react';
 
 interface StoresSettingsTabProps {
   stores: StoreBranch[];
   setStores: React.Dispatch<React.SetStateAction<StoreBranch[]>>;
+  onViewTransactions?: (store: StoreBranch | null) => void;
 }
 
-export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, setStores }) => {
+export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, setStores, onViewTransactions }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
   
@@ -123,12 +124,23 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
           </p>
         </div>
         {mode === 'list' && (
-          <button
-            onClick={handleOpenCreate}
-            className="bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm cursor-pointer shrink-0"
-          >
-            <Plus className="w-4 h-4" /> Add New Branch
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {onViewTransactions && (
+              <button
+                id="stores-tab-view-all-transactions-btn"
+                onClick={() => onViewTransactions(null)}
+                className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+              >
+                <Receipt className="w-4 h-4" /> Transaksi Nasional (41 Cabang)
+              </button>
+            )}
+            <button
+              onClick={handleOpenCreate}
+              className="bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Add New Branch
+            </button>
+          </div>
         )}
       </div>
 
@@ -354,6 +366,15 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
               </div>
               
               <div className="flex items-center gap-1">
+                {onViewTransactions && (
+                  <button
+                    onClick={() => onViewTransactions(store)}
+                    className="p-2 text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors cursor-pointer"
+                    title={`Lihat Seluruh Transaksi Cabang ${store.name}`}
+                  >
+                    <Receipt className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => handleOpenEdit(store)}
                   className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
@@ -390,15 +411,27 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-slate-400 font-medium">Manager:</span>{' '}
-                <span className="font-bold text-slate-800 dark:text-slate-200">{store.managerName}</span>
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-400 font-medium">Manager:</span>{' '}
+                  <span className="font-bold text-slate-800 dark:text-slate-200">{store.managerName}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-400 font-medium">Cashiers:</span>{' '}
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{store.cashierCount} staff</span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-slate-400 font-medium">Cashiers:</span>{' '}
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">{store.cashierCount} staff</span>
-              </div>
+
+              {onViewTransactions && (
+                <button
+                  onClick={() => onViewTransactions(store)}
+                  className="w-full py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-900 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <Receipt className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Lihat Seluruh Transaksi Toko</span>
+                </button>
+              )}
             </div>
           </div>
         ))}
