@@ -19,13 +19,27 @@ interface LoyaltyRulesTabProps {
   config: LoyaltyConfig;
   setConfig?: (newConfig: LoyaltyConfig) => void;
   onSaveConfig?: (newConfig: LoyaltyConfig) => void;
+  isSkeletonLoading?: boolean;
 }
 
 export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
   config,
   setConfig,
   onSaveConfig,
+  isSkeletonLoading = false
 }) => {
+  if (isSkeletonLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-64 bg-slate-200 rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-64 bg-slate-200 rounded-3xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const [formData, setFormData] = useState<LoyaltyConfig>({ ...config });
   const [testSpend, setTestSpend] = useState<number>(3500000);
   const [testTier, setTestTier] = useState<'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK'>('GOLD');

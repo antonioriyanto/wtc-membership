@@ -25,6 +25,7 @@ interface VouchersTabProps {
   onCreateVoucher: () => void;
   onEditVoucher?: (voucher: Voucher) => void;
   onToggleVoucherStatus: (voucherId: string) => void;
+  isSkeletonLoading?: boolean;
 }
 
 export const VouchersTab: React.FC<VouchersTabProps> = ({
@@ -34,7 +35,23 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
   onCreateVoucher,
   onEditVoucher,
   onToggleVoucherStatus,
+  isSkeletonLoading = false
 }) => {
+  if (isSkeletonLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="flex justify-between items-center">
+          <div className="h-8 w-64 bg-slate-200 rounded-xl" />
+          <div className="h-10 w-36 bg-slate-200 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-48 bg-slate-200 rounded-3xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);

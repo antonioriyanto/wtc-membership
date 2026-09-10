@@ -93,8 +93,16 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     return tickets.filter(t => t.memberId === member.id || t.memberPhone === member.phone);
   }, [tickets, member]);
 
+  const hasUnresolvedTicket = useMemo(() => {
+    return myTickets.some(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS');
+  }, [myTickets]);
+
   const handleCreateTicketSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasUnresolvedTicket) {
+      alert('Anda masih memiliki tiket kendala yang sedang berlangsung (Open / In Progress). Harap tunggu hingga tiket sebelumnya diselesaikan (Resolved) oleh Tim Support HO sebelum mengajukan tiket baru.');
+      return;
+    }
     if (!ticketSubject.trim() || !ticketMessage.trim()) return;
 
     if (onSubmitTicket) {
@@ -218,19 +226,6 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             <WatchClubLogo />
           </div>
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => {
-                setTicketSuccessNotice(null);
-                setIsSupportModalOpen(true);
-              }}
-              title="Pusat Bantuan & Tiket Kendala"
-              className="relative w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-100 flex justify-center items-center text-slate-700 shadow-xs cursor-pointer transition-colors"
-            >
-              <HelpCircle className="w-5 h-5 text-blue-600" />
-              {myTickets.some(t => t.status === 'RESOLVED') && (
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white animate-pulse" />
-              )}
-            </button>
             <div className="w-10 h-10 rounded-full border border-slate-300 bg-slate-200 flex justify-center items-center font-bold text-slate-500 overflow-hidden shrink-0">
               {member.name.charAt(0).toUpperCase()}
             </div>
@@ -243,14 +238,19 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             {activePromoCampaign && (
               <div 
                 onClick={() => setActiveCampaignModal(activePromoCampaign)}
-                className="mx-5 mt-2 p-3 rounded-2xl bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white shadow-md cursor-pointer hover:scale-[1.01] transition-transform flex items-center justify-between gap-3 border border-purple-600/40"
+                className="mx-5 mt-2 p-3 rounded-2xl text-white shadow-md cursor-pointer hover:scale-[1.01] transition-transform flex items-center justify-between gap-3 border border-white/20 relative overflow-hidden"
+                style={{
+                  backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.9)), url(${activePromoCampaign.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/30 border border-purple-400/40 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                <div className="flex items-center gap-2.5 min-w-0 relative z-10">
+                  <div className="w-7 h-7 rounded-lg bg-white/20 border border-white/30 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-purple-300">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-amber-300">
                       {activePromoCampaign.badgeText || 'PROMO KHUSUS MEMBER'}
                     </div>
                     <div className="text-xs font-bold truncate text-white">
@@ -258,7 +258,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     </div>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-1 bg-white/20 hover:bg-white/30 rounded-lg shrink-0 transition-colors">
+                <span className="text-[10px] font-bold px-2 py-1 bg-white/20 hover:bg-white/30 rounded-lg shrink-0 transition-colors relative z-10">
                   Klaim Promo →
                 </span>
               </div>
@@ -299,8 +299,8 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   <div className={`text-xs sm:text-sm tracking-[3px] font-semibold mt-1 whitespace-nowrap ${member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'text-slate-700' : member.tier === 'GOLD' ? 'text-amber-900 font-bold' : 'text-slate-300'}`}>{member.membershipId}</div>
                 </div>
                 <div className="flex flex-col justify-between items-end text-right h-full">
-                  <div className={`w-full max-w-[110px] mb-1 ${member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'brightness-0 contrast-200' : member.tier === 'GOLD' ? 'text-amber-950 font-bold' : 'text-white'}`}>
-                    <WatchClubLogo />
+                  <div className={`w-full max-w-[110px] mb-1 ${member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'text-slate-900' : member.tier === 'GOLD' ? 'text-amber-950 font-bold' : 'text-white'}`}>
+                    <WatchClubLogo variant={member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'dark' : member.tier === 'GOLD' ? 'dark' : 'white'} />
                   </div>
                   <div className="flex flex-col items-end gap-1.5 w-full mt-auto">
                     <div className="w-[60px] sm:w-[70px] h-[60px] sm:h-[70px] bg-white rounded-[4px] p-1 flex justify-center items-center shadow-lg transition-transform hover:scale-105">
@@ -718,75 +718,45 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
         {/* 1. PUSH-POP CAMPAIGN BANNER MODAL */}
         {activeCampaignModal && (
-          <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex justify-center items-center z-[10000] p-4 animate-fadeIn">
-            <div className="bg-white rounded-3xl text-center shadow-2xl w-full max-w-sm overflow-hidden relative animate-scaleUp border border-purple-200">
-              {/* BANNER HEADER */}
-              <div className="bg-gradient-to-br from-purple-700 via-indigo-800 to-slate-900 text-white p-6 relative">
-                <button 
-                  onClick={() => setActiveCampaignModal(null)}
-                  className="absolute top-3.5 right-3.5 bg-white/20 hover:bg-white/30 text-white rounded-full p-1.5 transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-[10px] font-extrabold uppercase tracking-wider text-purple-200 mb-2.5">
-                  <Sparkles className="w-3 h-3 text-amber-300" />
-                  {activeCampaignModal.badgeText || 'PROMO SPESIAL MEMBER'}
-                </div>
-                <h3 className="text-lg font-black leading-tight text-white">
-                  {activeCampaignModal.headline || activeCampaignModal.name}
-                </h3>
-              </div>
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center z-[10000] p-4 animate-fadeIn">
+            <div className="bg-slate-900 rounded-3xl text-center shadow-2xl w-full max-w-sm overflow-hidden relative animate-scaleUp border border-slate-700">
+              <button 
+                onClick={() => setActiveCampaignModal(null)}
+                className="absolute top-3.5 right-3.5 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 transition-colors cursor-pointer z-20 backdrop-blur-sm shadow-md"
+              >
+                <X className="w-4 h-4" />
+              </button>
 
-              {/* BANNER BODY */}
-              <div className="p-5 text-xs text-slate-600 space-y-4">
-                <p className="leading-relaxed">
-                  {activeCampaignModal.content}
-                </p>
-
-                {activeCampaignModal.voucherCode && (
-                  <div className="p-3.5 bg-purple-50 rounded-2xl border border-dashed border-purple-300 space-y-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-purple-700">
-                      KODE VOUCHER PROMO
-                    </div>
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="font-mono text-base font-black text-purple-950 bg-white px-3 py-1 rounded-lg border border-purple-200 shadow-xs">
-                        {activeCampaignModal.voucherCode}
-                      </span>
-                      <button
-                        onClick={() => {
-                          if (activeCampaignModal.voucherCode) {
-                            navigator.clipboard.writeText(activeCampaignModal.voucherCode);
-                            setCopiedVoucher(true);
-                            setTimeout(() => setCopiedVoucher(false), 2000);
-                          }
-                        }}
-                        className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold flex items-center gap-1 text-[11px] cursor-pointer transition-colors"
-                      >
-                        {copiedVoucher ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedVoucher ? 'Tersalin' : 'Salin'}</span>
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-purple-600">
-                      Tunjukkan kode ini saat pembayaran di kasir toko Watch Club.
-                    </p>
+              {/* 3:4 Banner Image Popup */}
+              <div 
+                className="relative w-full aspect-[3/4] bg-slate-950 overflow-hidden cursor-pointer group"
+                onClick={() => {
+                  setActiveCampaignModal(null);
+                  setActiveTab('REWARDS');
+                }}
+              >
+                <img 
+                  src={activeCampaignModal.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'} 
+                  alt={activeCampaignModal.headline || activeCampaignModal.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/20 to-transparent flex flex-col justify-end p-6 text-left">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-extrabold uppercase tracking-wider text-amber-300 mb-2 w-max">
+                    <Sparkles className="w-3 h-3 text-amber-300" />
+                    {activeCampaignModal.badgeText || 'PROMO SPESIAL'}
                   </div>
-                )}
-
-                <div className="pt-2 flex flex-col gap-2">
+                  <h3 className="text-base font-black leading-tight text-white mb-3">
+                    {activeCampaignModal.headline || activeCampaignModal.name}
+                  </h3>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setActiveCampaignModal(null);
                       setActiveTab('REWARDS');
                     }}
-                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-colors cursor-pointer shadow-xs"
+                    className="w-full py-3 bg-white hover:bg-slate-100 text-slate-950 font-bold rounded-xl transition-colors cursor-pointer shadow-lg text-xs"
                   >
                     Gunakan & Lihat Rewards
-                  </button>
-                  <button
-                    onClick={() => setActiveCampaignModal(null)}
-                    className="w-full py-2 text-slate-400 hover:text-slate-600 font-semibold cursor-pointer"
-                  >
-                    Tutup Pengumuman
                   </button>
                 </div>
               </div>
@@ -851,6 +821,14 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               <div className="p-5 overflow-y-auto flex-1 space-y-4">
                 {supportModalTab === 'NEW' ? (
                   <form onSubmit={handleCreateTicketSubmit} className="space-y-3">
+                    {hasUnresolvedTicket && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Tiket Aktif Ditemukan:</strong> Anda memiliki tiket kendala yang belum diselesaikan (Resolved). Anda tidak dapat mengajukan tiket baru sampai tiket sebelumnya selesai. Cek <button type="button" onClick={() => setSupportModalTab('HISTORY')} className="underline font-bold text-blue-700 cursor-pointer">Riwayat Tiket Saya</button>.
+                        </div>
+                      </div>
+                    )}
                     {ticketSuccessNotice && (
                       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-bold text-xs flex items-center gap-2 animate-fadeIn">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />

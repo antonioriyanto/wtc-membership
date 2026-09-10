@@ -655,6 +655,7 @@ export default function App() {
                     stores={stores} 
                     setStores={setStores} 
                     onViewTransactions={(store) => handleOpenStoreTransactions(store)} 
+                    isSkeletonLoading={isRefreshingData}
                   />
                 )}
                 {activeTab === 'members' && (
@@ -667,10 +668,11 @@ export default function App() {
                     onDeleteMember={handleDeleteMember}
                     onToggleSuspendMember={handleToggleSuspendMember}
                     onOpenPointAdjust={() => setIsPointAdjustOpen(true)}
+                    isSkeletonLoading={isRefreshingData}
                   />
                 )}
                 {activeTab === 'loyalty' && (
-                  <LoyaltyRulesTab config={loyaltyConfig} setConfig={setLoyaltyConfig} />
+                  <LoyaltyRulesTab config={loyaltyConfig} setConfig={setLoyaltyConfig} isSkeletonLoading={isRefreshingData} />
                 )}
                 {activeTab === 'vouchers' && (
                   <VouchersTab 
@@ -704,6 +706,7 @@ export default function App() {
                         return next;
                       });
                     }}
+                    isSkeletonLoading={isRefreshingData}
                   />
                 )}
                 {activeTab === 'transactions' && (
@@ -713,10 +716,11 @@ export default function App() {
                     members={members}
                     initialSelectedStore={selectedStoreForTrx}
                     onSelectStore={(store) => setSelectedStoreForTrx(store)}
+                    isSkeletonLoading={isRefreshingData}
                   />
                 )}
                 {activeTab === 'audit' && (
-                  <AuditTrailTab logs={auditLogs} />
+                  <AuditTrailTab logs={auditLogs} isSkeletonLoading={isRefreshingData} />
                 )}
                 {activeTab === 'campaigns' && (
                   <CampaignsTab 
@@ -725,6 +729,7 @@ export default function App() {
                     onToggleCampaignStatus={handleToggleCampaignStatus}
                     onDeleteCampaign={handleDeleteCampaign}
                     vouchers={vouchers}
+                    isSkeletonLoading={isRefreshingData}
                   />
                 )}
                 {activeTab === 'support' && (
@@ -734,6 +739,7 @@ export default function App() {
                     onDirectPointAdjustment={handleDirectPointAdjustment}
                     members={members}
                     stores={stores}
+                    isSkeletonLoading={isRefreshingData}
                   />
                 )}
               </div>

@@ -702,8 +702,8 @@ export const initialStores: StoreBranch[] = [
     skus: { "prz_jam": ["CV 71186L-1J BLU"] }
   },
   {
-    id: 'APJ',
-    code: 'APJ',
+    id: 'AMB',
+    code: 'AMB',
     name: 'Ambarukmo Plaza Jogja',
     mallName: 'Plaza Ambarrukmo, Lantai Dasar Unit A6-A7',
     city: 'Yogyakarta',
@@ -826,7 +826,7 @@ export const initialStores: StoreBranch[] = [
 export const initialMembers: Member[] = [
   {
     id: 'MBR-001',
-    membershipId: '123456789012',
+    membershipId: 'PUR0001',
     name: 'Sarah Johnson',
     phone: '+62 858 1741 8645',
     email: 'sarah.johnson@email.com',
@@ -845,7 +845,7 @@ export const initialMembers: Member[] = [
   },
   {
     id: 'MBR-002',
-    membershipId: '987654321098',
+    membershipId: 'KKJ0002',
     name: 'Budi Santoso',
     phone: '+62 812 3456 7890',
     email: 'budi.santoso@gmail.com',
@@ -864,7 +864,7 @@ export const initialMembers: Member[] = [
   },
   {
     id: 'MBR-003',
-    membershipId: '556677889900',
+    membershipId: 'MTS0003',
     name: 'Anita Wijaya',
     phone: '+62 898 1158 0211',
     email: 'anita.wijaya@outlook.com',
@@ -883,7 +883,7 @@ export const initialMembers: Member[] = [
   },
   {
     id: 'MBR-004',
-    membershipId: '334455667788',
+    membershipId: 'SOLB0004',
     name: 'Andi Pratama',
     phone: '+62 811 2233 4455',
     email: 'andi.pratama@yahoo.com',
@@ -902,7 +902,7 @@ export const initialMembers: Member[] = [
   },
   {
     id: 'MBR-005',
-    membershipId: '112233445566',
+    membershipId: 'PAR0005',
     name: 'Jessica Meliana',
     phone: '+62 813 9081 2234',
     email: 'jess.meliana@gmail.com',
@@ -921,7 +921,7 @@ export const initialMembers: Member[] = [
   },
   {
     id: 'MBR-006',
-    membershipId: '778899001122',
+    membershipId: '2PB0006',
     name: 'Dr. Gunawan Wibowo',
     phone: '+62 818 0741 9901',
     email: 'dr.gunawan@clinic.id',
@@ -1448,6 +1448,7 @@ export const initialCampaigns: any[] = [
     content: 'Nikmati penawaran eksklusif perayaan ulang tahun Watch Club di seluruh gerai resmi di Indonesia. Tunjukkan kode promo ini di kasir saat pembayaran.',
     badgeText: '🔥 PROMO ANNIVERSARY EKSKLUSIF',
     voucherCode: 'WATCHCLUB-ANNIV',
+    bannerImage: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80',
     showAsPopupOnApp: true,
     sentCount: 18200,
     openCount: 11450,
@@ -1463,6 +1464,7 @@ export const initialCampaigns: any[] = [
     content: 'Undangan khusus bagi member Platinum & Diamond untuk menikmati preview koleksi jam tangan mewah terbaru dengan cashback poin ganda.',
     badgeText: '💎 VIP PRIVATE SALE',
     voucherCode: 'VIP-GOLD-100K',
+    bannerImage: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=600&auto=format&fit=crop&q=80',
     showAsPopupOnApp: true,
     sentCount: 3200,
     openCount: 2450,

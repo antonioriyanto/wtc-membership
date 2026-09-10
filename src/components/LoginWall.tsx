@@ -8,7 +8,7 @@ export const STORE_ACCOUNTS = [
   { name: "23 Semarang", username: "23SMG", password: "23SMG2026" },
   { name: "AEON Sentul", username: "AMSC", password: "AMSC2026" },
   { name: "Alianyang Singkawang", username: "ALIAN", password: "ALIAN2026" },
-  { name: "Ambarukmo Plaza Jogja", username: "AMB 1", password: "AMB 12026" },
+  { name: "Ambarukmo Plaza Jogja", username: "AMB", password: "AMB2026" },
   { name: "Ayani Pontianak", username: "AYANI", password: "AYANI2026" },
   { name: "BIG Mall Samarinda", username: "BIG", password: "BIG2026" },
   { name: "Bogor Botani", username: "BOS", password: "BOS2026" },

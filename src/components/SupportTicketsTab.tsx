@@ -29,6 +29,7 @@ interface SupportTicketsTabProps {
   onDirectPointAdjustment: (memberId: string, pointsDelta: number, note: string, ticketId: string) => Promise<boolean>;
   members: Member[];
   stores: StoreBranch[];
+  isSkeletonLoading?: boolean;
 }
 
 export const SupportTicketsTab: React.FC<SupportTicketsTabProps> = ({
@@ -36,8 +37,21 @@ export const SupportTicketsTab: React.FC<SupportTicketsTabProps> = ({
   onUpdateTicket,
   onDirectPointAdjustment,
   members,
-  stores
+  stores,
+  isSkeletonLoading = false
 }) => {
+  if (isSkeletonLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-64 bg-slate-200 rounded-xl" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-16 bg-slate-200 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'>('ALL');
   const [sourceFilter, setSourceFilter] = useState<'ALL' | 'MEMBER' | 'CASHIER'>('ALL');

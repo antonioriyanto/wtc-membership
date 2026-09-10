@@ -118,37 +118,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
         </button>
-
-        {onLogout && (
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm text-rose-300 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/30 transition-all text-left group mt-2"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-1.5 rounded-lg bg-rose-500/20 text-rose-400">
-                <LogOut className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-rose-200">Keluar Dashboard</div>
-                <div className="text-[10px] text-rose-400/80">Logout HO Admin</div>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-rose-400 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        )}
       </div>
-      <div className="p-4 border-t border-slate-800/80 bg-slate-950/60">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-bold flex items-center justify-center text-sm shadow-md">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-bold flex items-center justify-center text-sm shadow-md shrink-0">
               HO
             </div>
             <div className="overflow-hidden">
-              <div className="text-xs font-bold text-slate-200 truncate">Head Office</div>
-              <div className="text-[11px] text-slate-400 truncate">HO PIK</div>
+              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">Head Office</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">HO PIK Admin</div>
             </div>
           </div>
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20" title="Full Super Admin Authorization"></div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              title="Logout HO Admin"
+              className="p-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-500/30 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </aside>

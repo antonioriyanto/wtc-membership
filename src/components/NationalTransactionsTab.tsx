@@ -31,6 +31,7 @@ interface NationalTransactionsTabProps {
   members: Member[];
   initialSelectedStore?: StoreBranch | null;
   onSelectStore?: (store: StoreBranch | null) => void;
+  isSkeletonLoading?: boolean;
 }
 
 export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = ({
@@ -38,8 +39,21 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
   transactions,
   members,
   initialSelectedStore = null,
-  onSelectStore
+  onSelectStore,
+  isSkeletonLoading = false
 }) => {
+  if (isSkeletonLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-64 bg-slate-200 rounded-xl" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-16 bg-slate-200 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const [selectedStore, setSelectedStore] = useState<StoreBranch | null>(initialSelectedStore);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('ALL');

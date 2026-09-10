@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button 
           onClick={onRefreshData} 
           disabled={isRefreshing}
-          title="Segarkan Data & Simulasi Skeleton Fetch"
+          title="Segarkan Data"
           className="w-9 h-9 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 flex justify-center items-center transition-colors cursor-pointer disabled:opacity-50"
         >
           <RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-emerald-600' : ''}`} />

@@ -86,8 +86,52 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
     
     setIsSubmitting(true);
     try {
+      const storeCodeMap: Record<string, string> = {
+        'level 21 bali': 'L2B',
+        'trans studio bali': 'TSMB',
+        'e-walk balikpapan': 'EWB',
+        'penta city balikpapan': 'PCB',
+        'tsm bandung': 'TSMBND',
+        'summarecon mall bandung': 'SMB',
+        '23 paskal bandung': '2PB',
+        'duta mall 1 banjarmasin': 'DUT',
+        'duta mall 2 banjarmasin': 'DM2',
+        'cibinong city mall': 'CCM',
+        'aeon sentul': 'AEO',
+        'bogor botani': 'BOG',
+        'tsm cibubur': 'TSMC',
+        'the park sawangan depok': 'TPSD',
+        'kota kasablanka jakarta': 'KKJ',
+        'puri jakarta': 'PUR',
+        'panakukang': 'PAN',
+        'tsm makassar': 'TSM',
+        'mall olympic garden 1 malang': 'MOG1',
+        'mall olympic garden 2 malang': 'MOG2',
+        'manado town square': 'MTS',
+        'singkawang grand mall': 'SGM',
+        'palu': 'PAL',
+        'ayani pontianak': 'AYA',
+        'gaia pontianak': 'GAI',
+        'gorontalo': 'GOR',
+        'jayapura': 'JAY',
+        'kendari': 'KEN',
+        'paragon semarang': 'PAR',
+        'ciputra semarang': 'CIP',
+        'dp mall semarang': 'DMS',
+        '23 semarang': '23S',
+        'alianyang singkawang': 'ALI',
+        'solo square': 'SOLSQ',
+        'solo baru': 'SOLB',
+        'the park solo': 'TPS',
+        'ambarukmo plaza jogja': 'AMB',
+        'jogja city mall': 'JCM',
+        'pakuwon mall yogya': 'PMY'
+      };
+      const code = storeCodeMap[registeredStore.toLowerCase()] || 'PUR';
+      const generatedMembershipId = `${code}${Math.floor(1000 + Math.random() * 9000)}`;
+
       await onCreateMember({
-        membershipId: 'MBR-' + Math.floor(100000 + Math.random() * 900000),
+        membershipId: generatedMembershipId,
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim() || undefined,

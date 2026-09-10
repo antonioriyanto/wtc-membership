@@ -25,6 +25,7 @@ interface CampaignsTabProps {
   onToggleCampaignStatus: (id: string) => void;
   onDeleteCampaign: (id: string) => void;
   vouchers: Voucher[];
+  isSkeletonLoading?: boolean;
 }
 
 export const CampaignsTab: React.FC<CampaignsTabProps> = ({
@@ -32,8 +33,24 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
   onAddCampaign,
   onToggleCampaignStatus,
   onDeleteCampaign,
-  vouchers
+  vouchers,
+  isSkeletonLoading = false
 }) => {
+  if (isSkeletonLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="flex justify-between items-center">
+          <div className="h-8 w-64 bg-slate-200 rounded-xl" />
+          <div className="h-10 w-36 bg-slate-200 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-48 bg-slate-200 rounded-3xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const [search, setSearch] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -41,6 +58,7 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
   const [name, setName] = useState('');
   const [headline, setHeadline] = useState('');
   const [content, setContent] = useState('');
+  const [bannerImage, setBannerImage] = useState('https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80');
   const [targetAudience, setTargetAudience] = useState<Campaign['targetAudience']>('ALL');
   const [voucherCode, setVoucherCode] = useState('');
   const [badgeText, setBadgeText] = useState('🔥 PROMO SPESIAL MEMBER');
@@ -70,6 +88,7 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
       content: content.trim(),
       badgeText: badgeText.trim() || '🔥 PROMO SPESIAL',
       voucherCode: voucherCode.trim() || undefined,
+      bannerImage: bannerImage.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80',
       showAsPopupOnApp,
       sentCount: initialActive ? 15420 : 0,
       openCount: initialActive ? 8420 : 0,
@@ -83,6 +102,7 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
     setName('');
     setHeadline('');
     setContent('');
+    setBannerImage('https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80');
     setVoucherCode('');
   };
 
@@ -331,6 +351,21 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                   placeholder="Contoh: Berlaku khusus untuk member setia di seluruh gerai Watch Club Indonesia. Tunjukkan kode voucher di kasir saat pembayaran."
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
                 />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  URL Gambar Banner Pop-up (Rasio 3:4 JPG/PNG) *
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  value={bannerImage}
+                  onChange={(e) => setBannerImage(e.target.value)}
+                  placeholder="https://images.unsplash.com/photo-..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white text-[11px]"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Gambar vertikal rasio 3:4 yang akan muncul sebagai pop-up utama saat customer login & latar belakang notifikasi.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

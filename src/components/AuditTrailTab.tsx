@@ -19,9 +19,22 @@ import { AuditLog } from '../types';
 
 interface AuditTrailTabProps {
   logs?: AuditLog[];
+  isSkeletonLoading?: boolean;
 }
 
-export const AuditTrailTab: React.FC<AuditTrailTabProps> = ({ logs: propLogs }) => {
+export const AuditTrailTab: React.FC<AuditTrailTabProps> = ({ logs: propLogs, isSkeletonLoading = false }) => {
+  if (isSkeletonLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-64 bg-slate-200 rounded-xl" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-16 bg-slate-200 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const [search, setSearch] = useState('');
   const [selectedModule, setSelectedModule] = useState<string>('ALL');
   const [selectedRole, setSelectedRole] = useState<string>('ALL');

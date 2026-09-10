@@ -37,6 +37,7 @@ interface MembersTabProps {
   onDeleteMember?: (memberId: string) => void;
   onToggleSuspendMember?: (memberId: string) => void;
   onOpenPointAdjust?: (member: Member) => void;
+  isSkeletonLoading?: boolean;
 }
 
 export const MembersTab: React.FC<MembersTabProps> = ({ 
@@ -47,8 +48,25 @@ export const MembersTab: React.FC<MembersTabProps> = ({
   onUpdateMember,
   onDeleteMember,
   onToggleSuspendMember,
-  onOpenPointAdjust
-}) => {
+  onOpenPointAdjust,
+  isSkeletonLoading = false
+}) => { 
+  if (isSkeletonLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="flex justify-between items-center">
+          <div className="h-8 w-64 bg-slate-200 rounded-xl" />
+          <div className="h-10 w-48 bg-slate-200 rounded-xl" />
+        </div>
+        <div className="h-16 bg-slate-200 rounded-2xl" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-16 bg-slate-200 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const [search, setSearch] = useState('');
   const [filterTier, setFilterTier] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
