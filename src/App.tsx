@@ -506,8 +506,13 @@ export default function App() {
                 const userSnap = await getDoc(userRef);
                 
                 if (!userSnap.exists()) {
+                  // Generate a realistic membership ID instead of using the raw Firebase UID for the UI
+                  const shortUid = user.uid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).toUpperCase();
+                  const membershipId = 'ONL' + shortUid;
+                  
                   const newMember = {
                     id: user.uid,
+                    membershipId: membershipId, // Added readable membership ID
                     name: user.displayName || 'Google User',
                     phone: user.phoneNumber || '', 
                     email: user.email || '',
