@@ -1,0 +1,6 @@
+{
+  "name": "Watch Club - Head Office Admin Portal",
+  "description": "Enterprise Head Office (HO) Management & Analytics Portal for Watch Club Indonesia (40+ Stores, Cashiers, Loyalty Engine & CRM)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

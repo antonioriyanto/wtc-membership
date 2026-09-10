@@ -1,0 +1,227 @@
+import React, { useState } from 'react';
+import { Voucher, StoreBranch } from '../types';
+import { 
+  Ticket, 
+  Plus, 
+  Search, 
+  Calendar, 
+  Tag, 
+  CheckCircle2, 
+  Percent, 
+  DollarSign, 
+  Store,
+  ChevronDown,
+  Info,
+  Copy,
+  Check
+} from 'lucide-react';
+
+interface VouchersTabProps {
+  vouchers: Voucher[];
+  stores: StoreBranch[];
+  onCreateVoucher: () => void;
+  onEditVoucher?: (voucher: Voucher) => void;
+  onToggleVoucherStatus: (voucherId: string) => void;
+}
+
+export const VouchersTab: React.FC<VouchersTabProps> = ({
+  vouchers,
+  stores,
+  onCreateVoucher,
+  onEditVoucher,
+  onToggleVoucherStatus,
+}) => {
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const filteredVouchers = vouchers.filter(v => {
+    const matchesStatus = filterStatus === 'ALL' || v.status === filterStatus;
+    const matchesSearch = 
+      v.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      v.title.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <Ticket className="w-6 h-6 text-purple-600" />
+            <span>Master Voucher & Promo Campaigns</span>
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Create and distribute digital coupons, discount vouchers, and exclusive store rewards for the Customer App.
+          </p>
+        </div>
+
+        <button
+          onClick={onCreateVoucher}
+          className="px-4 py-2.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md transition-all flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4 text-amber-400" />
+          <span>Create New Voucher</span>
+        </button>
+      </div>
+
+      {/* Filter and Search */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search voucher title, code..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 text-sm text-slate-900 placeholder:text-slate-400 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          {['ALL', 'ACTIVE', 'SCHEDULED', 'EXPIRED'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                filterStatus === status
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Vouchers Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredVouchers.map((voucher) => {
+          const usagePercent = Math.min(100, Math.round((voucher.totalUsed / voucher.maxUsageLimit) * 100));
+
+          return (
+            <div
+              key={voucher.id}
+              className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+            >
+              <div>
+                {/* Status and Scope Header */}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    voucher.status === 'ACTIVE'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {voucher.status}
+                  </span>
+
+                  <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+                    <Store className="w-3 h-3 text-slate-400" />
+                    <span>{voucher.scope === 'ALL_STORES' ? 'All Indonesia' : 'Specific Mall'}</span>
+                  </span>
+                </div>
+
+                {/* Voucher Title and Code Banner */}
+                <div 
+                  className="p-4 rounded-2xl text-white mb-4 relative overflow-hidden shadow-inner"
+                  style={{ 
+                    backgroundImage: voucher.imagePath ? `url('${voucher.imagePath}')` : 'linear-gradient(to right, #020617, #0f172a, #1e293b)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                >
+                  <div className="absolute inset-0 bg-slate-900/40 z-0"></div>
+                  <div className="relative z-10">
+                    <div className="text-[10px] uppercase font-bold tracking-widest text-slate-300">
+                      Watch Club Promotion
+                    </div>
+                    <div className="text-2xl font-bold text-amber-300 mt-1 drop-shadow-md">
+                      {voucher.discountType === 'PERCENTAGE' ? `${voucher.discountValue}% OFF` : `Rp ${(voucher.discountValue).toLocaleString('id-ID')}`}
+                    </div>
+                    <div className="text-xs text-slate-100 font-medium mt-0.5 truncate drop-shadow-md">
+                      {voucher.title}
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20 text-xs">
+                      <span className="font-mono text-white font-bold bg-black/50 px-2 py-0.5 rounded">
+                        {voucher.code}
+                      </span>
+                      <button
+                        onClick={() => handleCopyCode(voucher.code)}
+                        className="text-slate-200 hover:text-white flex items-center gap-1 text-[11px] transition-colors bg-black/20 px-2 py-1 rounded"
+                      >
+                        {copiedCode === voucher.code ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy Code</span>
+                          </>
+                        )}
+                      </button>
+                <button onClick={() => onEditVoucher?.(voucher)} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Edit Image</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details & Limits */}
+                <div className="space-y-2 text-xs text-slate-600 my-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Min. Spend:</span>
+                    <span className="font-semibold text-slate-800">
+                      {voucher.minPurchase > 0 ? `Rp ${(voucher.minPurchase).toLocaleString('id-ID')}` : 'No Min Spend'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Valid Until:</span>
+                    <span className="font-semibold text-slate-800">{voucher.validUntil}</span>
+                  </div>
+                </div>
+
+                {/* Progress bar of redemptions */}
+                <div className="space-y-1.5 my-3">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500 font-medium">Used: <strong>{voucher.totalUsed}</strong> / {voucher.maxUsageLimit}</span>
+                    <span className="font-bold text-slate-700">{usagePercent}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-slate-900 rounded-full transition-all duration-500"
+                      style={{ width: `${usagePercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action */}
+              <div className="border-t border-slate-100 pt-4 flex items-center justify-between">
+                <button
+                  onClick={() => onToggleVoucherStatus(voucher.id)}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900"
+                >
+                  {voucher.status === 'ACTIVE' ? 'Pause Campaign' : 'Resume Campaign'}
+                </button>
+                <button onClick={() => onEditVoucher?.(voucher)} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Edit Image</button>
+
+                <span className="text-[11px] text-slate-400">
+                  {voucher.totalClaimed} Claimed
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
