@@ -44,8 +44,14 @@ export default function App() {
   
   const [adminAuthenticated, setAdminAuthenticated] = useState(() => {
     try {
-      if (localStorage.getItem('wtc_admin_auth') === 'true') return true;
-      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/cashier')) return true;
+      return localStorage.getItem('wtc_admin_auth') === 'true';
+    } catch {}
+    return false;
+  });
+
+  const [cashierAuthenticated, setCashierAuthenticated] = useState(() => {
+    try {
+      return localStorage.getItem('wtc_cashier_auth') === 'true';
     } catch {}
     return false;
   });
@@ -55,11 +61,7 @@ export default function App() {
   
   const [loggedInMemberId, setLoggedInMemberId] = useState<string | null>(() => {
     try {
-      const saved = localStorage.getItem('wtc_logged_in_member');
-      if (saved) return saved;
-      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/member')) {
-        return 'MBR-001';
-      }
+      return localStorage.getItem('wtc_logged_in_member') || null;
     } catch {}
     return null;
   });
@@ -69,6 +71,12 @@ export default function App() {
       localStorage.setItem('wtc_admin_auth', String(adminAuthenticated));
     } catch {}
   }, [adminAuthenticated]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('wtc_cashier_auth', String(cashierAuthenticated));
+    } catch {}
+  }, [cashierAuthenticated]);
 
   useEffect(() => {
     try {
@@ -520,7 +528,7 @@ export default function App() {
     <>
       <Routes>
         <Route path="/cashier" element={
-        adminAuthenticated ? (
+        cashierAuthenticated ? (
           <CashierPOSView 
             members={members} 
             setMembers={setMembers}
@@ -528,7 +536,11 @@ export default function App() {
             setTransactions={setTransactions}
             currentStore={stores.find(s => s.name.toLowerCase() === cashierStoreName.toLowerCase() || s.code.toLowerCase() === cashierStoreName.toLowerCase()) || stores[0] || initialStores[0]}
             cashierName={cashierName}
-            onSignOut={() => setAdminAuthenticated(false)}
+            onSignOut={() => {
+              setCashierAuthenticated(false);
+              try { localStorage.removeItem('wtc_cashier_auth'); } catch {}
+              navigate('/cashier');
+            }}
             onSwitchPerspective={(p) => navigate(p === 'HO' ? '/' : '/' + p.toLowerCase())}
           />
         ) : (
@@ -536,7 +548,7 @@ export default function App() {
             onLogin={(user, storeName) => {
               if (user) setCashierName(user);
               if (storeName) setCashierStoreName(storeName);
-              setAdminAuthenticated(true);
+              setCashierAuthenticated(true);
             }} 
             title="Portal Kasir Toko" 
             subtitle="Masuk menggunakan Login ID (Username) dan Password cabang toko Anda." 
@@ -552,7 +564,11 @@ export default function App() {
             vouchers={vouchers}
             stores={stores}
             transactions={transactions}
-            onBackToHO={() => navigate('/')}
+            onBackToHO={() => {
+              setLoggedInMemberId(null);
+              try { localStorage.removeItem('wtc_logged_in_member'); } catch {}
+              navigate('/member');
+            }}
             campaigns={campaigns}
             tickets={supportTickets}
             onSubmitTicket={handleMemberSubmitTicket}
