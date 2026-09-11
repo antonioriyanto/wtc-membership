@@ -1,17 +1,12 @@
-import { Store, Member, Voucher, Transaction, LoyaltyConfig, SupportTicket, Campaign, AuditLog } from '../types';
+const fs = require('fs');
 
-export const initialLoyaltyConfig: LoyaltyConfig = {
-  currencyToPointRatio: 10000,
-  tiers: [
-    { name: 'BLUE', minPoints: 0, benefits: ['Additional 10% Discount', 'Watch Services Discount', 'Watch Club Sticker Pack'] },
-    { name: 'SILVER', minPoints: 5000, benefits: ['Additional 15% Discount', 'Free Battery Replacement', 'Birthday Gift'] },
-    { name: 'GOLD', minPoints: 15000, benefits: ['Additional 20% Discount', 'Priority Service', 'Exclusive Event Invites'] }
-  ]
-};
+let content = fs.readFileSync('src/data/mockData.ts', 'utf-8');
 
-// Start with empty arrays to prevent frontend from seeding dummy data
-export const initialStores: Store[] = [
-  { id: 'PUR', code: 'PUR', name: 'Puri Indah Mall Jakarta', location: 'Lantai G, Puri Indah Mall, Jakarta Barat', type: 'STORE', isActive: true, phone: '021-5822765' },
+// The stores were replaced with just one mock store when we cleared the mock data.
+// Let's restore the full list of stores so the UI has them available as defaults if Firestore is empty.
+
+const fullStoresList = `export const initialStores: Store[] = [
+  { id: 'PUR', code: 'PUR', name: 'Puri Jakarta', location: 'Lantai G, Puri Indah Mall, Jakarta Barat', type: 'STORE', isActive: true, phone: '021-5822765' },
   { id: 'KLP', code: 'KLP', name: 'Kelapa Gading', location: 'Lantai 1, Mall Kelapa Gading, Jakarta Utara', type: 'STORE', isActive: true, phone: '021-4529731' },
   { id: 'SEN', code: 'SEN', name: 'Senayan City', location: 'Lantai 2, Senayan City, Jakarta Pusat', type: 'STORE', isActive: true, phone: '021-72781423' },
   { id: 'KOT', code: 'KOT', name: 'Kota Kasablanka', location: 'Lantai UG, Kota Kasablanka, Jakarta Selatan', type: 'STORE', isActive: true, phone: '021-29465134' },
@@ -25,10 +20,17 @@ export const initialStores: Store[] = [
   { id: 'MDN', code: 'MDN', name: 'Sun Plaza Medan', location: 'Lantai 1, Sun Plaza, Medan', type: 'STORE', isActive: true, phone: '061-4567890' },
   { id: 'BAL', code: 'BAL', name: 'Beachwalk Bali', location: 'Lantai 1, Beachwalk Shopping Center, Bali', type: 'STORE', isActive: true, phone: '0361-8464888' },
   { id: 'HO', code: 'HO', name: 'Head Office', location: 'PIK Avenue, Jakarta Utara', type: 'HO', isActive: true, phone: '021-5551234' }
-];
-export const initialMembers: Member[] = [];
-export const initialVouchers: Voucher[] = [];
-export const initialTransactions: Transaction[] = [];
-export const initialSupportTickets: SupportTicket[] = [];
-export const initialCampaigns: Campaign[] = [];
-export const initialAuditLogs: AuditLog[] = [];
+];`;
+
+content = content.replace(/export const initialStores: Store\[\] = \[[\s\S]*?\];/g, fullStoresList);
+
+fs.writeFileSync('src/data/mockData.ts', content);
+
+// We should also make sure that if the app is trying to save a store to Firebase, it handles it correctly.
+let appContent = fs.readFileSync('src/App.tsx', 'utf-8');
+// The app relies on `stores` state. We need to make sure the sync logic initializes with initialStores if Firestore has no stores.
+if (!appContent.includes('// Check if stores need seeding')) {
+  // Let's add a small check in the useEffect where it syncs data. 
+  // It's probably better to just rely on initialStores if stores are empty, or seed them once.
+}
+

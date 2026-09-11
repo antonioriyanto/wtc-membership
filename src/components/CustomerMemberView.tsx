@@ -501,39 +501,43 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             <div className="flex flex-col gap-4 px-5 py-2.5 pb-5">
               {filteredStores.map((store, idx) => (
                 <div key={store.id} className="bg-white rounded-[24px] shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col transition-transform hover:-translate-y-0.5 border border-slate-100">
-                  <div className="p-5 flex flex-col gap-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{store.region}</div>
-                        <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
-                          {store.name.startsWith('Watch Club') ? store.name : `Watch Club - ${store.name}`}
-                        </h3>
-                      </div>
-                      <span className="text-[0.65rem] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase tracking-wider shrink-0 border border-slate-200">
-                        {store.code}
-                      </span>
+                  {/* Photo Placeholder */}
+                  <div className="w-full h-32 bg-slate-100 overflow-hidden relative border-b border-slate-100">
+                    <img 
+                      src={store.image || 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'} 
+                      alt={store.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                    <div className="absolute bottom-3 left-4 right-4">
+                      <div className="text-[0.65rem] font-bold uppercase tracking-wider text-white/90 mb-0.5 shadow-sm">{store.region}</div>
+                      <h3 className="text-base sm:text-lg font-bold text-white leading-snug drop-shadow-md">
+                        {store.name}
+                      </h3>
                     </div>
+                  </div>
 
+                  <div className="p-4 flex flex-col gap-3">
                     <div className="text-xs text-slate-600 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <div className="font-semibold text-slate-800">{store.mallName}</div>
-                      <div className="text-slate-500 mt-0.5">{store.city}</div>
+                      <div className="text-slate-500 mt-0.5 flex items-start gap-1">
+                        <MapPin className="text-slate-400 w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>{store.address || `${store.mallName}, Indonesia`}</span>
+                      </div>
                     </div>
-
-                    <div className="flex items-start gap-2.5 text-[0.8rem] text-slate-500 leading-relaxed font-medium">
-                      <MapPin className="text-slate-700 w-4 h-4 mt-0.5 shrink-0" />
-                      <span>{store.address || `${store.mallName}, Indonesia`}</span>
-                    </div>
-
                     {store.whatsapp && (
-                      <div className="flex items-center gap-2 pt-1 mt-1 border-t border-slate-100">
-                        <MessageCircle className="text-[#25D366] w-4 h-4 shrink-0" />
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <div className="flex items-center gap-1.5">
+                          <MessageCircle className="text-[#25D366] w-4 h-4 shrink-0" />
+                          <span className="text-xs font-semibold text-slate-700">WhatsApp:</span>
+                        </div>
                         <a 
-                          href={`https://wa.me/${store.whatsapp.replace(/[^0-9]/g, '')}`} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="text-xs font-semibold text-[#25D366] hover:underline"
+                          href={`https://wa.me/${store.whatsapp.replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline bg-emerald-50 px-2 py-1 rounded-md transition-colors"
                         >
-                          WhatsApp: {store.whatsapp}
+                          {store.whatsapp}
                         </a>
                       </div>
                     )}
