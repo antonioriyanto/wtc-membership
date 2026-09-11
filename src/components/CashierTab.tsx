@@ -107,7 +107,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
   };
 
   const handleAddPointsSubmit = () => {
-    if (!activeMember || !receiptInput || parsedAmount <= 0) return;
+    if (!activeMember || !receiptInput || parsedAmount <= 0 || isSubmitting) return;
     onAddPoints(activeMember.id, parsedAmount, receiptInput);
     setReceiptInput('');
     setAmountInput('');
@@ -295,7 +295,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
             <input 
               type="text" 
               value={receiptInput}
-              disabled={!activeMember}
+              disabled={!activeMember || isSubmitting}
               onChange={(e) => setReceiptInput(e.target.value)}
               className="w-full px-4 py-3 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-emerald-500 disabled:bg-slate-100 dark:disabled:bg-slate-900/40"
               placeholder="Contoh: INV-00123"
@@ -327,7 +327,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
 
         <div className="flex gap-3">
           <button 
-            disabled={!activeMember || !receiptInput || parsedAmount <= 0}
+            disabled={!activeMember || !receiptInput || parsedAmount <= 0 || isSubmitting}
             onClick={handleAddPointsSubmit}
             className="flex-1 bg-slate-900 dark:bg-emerald-600 text-white rounded-lg py-3 font-bold disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-slate-800 dark:hover:bg-emerald-700 transition-colors"
           >

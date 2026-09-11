@@ -107,9 +107,9 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
       let updatedMemberData = {
         name: editName.trim(),
         phone: editPhone.trim(),
-        email: editEmail.trim() || undefined,
+        email: editEmail.trim() || '',
         gender: editGender,
-        address: editAddress.trim() || undefined,
+        address: editAddress.trim() || '',
         birthDate: editBirthDate ? new Date(editBirthDate).toISOString() : editingMember.birthDate
       };
 

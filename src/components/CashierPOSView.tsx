@@ -332,6 +332,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
         onClose={() => setIsCreateMemberOpen(false)}
         defaultStore={currentStore?.name || 'Puri Jakarta'}
         isStoreLocked={true}
+        stores={stores}
         members={members}
         onExistingMember={(member) => {
           showAlert('Nomor handphone sudah terdaftar! Member telah dipilih otomatis.', 'Pemberitahuan', 'info');
@@ -346,7 +347,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
             name: newMember.name || '',
             phone: newMember.phone || '',
             email: newMember.email || '',
-            birthDate: newMember.birthDate,
+            birthDate: newMember.birthDate || '',
             gender: (newMember.gender as any) || 'Pria',
             registeredStore: newMember.registeredStore || currentStore?.name || 'Puri Jakarta',
             lastStoreVisited: newMember.lastStoreVisited || currentStore?.name || 'Puri Jakarta',
@@ -357,7 +358,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
             totalSpend: Number(newMember.totalSpend) || 0,
             tier: (newMember.tier as any) || 'BLUE',
             status: (newMember.status as any) || 'ACTIVE',
-            address: newMember.address
+            address: newMember.address || ''
           };
 
           try {

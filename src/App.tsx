@@ -108,7 +108,7 @@ export default function App() {
       const saved = localStorage.getItem('wtc_stores');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 40) return parsed; // Force reload if old small array
       }
     } catch {}
     return initialStores;

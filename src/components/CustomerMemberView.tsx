@@ -115,7 +115,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         memberName: member.name,
         memberPhone: member.phone,
         storeName: ticketStore,
-        receiptNo: ticketReceipt.trim() || undefined,
+        receiptNo: ticketReceipt.trim() || '',
         subject: ticketSubject.trim(),
         category: ticketCategory,
         status: 'OPEN',
@@ -267,7 +267,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     background: 'linear-gradient(135deg, #ECF1F7 0%, #A7B8CA 25%, #E2E7ED 50%, #A7B8CA 75%, #F8F7FC 100%)'
                   } : member.tier === 'DIAMOND' ? {
                     background: 'linear-gradient(135deg, #F9FFFF 0%, #FFFFFF 12.5%, #CCD7E7 25%, #FDE2CA 30.61%, #B9C9DD 38.27%, #E7F7E0 50%, #FFFFFF 62.29%, #FEEBF0 70.02%, #DCE4EE 75%, #B9C9DD 85.2%, #FFFFFF 100%)'
-                  } : undefined
+                  } : null
                 }
                 onClick={() => {
                   setSelectedVoucherForQr(null);

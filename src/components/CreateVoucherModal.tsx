@@ -246,7 +246,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
       applicableStoreIds: scope === 'SPECIFIC_STORES' ? selectedStoreIds : [],
       maxUsageLimit,
       status: 'ACTIVE',
-      imagePath: imagePath || undefined,
+      imagePath: imagePath || '',
       terms: termsArray.length > 0 ? termsArray : ['Valid at Watch Club stores throughout Indonesia.']
     });
 
