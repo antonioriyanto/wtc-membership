@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Member, Voucher, StoreBranch, Transaction, Campaign, SupportTicket } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
+import { useMemberLiveProfile } from '../hooks/useMemberLiveProfile';
 import { 
   CreditCard, 
   Award, 
@@ -44,7 +45,7 @@ interface CustomerMemberViewProps {
 }
 
 export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
-  member,
+  member: initialMember,
   vouchers,
   stores,
   transactions,
@@ -54,6 +55,10 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   onBackToHO,
 }) => {
   const { showAlert } = useCustomDialog();
+  // Live single-document reactive stream (<500ms latency directly from Firestore)
+  const { profile: liveProfile } = useMemberLiveProfile(initialMember?.id || null);
+  const member = liveProfile || initialMember;
+
   const [activeTab, setActiveTab] = useState<'MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE'>('MEMBERSHIP');
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);

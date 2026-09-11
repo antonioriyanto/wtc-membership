@@ -3,6 +3,7 @@ import { Search, Plus, Barcode, Camera, ShoppingCart, List, Tag, CheckCircle, Al
 import { Member, Transaction, StoreBranch } from '../types';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { TierBadge } from '../utils/tierBadge';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
 interface CashierTabProps {
   isSubmitting?: boolean;
@@ -105,6 +106,20 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
       performSearch(searchInput);
     }
   };
+
+  // Hardware Barcode Scanner integration with active typing collision prevention
+  useBarcodeScanner({
+    onScan: (scannedCode) => {
+      // If redeem voucher modal is open, treat scan as voucher
+      if (isRedeemOpen) {
+        setVoucherInput(scannedCode);
+        executeClaimVoucher(scannedCode);
+        return;
+      }
+      // Otherwise treat scan as Member QR / Barcode
+      performSearch(scannedCode);
+    }
+  });
 
   const handleAddPointsSubmit = () => {
     if (!activeMember || !receiptInput || parsedAmount <= 0 || isSubmitting) return;
