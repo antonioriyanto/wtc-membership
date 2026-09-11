@@ -29,6 +29,7 @@ import {
   AlertCircle,
   Send
 } from 'lucide-react';
+import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { WatchClubLogo } from './WatchClubLogo';
 
 interface CustomerMemberViewProps {
