@@ -74,7 +74,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
         (m.membershipId && m.membershipId.toLowerCase() === code.toLowerCase()) ||
         (m.phone && m.phone === code) ||
         (cleanDigits.length >= 4 && mCleanDigits.includes(cleanDigits)) ||
-        (cleanDigits.length >= 4 && cleanDigits.includes(mCleanDigits)) ||
+        (cleanDigits.length >= 4 && mCleanDigits.length >= 4 && cleanDigits.includes(mCleanDigits)) ||
         (m.name && m.name.toLowerCase().includes(code.toLowerCase()))
       );
     });

@@ -234,7 +234,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
       const cleanDigits = phone.replace(/[^0-9]/g, '');
       const found = membersList.find((m: any) => {
         const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
-        return m.phone === phone || (cleanDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
+        return m.phone === phone || (cleanDigits.length >= 4 && mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
       });
       if (found) {
         onLogin(found.id);
