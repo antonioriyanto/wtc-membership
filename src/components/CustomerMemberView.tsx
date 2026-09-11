@@ -149,65 +149,43 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   );
 
   // Map transactions using provided store dataset
-  const memberTransactions = useMemo(() => {
-    // 1. If we have matched transactions from props
-    if (transactions && transactions.length > 0) {
-      const matched = transactions.filter(
-        t => (member?.id && t.memberId === member.id) || 
-             (member?.phone && t.memberPhone === member.phone) ||
-             (member?.name && t.memberName === member.name)
-      );
-      if (matched.length > 0) {
-        return matched.map(t => {
-          let storeDisplayName = 'Watch Club - Puri Jakarta';
-          if (t.type === 'REDEEM' || t.type === 'VOUCHER_DISCOUNT') {
-            storeDisplayName = 'Voucher Redeemed';
-          } else if (t.storeName) {
-            storeDisplayName = t.storeName.startsWith('Watch Club') 
-              ? t.storeName 
-              : `Watch Club - ${t.storeName}`;
-          }
+    const memberTransactions = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    
+    return transactions
+      .filter(t => 
+        (member?.id && t.memberId === member.id) || 
+        (member?.phone && t.memberPhone === member.phone) || 
+        (member?.name && t.memberName === member.name)
+      )
+      .map(t => {
+        let storeDisplayName = 'Watch Club - Branch';
+        if (t.type === 'REDEEM' || t.type === 'VOUCHER_DISCOUNT') {
+          storeDisplayName = 'Voucher Redeemed';
+        } else if (t.storeName) {
+          storeDisplayName = t.storeName.startsWith('Watch Club') 
+            ? t.storeName 
+            : `Watch Club - ${t.storeName}`;
+        }
 
-          const txDate = t.timestamp 
-            ? new Date(t.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-            : '20 Aug 2026';
+        const txDate = t.timestamp 
+          ? new Date(t.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          : '-';
 
-          return {
-            id: t.receiptNo || t.id,
-            date: txDate,
-            store: storeDisplayName,
-            points: Math.abs(t.pointsDelta),
-            type: t.pointsDelta >= 0 ? 'EARN' : 'REDEEM'
-          };
-        });
-      }
-    }
-
-    // 2. Default transaction history mapped strictly to provided stores
-    const availableStores = stores.length > 0 ? stores : [
-      { name: 'Puri Jakarta' },
-      { name: 'Kota Kasablanka Jakarta' },
-      { name: '23 Paskal Bandung' },
-      { name: 'Paragon Semarang' },
-      { name: 'Solo Baru' },
-      { name: 'Level 21 Bali' }
-    ];
-
-    const getStoreName = (idx: number, fallback: string) => {
-      const found = availableStores[idx % availableStores.length];
-      const rawName = found ? found.name : fallback;
-      return rawName.startsWith('Watch Club') ? rawName : `Watch Club - ${rawName}`;
-    };
-
-    return [
-      { id: 'INV-00121', date: '20 Aug 2026', store: getStoreName(0, 'Puri Jakarta'), points: 120, type: 'EARN' },
-      { id: 'VOUCHER-POS', date: '20 Aug 2026', store: 'Voucher Redeemed', points: 50, type: 'REDEEM' },
-      { id: 'INV-00119', date: '19 Aug 2026', store: getStoreName(1, 'Kota Kasablanka Jakarta'), points: 85, type: 'EARN' },
-      { id: 'INV-00080', date: '10 Aug 2026', store: getStoreName(2, '23 Paskal Bandung'), points: 300, type: 'EARN' },
-      { id: 'INV-00045', date: '02 Aug 2026', store: getStoreName(3, 'Paragon Semarang'), points: 150, type: 'EARN' },
-      { id: 'INV-00012', date: '15 Jul 2026', store: getStoreName(4, 'Level 21 Bali'), points: 50, type: 'EARN' },
-    ];
-  }, [transactions, member, stores]);
+        return {
+          id: t.receiptNo || t.id,
+          date: txDate,
+          store: storeDisplayName,
+          points: Math.abs(t.pointsDelta),
+          type: t.pointsDelta >= 0 ? 'EARN' : 'REDEEM'
+        };
+      })
+      .sort((a, b) => {
+        // Sort by date descending assuming id/receiptNo gives chronological order or just rely on timestamp if available
+        // To keep it simple, if they come from Firestore they are likely ordered, but let's reverse them to show newest first if they aren't.
+        return 0; // The source array should be sorted.
+      });
+  }, [transactions, member]);
 
   const navItems = [
     { id: 'MEMBERSHIP', label: 'Membership', icon: CreditCard },
