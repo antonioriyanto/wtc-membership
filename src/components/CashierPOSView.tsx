@@ -37,9 +37,10 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
   setVouchers,
   onVoucherRedeemed,
   currentStore, 
-  cashierName = 'Kasir Puri',
+  cashierName,
   onSignOut,
-  onSwitchPerspective
+  onSwitchPerspective,
+  stores
 }) => {
   const { showAlert } = useCustomDialog();
   const [activeTab, setActiveTab] = useState<CashierTabType>('cashier');
@@ -90,7 +91,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       memberPhone: member.phone,
       storeId: currentStore?.id || currentStore?.code || 'PUR',
       storeName: currentStore?.name || 'Puri Jakarta',
-      cashierName: cashierName || `Kasir ${currentStore?.name || 'Puri'}`,
+      cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
       type: 'EARN',
       amount: amount,
       pointsDelta: calculatedPoints,
@@ -334,7 +335,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
         members={members}
         onExistingMember={(member) => {
           showAlert('Nomor handphone sudah terdaftar! Member telah dipilih otomatis.', 'Pemberitahuan', 'info');
-          setAutoSelectMemberId(member.id);
+          setAutoSelectMemberId(member.id + '|' + Date.now());
           setIsCreateMemberOpen(false);
           setActiveTab('cashier'); // Ensure we are on the cashier tab
         }}

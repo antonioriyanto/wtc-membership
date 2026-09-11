@@ -65,7 +65,7 @@ export const CashierHeader: React.FC<HeaderProps> = ({
           </div>
           <div>
             <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 transition-colors leading-tight">
-              {cashierName ? `Kasir: ${cashierName.toUpperCase()}` : 'Kasir Aktif'}
+              {storeName ? `Kasir: ${storeName.toUpperCase()}` : 'Kasir Aktif'}
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 transition-colors">
               <span>{dateStr}</span> &nbsp;•&nbsp; 

@@ -21,12 +21,14 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
 
   useEffect(() => {
     if (autoSelectMemberId && members.length > 0) {
-      const found = members.find(m => m.id === autoSelectMemberId);
+      const actualId = autoSelectMemberId.split('|')[0];
+      const found = members.find(m => m.id === actualId);
       if (found) {
         setActiveMember(found);
       }
     }
   }, [autoSelectMemberId, members]);
+
   
   const [receiptInput, setReceiptInput] = useState('');
   const [amountInput, setAmountInput] = useState('');

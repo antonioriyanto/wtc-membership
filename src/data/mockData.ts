@@ -1,7 +1,7 @@
-import { Store, Member, Voucher, Transaction, LoyaltyConfig, SupportTicket, Campaign, AuditLog } from '../types';
+import { Member, Transaction, SupportTicket, StoreBranch, LoyaltyConfig, Voucher, Campaign, AuditLog } from '../types';
 
-export const initialLoyaltyConfig: LoyaltyConfig = {
-  currencyToPointRatio: 10000,
+export const initialLoyaltyConfig: any = {
+  
   tiers: [
     { name: 'BLUE', minPoints: 0, benefits: ['Additional 10% Discount', 'Watch Services Discount', 'Watch Club Sticker Pack'] },
     { name: 'SILVER', minPoints: 5000, benefits: ['Additional 15% Discount', 'Free Battery Replacement', 'Birthday Gift'] },
@@ -10,7 +10,7 @@ export const initialLoyaltyConfig: LoyaltyConfig = {
 };
 
 // Start with empty arrays to prevent frontend from seeding dummy data
-export const initialStores: Store[] = [
+export const initialStores: any[] = [
   { id: 'PUR', code: 'PUR', name: 'Puri Indah Mall Jakarta', location: 'Lantai G, Puri Indah Mall, Jakarta Barat', type: 'STORE', isActive: true, phone: '021-5822765' },
   { id: 'KLP', code: 'KLP', name: 'Kelapa Gading', location: 'Lantai 1, Mall Kelapa Gading, Jakarta Utara', type: 'STORE', isActive: true, phone: '021-4529731' },
   { id: 'SEN', code: 'SEN', name: 'Senayan City', location: 'Lantai 2, Senayan City, Jakarta Pusat', type: 'STORE', isActive: true, phone: '021-72781423' },

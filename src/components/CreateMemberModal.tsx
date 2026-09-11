@@ -68,6 +68,23 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Auto-detect on phone change
+  useEffect(() => {
+    if (phone && members) {
+      const cleanDigits = phone.replace(/[^0-9]/g, '');
+      if (cleanDigits.length >= 4) {
+        const existing = members.find(m => {
+          const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
+          return m.phone === phone || (mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
+        });
+        
+        if (existing && onExistingMember) {
+          onExistingMember(existing);
+        }
+      }
+    }
+  }, [phone, members, onExistingMember]);
+
   // Otomatis sinkronisasi toko pendaftaran dengan profil akun toko yang sedang login
   useEffect(() => {
     if (defaultStore) {
@@ -157,7 +174,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
         'pakuwon mall yogya': 'PMY'
       };
       }
-      if (!code) { code = storeCodeMap[registeredStore.toLowerCase()] || 'PUR'; }
+      
       const generatedMembershipId = `${code}${Math.floor(1000 + Math.random() * 9000)}`;
 
       await onCreateMember({

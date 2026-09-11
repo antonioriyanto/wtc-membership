@@ -1,3 +1,6 @@
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider, db } from './lib/firebase';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Member, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch, SupportTicket, Campaign, AuditLog } from './types';
@@ -13,8 +16,6 @@ import {
   initialAuditLogs
 } from './data/mockData';
 import { setupFirestoreListeners, seedFirestoreIfEmpty } from './lib/syncFirestore';
-import { doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-import { db, auth, googleProvider } from './lib/firebase';
 
 // HO Components
 import { Sidebar } from './components/Sidebar';
@@ -37,10 +38,8 @@ import { ManualPointAdjustmentModal } from './components/ManualPointAdjustmentMo
 import { CashierPOSView } from './components/CashierPOSView';
 import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider, db } from './lib/firebase';
 import { PortalSwitcher } from './components/PortalSwitcher';
+import { calculateTier } from './lib/loyalty';
 import { StoreTransactionsModal } from './components/StoreTransactionsModal';
 import { NationalActivityNotifications } from './components/NationalActivityNotifications';
 
@@ -63,8 +62,14 @@ export default function App() {
     return false;
   });
 
-  const [cashierName, setCashierName] = useState('Kasir Puri');
-  const [cashierStoreName, setCashierStoreName] = useState<string>('Puri Jakarta');
+  const [cashierName, setCashierName] = useState(() => {
+    try { return localStorage.getItem('wtc_cashier_name') || 'Kasir Aktif'; } catch {}
+    return 'Kasir Aktif';
+  });
+  const [cashierStoreName, setCashierStoreName] = useState<string>(() => {
+    try { return localStorage.getItem('wtc_cashier_store') || 'Puri Jakarta'; } catch {}
+    return 'Puri Jakarta';
+  });
   
   const [loggedInMemberId, setLoggedInMemberId] = useState<string | null>(() => {
     try {
@@ -246,6 +251,15 @@ export default function App() {
   };
 
   // Support Ticket Handlers
+  
+  const handleDeleteCampaign = (id: string) => {
+    setCampaigns(prev => {
+      const next = prev.filter(c => c.id !== id);
+      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  
   const handleUpdateTicket = async (updated: SupportTicket) => {
     try {
       await setDoc(doc(db, 'support', updated.id), updated);
@@ -460,7 +474,11 @@ export default function App() {
             cashierName={cashierName}
             onSignOut={() => {
               setCashierAuthenticated(false);
-              try { localStorage.removeItem('wtc_cashier_auth'); } catch {}
+              try { 
+                localStorage.removeItem('wtc_cashier_auth'); 
+                localStorage.removeItem('wtc_cashier_name'); 
+                localStorage.removeItem('wtc_cashier_store'); 
+              } catch {}
               navigate('/cashier');
             }}
             onSwitchPerspective={(p) => navigate(p === 'HO' ? '/' : '/' + p.toLowerCase())}
@@ -468,9 +486,17 @@ export default function App() {
         ) : (
           <AdminLogin 
             onLogin={(user, storeName) => {
-              if (user) setCashierName(user);
-              if (storeName) setCashierStoreName(storeName);
+              if (user) {
+                const displayUser = (storeName && user.toUpperCase() !== 'ADMIN' && user.toUpperCase() !== 'HO') ? storeName : user;
+                setCashierName(displayUser);
+                try { localStorage.setItem('wtc_cashier_name', displayUser); } catch {}
+              }
+              if (storeName) {
+                setCashierStoreName(storeName);
+                try { localStorage.setItem('wtc_cashier_store', storeName); } catch {}
+              }
               setCashierAuthenticated(true);
+              try { localStorage.setItem('wtc_cashier_auth', 'true'); } catch {}
             }} 
             title="Portal Kasir Toko" 
             subtitle="Masuk menggunakan Login ID (Username) dan Password cabang toko Anda." 
