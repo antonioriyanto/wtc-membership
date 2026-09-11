@@ -90,6 +90,9 @@ export interface Member {
 }
 
 export interface StoreBranch {
+  latitude?: number;
+  longitude?: number;
+  distance?: number; // Temporary UI field
   id: string;
   code: string;
   name: string;

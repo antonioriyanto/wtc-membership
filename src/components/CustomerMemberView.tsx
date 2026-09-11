@@ -514,6 +514,36 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                       <h3 className="text-base sm:text-lg font-bold text-white leading-snug drop-shadow-md">
                         {store.name}
                       </h3>
+                      {store.distance !== undefined && (
+                        <div className="flex items-center gap-1 text-[0.65rem] font-bold text-emerald-300 drop-shadow-md mt-0.5">
+                          <MapPin className="w-3 h-3" />
+                          <span>
+                            {store.distance < 1 
+                              ? `${Math.round(store.distance * 1000)} METER DARI ANDA` 
+                              : `${store.distance.toFixed(1)} KM DARI ANDA`}
+                          </span>
+                        </div>
+                      )}
+                      {store.distance !== undefined && (
+                        <div className="flex items-center gap-1 text-[0.65rem] font-bold text-emerald-300 drop-shadow-md mt-0.5">
+                          <MapPin className="w-3 h-3" />
+                          <span>
+                            {store.distance < 1 
+                              ? `${Math.round(store.distance * 1000)} METER DARI ANDA` 
+                              : `${store.distance.toFixed(1)} KM DARI ANDA`}
+                          </span>
+                        </div>
+                      )}
+                      {store.distance !== undefined && (
+                        <div className="flex items-center gap-1 text-xs font-semibold text-white/90 drop-shadow-md mt-1">
+                          <MapPin className="w-3 h-3 text-emerald-400" />
+                          <span>
+                            {store.distance < 1 
+                              ? `${Math.round(store.distance * 1000)} m dari Anda` 
+                              : `${store.distance.toFixed(1)} km dari Anda`}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
