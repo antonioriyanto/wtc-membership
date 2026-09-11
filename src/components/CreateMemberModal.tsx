@@ -52,11 +52,12 @@ interface CreateMemberModalProps {
   defaultStore?: string;
   isStoreLocked?: boolean;
   members?: Member[];
+  stores?: {name: string, code: string}[];
   onExistingMember?: (member: Member) => void;
 }
 
 export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
-  isOpen, onClose, onCreateMember, defaultStore = 'Puri Jakarta', isStoreLocked = true, members, onExistingMember
+  isOpen, onClose, onCreateMember, defaultStore = 'Puri Jakarta', isStoreLocked = true, members, stores, onExistingMember
 }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -74,7 +75,10 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
     }
   }, [defaultStore, isOpen]);
 
-  const storeList = Array.from(new Set([defaultStore, ...OFFICIAL_STORES].filter(Boolean)));
+    const storeList = Array.from(new Set([
+    defaultStore, 
+    ...(stores ? stores.map(s => s.name) : OFFICIAL_STORES)
+  ].filter(Boolean))).sort();
 
   if (!isOpen) return null;
 
@@ -106,7 +110,12 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const storeCodeMap: Record<string, string> = {
+            let code = 'PUR';
+      if (stores) {
+        const found = stores.find(s => s.name.toLowerCase() === registeredStore.toLowerCase());
+        if (found && found.code) code = found.code;
+      } else {
+        const storeCodeMap: Record<string, string> = {
         'level 21 bali': 'L2B',
         'trans studio bali': 'TSMB',
         'e-walk balikpapan': 'EWB',
@@ -147,7 +156,8 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
         'jogja city mall': 'JCM',
         'pakuwon mall yogya': 'PMY'
       };
-      const code = storeCodeMap[registeredStore.toLowerCase()] || 'PUR';
+      }
+      if (!code) { code = storeCodeMap[registeredStore.toLowerCase()] || 'PUR'; }
       const generatedMembershipId = `${code}${Math.floor(1000 + Math.random() * 9000)}`;
 
       await onCreateMember({

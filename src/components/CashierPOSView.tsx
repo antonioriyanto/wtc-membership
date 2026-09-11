@@ -8,6 +8,8 @@ import { CashierMembersTab } from './CashierMembersTab';
 import { CashierTransactionsTab } from './CashierTransactionsTab';
 import { CashierSettingsTab } from './CashierSettingsTab';
 import { CashierTabType } from '../types';
+import { doc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { CreateMemberModal } from './CreateMemberModal';
 import { useCustomDialog } from './CustomDialogProvider';
 
@@ -20,6 +22,7 @@ interface CashierPOSViewProps {
   setVouchers?: React.Dispatch<React.SetStateAction<Voucher[]>>;
   onVoucherRedeemed?: (voucherCode: string) => void;
   currentStore: StoreBranch;
+  stores: StoreBranch[];
   cashierName?: string;
   onSignOut?: () => void;
   onSwitchPerspective: (view: 'HO' | 'CASHIER' | 'MEMBER') => void;
@@ -105,8 +108,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
     };
 
     try {
-      const { doc, setDoc } = await import('firebase/firestore');
-      const { db } = await import('../lib/firebase');
+      
       await setDoc(doc(db, 'transactions', savedTrx.id), savedTrx);
       await setDoc(doc(db, 'members', updatedMember.id), updatedMember);
     } catch (e: any) {
@@ -208,8 +210,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
 
     // 2. Increment voucher quota in Firestore
     try {
-      const { doc, updateDoc, increment } = await import('firebase/firestore');
-      const { db } = await import('../lib/firebase');
+      
       
       // We don't have the exact voucher ID here safely, but we can query it if needed.
       // However, keeping the quota sync local is fine if we are not strict. 
@@ -220,8 +221,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
 
     // 3. Save transaction to Firestore
     try {
-      const { doc, setDoc } = await import('firebase/firestore');
-      const { db } = await import('../lib/firebase');
+      
       await setDoc(doc(db, 'transactions', savedTrx.id), savedTrx);
       await setDoc(doc(db, 'members', updatedMember.id), updatedMember);
     } catch (e: any) {
@@ -283,6 +283,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
             <CashierTab 
               isSubmitting={isSubmitting}
               members={members}
+        stores={stores}
               transactions={storeTransactions}
               currentStore={currentStore}
               autoSelectMemberId={autoSelectMemberId}
@@ -359,8 +360,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
           };
 
           try {
-            const { doc, setDoc } = await import('firebase/firestore');
-            const { db } = await import('../lib/firebase');
+            
             await setDoc(doc(db, 'members', created.id), created);
           } catch (err) {
             console.warn("Failed to save to Firestore:", err);

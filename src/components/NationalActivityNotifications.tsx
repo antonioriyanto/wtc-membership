@@ -126,7 +126,10 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
         memberName: mem.name,
         memberPhone: mem.phone,
         timestamp: mem.joinDate,
-        timeAgo: `${(idx + 1) * 22} menit lalu`,
+        timeAgo: (() => {
+          const m = Math.floor((Date.now() - new Date(mem.joinDate).getTime()) / 60000);
+          return m < 1 ? 'Baru saja' : m < 60 ? `${m} menit lalu` : `${Math.floor(m/60)} jam lalu`;
+        })(),
         isRead: effectiveReadIds.has(`mem-act-${mem.id}`),
         notes: `Toko pendaftaran: ${mem.registeredStore} • Status: ${mem.status}`
       });

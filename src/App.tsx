@@ -455,6 +455,7 @@ export default function App() {
             setMembers={setMembers}
             transactions={transactions} 
             setTransactions={setTransactions}
+            stores={stores}
             currentStore={stores.find(s => s.name.toLowerCase() === cashierStoreName.toLowerCase() || s.code.toLowerCase() === cashierStoreName.toLowerCase()) || stores[0] || initialStores[0]}
             cashierName={cashierName}
             onSignOut={() => {
