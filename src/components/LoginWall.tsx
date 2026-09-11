@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { WatchClubLogo } from './WatchClubLogo';
 import { Lock, User, KeyRound, Smartphone, ShieldCheck, Store, Search } from 'lucide-react';
 import { initialMembers } from '../data/mockData';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { findMemberByPhoneInFirestore, normalizePhoneNumber, isSamePhoneNumber } from '../lib/syncFirestore';
 
 export const STORE_ACCOUNTS = [
   { name: "23 Paskal Bandung", username: "23PSC", password: "23PSC2026" },
@@ -210,7 +213,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 };
 
 interface MemberLoginProps {
-  onLogin: (memberId: string) => void;
+  onLogin: (memberId: string, memberObj?: any) => void;
   onRegisterGoogle: (phone: string) => Promise<void>;
   members: any[];
 }
@@ -220,40 +223,60 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
   const [error, setError] = useState('');
   const [isNotRegistered, setIsNotRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isPendingGoogle, setIsPendingGoogle] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) return setError('Silakan masukkan nomor telepon Anda.');
+    const cleanPhone = phone.trim();
+    if (!cleanPhone) return setError('Silakan masukkan nomor telepon Anda.');
+
+    const normalized = normalizePhoneNumber(cleanPhone);
+    if (normalized.length < 8) {
+      return setError('Nomor handphone tidak valid (minimal 8-10 digit angka).');
+    }
     
     setLoading(true);
     setError('');
     setIsNotRegistered(false);
 
     try {
-      const cleanDigits = phone.replace(/[^0-9]/g, '');
-      const found = members.find((m: any) => {
-        const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
-        return m.phone === phone || (cleanDigits.length >= 4 && mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
-      });
+      // 1. Instant check in local state
+      let found = members.find((m: any) => isSamePhoneNumber(m.phone || '', cleanPhone));
+
+      // 2. Strict live check in Firestore
+      if (!found) {
+        found = await findMemberByPhoneInFirestore(cleanPhone);
+      }
 
       if (found) {
-        onLogin(found.id);
+        onLogin(found.id, found);
       } else {
-        setError('Nomor handphone belum terdaftar sebagai member.');
+        setError(`Nomor ${cleanPhone} belum terdaftar.`);
         setIsNotRegistered(true);
       }
     } catch (err) {
-      setError('Gagal memproses data member.');
+      setError('Gagal memproses verifikasi nomor member.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleClick = async (p?: string) => {
+    const target = (p || phone || '').trim();
+    if (!target) {
+      setError('Silakan ketik nomor handphone Anda pada kolom di atas terlebih dahulu agar akun dan poin member Anda tersambung.');
+      return;
+    }
+    const normalized = normalizePhoneNumber(target);
+    if (normalized.length < 8) {
+      setError('Nomor handphone tidak valid (minimal 8-10 digit angka).');
+      return;
+    }
     setLoading(true);
+    setError('');
     try {
-      await onRegisterGoogle(p || phone || '');
+      await onRegisterGoogle(target);
+    } catch (err: any) {
+      setError(err?.message || 'Gagal registrasi Google.');
     } finally {
       setLoading(false);
     }

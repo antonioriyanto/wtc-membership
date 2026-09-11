@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { TierBadge } from '../utils/tierBadge';
+import { safeSetDoc } from '../lib/syncFirestore';
 
 interface MembersTabProps {
   members: Member[];
@@ -114,9 +115,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
       };
 
       try {
-        const { doc, setDoc } = await import('firebase/firestore');
-        const { db } = await import('../lib/firebase');
-        await setDoc(doc(db, 'members', editingMember.id), { ...editingMember, ...updatedMemberData });
+        await safeSetDoc('members', editingMember.id, { ...editingMember, ...updatedMemberData });
       } catch (err) {
         console.warn("Backend API unavailable, saved member edit locally:", err);
       }

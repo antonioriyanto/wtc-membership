@@ -10,6 +10,7 @@ import { CashierSettingsTab } from './CashierSettingsTab';
 import { CashierTabType } from '../types';
 import { doc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { safeSetDoc } from '../lib/syncFirestore';
 import { CreateMemberModal } from './CreateMemberModal';
 import { useCustomDialog } from './CustomDialogProvider';
 
@@ -109,9 +110,8 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
     };
 
     try {
-      
-      await setDoc(doc(db, 'transactions', savedTrx.id), savedTrx);
-      await setDoc(doc(db, 'members', updatedMember.id), updatedMember);
+      await safeSetDoc('transactions', savedTrx.id, savedTrx);
+      await safeSetDoc('members', updatedMember.id, updatedMember);
     } catch (e: any) {
       console.warn("Backend API unavailable, transaction processed locally:", e);
     }
@@ -222,9 +222,8 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
 
     // 3. Save transaction to Firestore
     try {
-      
-      await setDoc(doc(db, 'transactions', savedTrx.id), savedTrx);
-      await setDoc(doc(db, 'members', updatedMember.id), updatedMember);
+      await safeSetDoc('transactions', savedTrx.id, savedTrx);
+      await safeSetDoc('members', updatedMember.id, updatedMember);
     } catch (e: any) {
       console.warn("Backend API unavailable, voucher redeemed locally:", e);
     }
@@ -362,8 +361,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
           };
 
           try {
-            
-            await setDoc(doc(db, 'members', created.id), created);
+            await safeSetDoc('members', created.id, created);
           } catch (err) {
             console.warn("Failed to save to Firestore:", err);
           }

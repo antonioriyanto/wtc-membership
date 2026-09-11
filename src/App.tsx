@@ -1,7 +1,7 @@
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, db } from './lib/firebase';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Member, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch, SupportTicket, Campaign, AuditLog } from './types';
 import { useCustomDialog } from './components/CustomDialogProvider';
@@ -15,7 +15,8 @@ import {
   initialCampaigns,
   initialAuditLogs
 } from './data/mockData';
-import { setupFirestoreListeners, seedFirestoreIfEmpty } from './lib/syncFirestore';
+import { setupFirestoreListeners, seedFirestoreIfEmpty, safeSetDoc, cleanForFirestore, findMemberByPhoneInFirestore, findMemberByGoogleUidInFirestore, normalizePhoneNumber, isSamePhoneNumber } from './lib/syncFirestore';
+import { startSyncWorker, runMemberSyncPass } from './lib/sync-worker';
 
 // HO Components
 import { Sidebar } from './components/Sidebar';
@@ -429,12 +430,43 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Background 30-second Sync Worker: audits & resolves data discrepancies between Cashier & Customer apps
+  const membersRef = useRef(members);
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+
+  useEffect(() => {
+    const stopWorker = startSyncWorker({
+      getMembers: () => membersRef.current,
+      setMembers: (reconciledMembers) => {
+        setMembers(reconciledMembers);
+      },
+      intervalMs: 30000,
+      immediate: true,
+      onSyncComplete: (report) => {
+        if (report.discrepanciesCount > 0) {
+          console.info("[SyncWorker] Discrepancies reconciled:", report);
+        }
+      }
+    });
+
+    return () => {
+      stopWorker();
+    };
+  }, []);
+
   const handleRefreshData = async () => {
     setIsRefreshingData(true);
-    // Realtime listeners already handle this, but we keep the visual feedback
-    setTimeout(() => {
-      setIsRefreshingData(false);
-    }, 1100);
+    try {
+      await runMemberSyncPass(membersRef.current, (reconciled) => setMembers(reconciled));
+    } catch (err) {
+      console.warn("Manual sync error:", err);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshingData(false);
+      }, 600);
+    }
   };
 
   // Toggle floating portal switcher (dinonaktifkan sementara sesuai permintaan pengguna)
@@ -524,136 +556,135 @@ export default function App() {
         ) : (
           <MemberLogin 
             members={members}
-            onLogin={(id) => setLoggedInMemberId(id)} 
+            onLogin={(id, memberObj) => {
+              if (memberObj) {
+                setMembers(prev => {
+                  const exists = prev.some(m => m.id === memberObj.id);
+                  const next = exists ? prev.map(m => m.id === memberObj.id ? memberObj : m) : [memberObj, ...prev];
+                  try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+                  return next;
+                });
+              }
+              setLoggedInMemberId(id);
+            }} 
             onRegisterGoogle={async (phoneNum: string) => {
               try {
                 const result = await signInWithPopup(auth, googleProvider);
                 const user = result.user;
                 
-                let targetPhone = phoneNum || user.phoneNumber || '';
-                
-                // 1. If we have a phone number, check if a member already exists with this phone
-                let existingMember = null;
-                if (targetPhone) {
-                  const cleanDigits = targetPhone.replace(/[^0-9]/g, '');
-                  if (cleanDigits.length >= 4) {
-                    existingMember = members.find(m => {
-                      const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
-                      return m.phone === targetPhone || (mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
-                    });
-                  }
-                }
-                
-                const userRef = doc(db, 'members', user.uid);
-                
-                if (existingMember) {
-                  // MERGE: Existing member found by phone (created by cashier)
-                  // We copy their data into the Google UID document, and delete the old one.
-                  if (existingMember.id !== user.uid) {
-                    const mergedData = {
-                      ...existingMember,
-                      id: user.uid,
-                      name: existingMember.name || user.displayName || 'Google User',
-                      email: existingMember.email || user.email || '',
-                      googleMergedAt: new Date().toISOString()
-                    };
-                    await setDoc(userRef, mergedData);
-                    // Attempt to delete old cashier-created document
-                    try {
-                      await deleteDoc(doc(db, 'members', existingMember.id));
-                    } catch(e) {
-                      console.warn("Could not delete old member doc:", e);
-                    }
-                  }
-                  setLoggedInMemberId(user.uid);
+                // 1. Check if this Google UID is already linked to any member document in Firestore
+                const linkedMemberByUid = await findMemberByGoogleUidInFirestore(user.uid);
+                if (linkedMemberByUid) {
+                  setMembers(prev => {
+                    const exists = prev.some(m => m.id === linkedMemberByUid.id);
+                    const next = exists ? prev.map(m => m.id === linkedMemberByUid.id ? linkedMemberByUid : m) : [linkedMemberByUid, ...prev];
+                    try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+                    return next;
+                  });
+                  setLoggedInMemberId(linkedMemberByUid.id);
                   return;
                 }
-                
-                // 2. Check if this Google UID already exists
-                const userSnap = await getDoc(userRef);
-                if (userSnap.exists()) {
-                   // Update phone if we have one and they didn't
-                   const data = userSnap.data();
-                   if (targetPhone && !data.phone) {
-                      await setDoc(userRef, { phone: targetPhone }, { merge: true });
-                   }
-                   setLoggedInMemberId(user.uid);
-                   return;
-                }
-                
-                // 3. Brand new member
+
+                let targetPhone = (phoneNum || user.phoneNumber || '').trim();
+
+                // 2. Validate phone number presence
                 if (!targetPhone) {
-                   // In a real app we'd show a "Complete Profile" modal here.
-                   // For now, prompt via window.prompt if missing.
-                   // Let's use our custom dialog to ask for the phone number
-                   targetPhone = await new Promise((resolve) => {
-                     const modalHtml = `
-                       <div style="text-align: left;">
-                         <p style="font-size: 14px; margin-bottom: 12px; color: #475569;">Kami tidak menemukan nomor handphone pada akun Google Anda. Masukkan nomor Anda untuk mengamankan poin.</p>
-                         <input type="tel" id="google-phone-prompt" placeholder="08123456789" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; font-size: 16px;" />
-                       </div>
-                     `;
-                     
-                     // We are hacking the showAlert UI temporarily by injecting HTML if possible, 
-                     // but since showAlert doesn't support input easily, let's just use window.prompt for now
-                     // because building a full React modal dynamically here is too complex.
-                     
-                     // ACTUALLY, let's use window.prompt but with better text.
-                     const res = window.prompt("Lengkapi Profil\n\nSatu langkah lagi! Masukkan nomor WhatsApp/Handphone Anda untuk menghubungkan poin:");
-                     resolve(res || '');
-                   });
-                   
-                   if (!targetPhone) {
-                      showAlert('Pendaftaran dibatalkan. Nomor handphone wajib diisi untuk mengamankan poin Anda.', 'Peringatan', 'warning');
-                      return; // Cancel sign in
-                   }
-                   
-                   // Re-check merge just in case they typed a cashier-registered phone
-                   const cleanDigits = targetPhone.replace(/[^0-9]/g, '');
-                   if (cleanDigits.length >= 4) {
-                     existingMember = members.find(m => {
-                       const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
-                       return m.phone === targetPhone || (mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
-                     });
-                   }
-                   if (existingMember && existingMember.id !== user.uid) {
-                      const mergedData = {
-                        ...existingMember,
-                        id: user.uid,
-                        name: existingMember.name || user.displayName || 'Google User',
-                        email: existingMember.email || user.email || '',
-                        googleMergedAt: new Date().toISOString()
-                      };
-                      await setDoc(userRef, mergedData);
-                      try { await deleteDoc(doc(db, 'members', existingMember.id)); } catch(e) {}
-                      setLoggedInMemberId(user.uid);
-                      return;
-                   }
+                  const input = window.prompt("Lengkapi Profil Member:\n\nMasukkan nomor WhatsApp / Handphone Anda untuk menghubungkan data dan poin:");
+                  targetPhone = (input || '').trim();
                 }
 
+                if (!targetPhone) {
+                  showAlert('Pendaftaran dibatalkan. Nomor handphone wajib diisi untuk mengamankan data dan poin Anda.', 'Perhatian', 'warning');
+                  return;
+                }
+
+                const normalizedTarget = normalizePhoneNumber(targetPhone);
+                if (normalizedTarget.length < 8) {
+                  showAlert('Nomor handphone tidak valid (minimal 8 digit angka).', 'Peringatan', 'warning');
+                  return;
+                }
+
+                // 3. STRICT UNIQUE PHONE NUMBER CHECK USING FIRESTORE QUERIES
+                // Verify whether ANY member document in Firestore already possesses this phone number
+                const existingMemberByPhone = await findMemberByPhoneInFirestore(normalizedTarget);
+
+                if (existingMemberByPhone) {
+                  // MERGE / LINK: Member already registered (e.g., at physical store POS by Cashier)
+                  // Link Google UID to the existing member document, preserving the member ID, points, and history!
+                  const updatedMemberData = cleanForFirestore({
+                    ...existingMemberByPhone,
+                    googleUid: user.uid,
+                    email: existingMemberByPhone.email || user.email || '',
+                    name: existingMemberByPhone.name || user.displayName || 'Member',
+                    phone: normalizePhoneNumber(existingMemberByPhone.phone || targetPhone),
+                    googleMergedAt: new Date().toISOString()
+                  });
+
+                  await safeSetDoc('members', existingMemberByPhone.id, updatedMemberData);
+
+                  // Clean up duplicate document if one exists under user.uid
+                  if (user.uid !== existingMemberByPhone.id) {
+                    try {
+                      await deleteDoc(doc(db, 'members', user.uid));
+                    } catch (delErr) {
+                      console.warn("Could not delete duplicate member doc:", delErr);
+                    }
+                  }
+
+                  setMembers(prev => {
+                    const filtered = prev.filter(m => m.id !== existingMemberByPhone.id && m.id !== user.uid);
+                    const next = [updatedMemberData, ...filtered];
+                    try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+                    return next;
+                  });
+
+                  setLoggedInMemberId(existingMemberByPhone.id);
+                  showAlert(
+                    `Selamat datang kembali, ${updatedMemberData.name}! Akun Google Anda telah terhubung ke member ${updatedMemberData.membershipId} dengan saldo ${Number(updatedMemberData.points || 0).toLocaleString()} poin.`,
+                    'Akun Terhubung',
+                    'success'
+                  );
+                  return;
+                }
+
+                // 4. TRULY BRAND NEW MEMBER
+                // Neither this Google UID nor this phone number exist in Firestore
                 const shortUid = user.uid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).toUpperCase();
-                const membershipId = 'ONL' + shortUid;
-                
-                const newMember = {
+                const membershipId = 'ONL' + (shortUid || Math.floor(1000 + Math.random() * 9000));
+
+                const newMember: Member = {
                   id: user.uid,
+                  googleUid: user.uid,
                   membershipId: membershipId,
-                  name: user.displayName || 'Google User',
-                  phone: targetPhone, 
+                  name: user.displayName || 'Google Member',
+                  phone: normalizedTarget,
                   email: user.email || '',
                   joinDate: new Date().toISOString().split('T')[0],
                   points: 0,
+                  lifetimePoints: 0,
+                  totalSpend: 0,
                   tier: 'BLUE',
-                  totalSpent: 0,
+                  status: 'ACTIVE',
                   registeredStore: 'Online',
                   lastStoreVisited: 'Online',
                   createdAt: new Date().toISOString()
-                };
-                
-                await setDoc(userRef, newMember);
+                } as any;
+
+                await safeSetDoc('members', user.uid, newMember);
+
+                setMembers(prev => {
+                  const next = [newMember, ...prev.filter(m => m.id !== user.uid)];
+                  try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+                  return next;
+                });
+
                 setLoggedInMemberId(user.uid);
+                showAlert('Pendaftaran member online berhasil! Selamat bergabung di Watch Club Loyalty.', 'Berhasil', 'success');
               } catch (e: any) {
                 console.error("Google Sign-In Error", e);
-                showAlert('Gagal login dengan Google: ' + e.message, 'Login Gagal', 'error');
+                if (e.code !== 'auth/popup-closed-by-user') {
+                  showAlert('Gagal login dengan Google: ' + (e.message || 'Terjadi kesalahan.'), 'Login Gagal', 'error');
+                }
               }
             }}
           />
@@ -810,7 +841,7 @@ export default function App() {
                   name: newMember.name || '',
                   phone: newMember.phone || '',
                   email: newMember.email || '',
-                  birthDate: newMember.birthDate,
+                  birthDate: newMember.birthDate || '',
                   gender: (newMember.gender as any) || 'Pria',
                   registeredStore: newMember.registeredStore || 'Puri Jakarta',
                   lastStoreVisited: newMember.lastStoreVisited || 'Puri Jakarta',
@@ -821,14 +852,20 @@ export default function App() {
                   totalSpend: Number(newMember.totalSpend) || 0,
                   tier: (newMember.tier as any) || 'BLUE',
                   status: (newMember.status as any) || 'ACTIVE',
-                  address: newMember.address
+                  address: newMember.address || ''
                 };
 
                 try {
-                  await setDoc(doc(db, 'members', created.id), created);
+                  await safeSetDoc('members', created.id, created);
                 } catch (err) {
                   console.warn("Backend API unavailable, saved member locally:", err);
                 }
+
+                setMembers(prev => {
+                  const next = [created, ...prev.filter(m => m.id !== created.id)];
+                  try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+                  return next;
+                });
               }}
             />
             

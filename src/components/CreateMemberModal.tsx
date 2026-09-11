@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Phone, User, Mail, Calendar, AlertCircle, Store, Mars, Venus } from 'lucide-react';
 import { Member } from '../types';
+import { findMemberByPhoneInFirestore, isSamePhoneNumber, normalizePhoneNumber } from '../lib/syncFirestore';
 
 export const OFFICIAL_STORES = [
   "23 Paskal Bandung",
@@ -106,27 +107,33 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
       setErrorMessage('Nama Lengkap dan Nomor Handphone wajib diisi.');
       return;
     }
+
+    const normalizedInput = normalizePhoneNumber(phone.trim());
+    if (normalizedInput.length < 8) {
+      setErrorMessage('Nomor handphone tidak valid (minimal 8-10 digit angka).');
+      return;
+    }
     
-    const cleanDigits = phone.replace(/[^0-9]/g, '');
-    if (members && cleanDigits.length >= 4) {
-      const existing = members.find(m => {
-        const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
-        return m.phone === phone || (mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
-      });
+    setIsSubmitting(true);
+    try {
+      // 1. Check local state
+      let existing = members ? members.find(m => isSamePhoneNumber(m.phone || '', phone)) : null;
+
+      // 2. Strict live check in Firestore
+      if (!existing) {
+        existing = await findMemberByPhoneInFirestore(phone);
+      }
       
       if (existing) {
+        setIsSubmitting(false);
         if (onExistingMember) {
           onExistingMember(existing);
           return;
         } else {
-          setErrorMessage('Nomor handphone sudah terdaftar!');
+          setErrorMessage(`Nomor handphone ${phone} sudah terdaftar atas nama ${existing.name} (${existing.membershipId})!`);
           return;
         }
       }
-    }
-
-    setIsSubmitting(true);
-    try {
             let code = 'PUR';
       if (stores) {
         const found = stores.find(s => s.name.toLowerCase() === registeredStore.toLowerCase());
