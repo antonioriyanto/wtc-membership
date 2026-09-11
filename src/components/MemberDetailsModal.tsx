@@ -61,14 +61,14 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
           <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-100">
             <div className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider">Current Balance</div>
             <div className="text-xl font-bold text-emerald-700 font-mono mt-0.5">
-              {member.points.toLocaleString('id-ID')} Pts
+              {(member.points || 0).toLocaleString('id-ID')} Pts
             </div>
           </div>
 
           <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Lifetime Points</div>
             <div className="text-xl font-bold text-slate-900 font-mono mt-0.5">
-              {member.lifetimePoints.toLocaleString('id-ID')} Pts
+              {(member.lifetimePoints || 0).toLocaleString('id-ID')} Pts
             </div>
           </div>
 

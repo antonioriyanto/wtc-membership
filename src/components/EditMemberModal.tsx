@@ -522,7 +522,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   <div>
                     <h4 className="text-sm font-bold text-rose-900">Hapus Akun Member Secara Permanen</h4>
                     <p className="text-xs text-rose-700 mt-1">
-                      Menghapus akun <strong>{member.name}</strong> ({member.membershipId}) akan menghapus seluruh data profil, hak poin sejumlah <strong>{member.points.toLocaleString('id-ID')} Pts</strong>, dan akses masuk member dari sistem.
+                      Menghapus akun <strong>{member.name}</strong> ({member.membershipId}) akan menghapus seluruh data profil, hak poin sejumlah <strong>{(member.points || 0).toLocaleString('id-ID')} Pts</strong>, dan akses masuk member dari sistem.
                     </p>
                   </div>
                 </div>

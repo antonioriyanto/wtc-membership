@@ -509,7 +509,7 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
                   </div>
                   {selectedActivity.amount !== undefined && (
                     <div className="text-slate-700 font-medium">
-                      Nilai Transaksi: <strong>Rp {selectedActivity.amount.toLocaleString('id-ID')}</strong>
+                      Nilai Transaksi: <strong>Rp {(selectedActivity.amount || 0).toLocaleString('id-ID')}</strong>
                     </div>
                   )}
                   {selectedActivity.pointsDelta !== undefined && (

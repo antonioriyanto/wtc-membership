@@ -177,7 +177,7 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                       Watch Club Promotion
                     </div>
                     <div className="text-2xl font-bold text-amber-300 mt-1 drop-shadow-md">
-                      {voucher.discountType === 'PERCENTAGE' ? `${voucher.discountValue}% OFF` : `Rp ${(voucher.discountValue).toLocaleString('id-ID')}`}
+                      {voucher.discountType === 'PERCENTAGE' ? `${voucher.discountValue}% OFF` : `Rp ${(voucher.discountValue || 0).toLocaleString('id-ID')}`}
                     </div>
                     <div className="text-xs text-slate-100 font-medium mt-0.5 truncate drop-shadow-md">
                       {voucher.title}

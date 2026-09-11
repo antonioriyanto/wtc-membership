@@ -321,7 +321,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   <div className="font-bold text-sm text-slate-900">
                     {member.tier === 'BLACK' 
                       ? 'Top Tier Reached'
-                      : `${(nextTierPoints - member.points).toLocaleString('id-ID')} more points to ${
+                      : `${((nextTierPoints || 0) - (member.points || 0)).toLocaleString('id-ID')} more points to ${
                           member.tier === 'DIAMOND' ? 'Black' :
                           member.tier === 'PLATINUM' ? 'Diamond' :
                           member.tier === 'GOLD' ? 'Platinum' :
@@ -329,7 +329,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         } Level`
                     }
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">Current Balance: {member.points.toLocaleString('id-ID')} Points</div>
+                  <div className="text-xs text-slate-500 mt-0.5">Current Balance: {(member.points || 0).toLocaleString('id-ID')} Points</div>
                 </div>
               </div>
               <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">

@@ -149,7 +149,7 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
               <div>
                 <span className="text-[10px] tracking-wider uppercase opacity-70">Saldo Poin Loyalitas</span>
                 <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-amber-300">
-                  {member.points.toLocaleString('id-ID')} <span className="text-xs font-normal text-white/80">Pts</span>
+                  {(member.points || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-white/80">Pts</span>
                 </div>
               </div>
 

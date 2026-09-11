@@ -610,7 +610,7 @@ export const SupportTicketsTab: React.FC<SupportTicketsTabProps> = ({
                     <div className="text-right">
                       <div className="text-[10px] text-slate-500 font-bold uppercase">Saldo Saat Ini</div>
                       <div className="font-bold text-emerald-700 text-xs font-mono">
-                        {linkedMember.points.toLocaleString('id-ID')} Pts
+                        {(linkedMember.points || 0).toLocaleString('id-ID')} Pts
                       </div>
                     </div>
                   )}

@@ -185,7 +185,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             +{totalPointsIssuedToday.toLocaleString('id-ID')} Pts
           </div>
           <div className="flex items-center gap-2 mt-2 text-xs font-medium text-slate-500">
-            <span>Rate: 1 Pt per Rp {(loyaltyConfig.amountUnit).toLocaleString('id-ID')}</span>
+            <span>Rate: 1 Pt per Rp {(loyaltyConfig.amountUnit || 0).toLocaleString('id-ID')}</span>
           </div>
         </div>
 
@@ -295,7 +295,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
                   <div className="text-right shrink-0 pl-12 sm:pl-0 flex flex-col items-end">
                     <div className="text-sm font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
-                      Rp {store.todayRevenue.toLocaleString('id-ID')}
+                      Rp {(store.todayRevenue || 0).toLocaleString('id-ID')}
                     </div>
                     <div className="text-[11px] text-slate-400">Daily Volume</div>
                     <span className="text-[10px] text-amber-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 mt-0.5">
