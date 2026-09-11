@@ -51,10 +51,12 @@ interface CreateMemberModalProps {
   onCreateMember: (member: Partial<Member>) => Promise<void>;
   defaultStore?: string;
   isStoreLocked?: boolean;
+  members?: Member[];
+  onExistingMember?: (member: Member) => void;
 }
 
 export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
-  isOpen, onClose, onCreateMember, defaultStore = 'Puri Jakarta', isStoreLocked = true
+  isOpen, onClose, onCreateMember, defaultStore = 'Puri Jakarta', isStoreLocked = true, members, onExistingMember
 }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -84,6 +86,24 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
       return;
     }
     
+    const cleanDigits = phone.replace(/[^0-9]/g, '');
+    if (members && cleanDigits.length >= 4) {
+      const existing = members.find(m => {
+        const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
+        return m.phone === phone || (mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
+      });
+      
+      if (existing) {
+        if (onExistingMember) {
+          onExistingMember(existing);
+          return;
+        } else {
+          setErrorMessage('Nomor handphone sudah terdaftar!');
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const storeCodeMap: Record<string, string> = {

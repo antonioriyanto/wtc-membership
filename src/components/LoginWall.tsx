@@ -211,7 +211,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
 interface MemberLoginProps {
   onLogin: (memberId: string) => void;
-  onRegisterGoogle: () => void;
+  onRegisterGoogle: (phone: string) => Promise<void>;
   members: any[];
 }
 
@@ -220,6 +220,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
   const [error, setError] = useState('');
   const [isNotRegistered, setIsNotRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isPendingGoogle, setIsPendingGoogle] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,14 +229,14 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
     setLoading(true);
     setError('');
     setIsNotRegistered(false);
-    try {
-      const membersList = members;
 
+    try {
       const cleanDigits = phone.replace(/[^0-9]/g, '');
-      const found = membersList.find((m: any) => {
+      const found = members.find((m: any) => {
         const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
         return m.phone === phone || (cleanDigits.length >= 4 && mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
       });
+
       if (found) {
         onLogin(found.id);
       } else {
@@ -244,6 +245,15 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
       }
     } catch (err) {
       setError('Gagal memproses data member.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleClick = async (p?: string) => {
+    setLoading(true);
+    try {
+      await onRegisterGoogle(p || phone || '');
     } finally {
       setLoading(false);
     }
@@ -304,7 +314,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
 
                 <button 
                   type="button"
-                  onClick={onRegisterGoogle} 
+                  onClick={() => handleGoogleClick()} 
                   className="w-full mt-4 py-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-3 cursor-pointer shadow-sm"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -330,7 +340,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               
               <button 
                 type="button"
-                onClick={onRegisterGoogle}
+                onClick={() => handleGoogleClick()}
                 className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm shadow-md transition-colors flex items-center justify-center gap-3 cursor-pointer"
               >
                 <svg className="w-5 h-5 bg-white rounded-full p-0.5" viewBox="0 0 24 24">

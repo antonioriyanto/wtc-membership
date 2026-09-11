@@ -9,14 +9,24 @@ interface CashierTabProps {
   members: Member[];
   transactions: Transaction[];
   currentStore?: StoreBranch;
+  autoSelectMemberId?: string;
   onAddPoints: (memberId: string, amount: number, receiptNo: string) => void;
   onRedeemVoucher: (memberId: string, voucherCode: string) => void;
   onOpenCreateMember: () => void;
 }
 
-export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, currentStore, onAddPoints, onRedeemVoucher, onOpenCreateMember, isSubmitting }) => {
+export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, currentStore, autoSelectMemberId, onAddPoints, onRedeemVoucher, onOpenCreateMember, isSubmitting }) => {
   const [searchInput, setSearchInput] = useState('');
   const [activeMember, setActiveMember] = useState<Member | null>(null);
+
+  useEffect(() => {
+    if (autoSelectMemberId && members.length > 0) {
+      const found = members.find(m => m.id === autoSelectMemberId);
+      if (found) {
+        setActiveMember(found);
+      }
+    }
+  }, [autoSelectMemberId, members]);
   
   const [receiptInput, setReceiptInput] = useState('');
   const [amountInput, setAmountInput] = useState('');

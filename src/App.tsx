@@ -37,6 +37,9 @@ import { ManualPointAdjustmentModal } from './components/ManualPointAdjustmentMo
 import { CashierPOSView } from './components/CashierPOSView';
 import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider, db } from './lib/firebase';
 import { PortalSwitcher } from './components/PortalSwitcher';
 import { StoreTransactionsModal } from './components/StoreTransactionsModal';
 import { NationalActivityNotifications } from './components/NationalActivityNotifications';
@@ -233,6 +236,8 @@ export default function App() {
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
   const [isStoreTransactionsModalOpen, setIsStoreTransactionsModalOpen] = useState(false);
   const [selectedStoreForTrx, setSelectedStoreForTrx] = useState<StoreBranch | null>(null);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<any>(null);
+  const [googlePhoneInput, setGooglePhoneInput] = useState('');
 
   // Navigate directly to dedicated National Transactions tab (No popup!)
   const handleOpenStoreTransactions = (store: StoreBranch | null) => {
@@ -493,45 +498,137 @@ export default function App() {
           <MemberLogin 
             members={members}
             onLogin={(id) => setLoggedInMemberId(id)} 
-            onRegisterGoogle={async () => {
+            onRegisterGoogle={async (phoneNum: string) => {
               try {
-                const { signInWithPopup } = await import('firebase/auth');
-                const { getDoc, serverTimestamp } = await import('firebase/firestore');
-                
                 const result = await signInWithPopup(auth, googleProvider);
                 const user = result.user;
                 
-                const userRef = doc(db, 'members', user.uid);
-                const userSnap = await getDoc(userRef);
+                let targetPhone = phoneNum || user.phoneNumber || '';
                 
-                if (!userSnap.exists()) {
-                  // Generate a realistic membership ID instead of using the raw Firebase UID for the UI
-                  const shortUid = user.uid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).toUpperCase();
-                  const membershipId = 'ONL' + shortUid;
-                  
-                  const newMember = {
-                    id: user.uid,
-                    membershipId: membershipId, // Added readable membership ID
-                    name: user.displayName || 'Google User',
-                    phone: user.phoneNumber || '', 
-                    email: user.email || '',
-                    joinDate: new Date().toISOString().split('T')[0],
-                    points: 0,
-                    tier: 'BLUE',
-                    totalSpent: 0,
-                    registeredStore: 'Online',
-                    lastStoreVisited: 'Online',
-                    createdAt: new Date().toISOString()
-                  };
-                  await setDoc(userRef, newMember);
+                // 1. If we have a phone number, check if a member already exists with this phone
+                let existingMember = null;
+                if (targetPhone) {
+                  const cleanDigits = targetPhone.replace(/[^0-9]/g, '');
+                  if (cleanDigits.length >= 4) {
+                    existingMember = members.find(m => {
+                      const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
+                      return m.phone === targetPhone || (mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
+                    });
+                  }
                 }
                 
+                const userRef = doc(db, 'members', user.uid);
+                
+                if (existingMember) {
+                  // MERGE: Existing member found by phone (created by cashier)
+                  // We copy their data into the Google UID document, and delete the old one.
+                  if (existingMember.id !== user.uid) {
+                    const mergedData = {
+                      ...existingMember,
+                      id: user.uid,
+                      name: existingMember.name || user.displayName || 'Google User',
+                      email: existingMember.email || user.email || '',
+                      googleMergedAt: new Date().toISOString()
+                    };
+                    await setDoc(userRef, mergedData);
+                    // Attempt to delete old cashier-created document
+                    try {
+                      await deleteDoc(doc(db, 'members', existingMember.id));
+                    } catch(e) {
+                      console.warn("Could not delete old member doc:", e);
+                    }
+                  }
+                  setLoggedInMemberId(user.uid);
+                  return;
+                }
+                
+                // 2. Check if this Google UID already exists
+                const userSnap = await getDoc(userRef);
+                if (userSnap.exists()) {
+                   // Update phone if we have one and they didn't
+                   const data = userSnap.data();
+                   if (targetPhone && !data.phone) {
+                      await setDoc(userRef, { phone: targetPhone }, { merge: true });
+                   }
+                   setLoggedInMemberId(user.uid);
+                   return;
+                }
+                
+                // 3. Brand new member
+                if (!targetPhone) {
+                   // In a real app we'd show a "Complete Profile" modal here.
+                   // For now, prompt via window.prompt if missing.
+                   // Let's use our custom dialog to ask for the phone number
+                   targetPhone = await new Promise((resolve) => {
+                     const modalHtml = `
+                       <div style="text-align: left;">
+                         <p style="font-size: 14px; margin-bottom: 12px; color: #475569;">Kami tidak menemukan nomor handphone pada akun Google Anda. Masukkan nomor Anda untuk mengamankan poin.</p>
+                         <input type="tel" id="google-phone-prompt" placeholder="08123456789" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; font-size: 16px;" />
+                       </div>
+                     `;
+                     
+                     // We are hacking the showAlert UI temporarily by injecting HTML if possible, 
+                     // but since showAlert doesn't support input easily, let's just use window.prompt for now
+                     // because building a full React modal dynamically here is too complex.
+                     
+                     // ACTUALLY, let's use window.prompt but with better text.
+                     const res = window.prompt("Lengkapi Profil\n\nSatu langkah lagi! Masukkan nomor WhatsApp/Handphone Anda untuk menghubungkan poin:");
+                     resolve(res || '');
+                   });
+                   
+                   if (!targetPhone) {
+                      showAlert('Pendaftaran dibatalkan. Nomor handphone wajib diisi untuk mengamankan poin Anda.', 'Peringatan', 'warning');
+                      return; // Cancel sign in
+                   }
+                   
+                   // Re-check merge just in case they typed a cashier-registered phone
+                   const cleanDigits = targetPhone.replace(/[^0-9]/g, '');
+                   if (cleanDigits.length >= 4) {
+                     existingMember = members.find(m => {
+                       const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
+                       return m.phone === targetPhone || (mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
+                     });
+                   }
+                   if (existingMember && existingMember.id !== user.uid) {
+                      const mergedData = {
+                        ...existingMember,
+                        id: user.uid,
+                        name: existingMember.name || user.displayName || 'Google User',
+                        email: existingMember.email || user.email || '',
+                        googleMergedAt: new Date().toISOString()
+                      };
+                      await setDoc(userRef, mergedData);
+                      try { await deleteDoc(doc(db, 'members', existingMember.id)); } catch(e) {}
+                      setLoggedInMemberId(user.uid);
+                      return;
+                   }
+                }
+
+                const shortUid = user.uid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).toUpperCase();
+                const membershipId = 'ONL' + shortUid;
+                
+                const newMember = {
+                  id: user.uid,
+                  membershipId: membershipId,
+                  name: user.displayName || 'Google User',
+                  phone: targetPhone, 
+                  email: user.email || '',
+                  joinDate: new Date().toISOString().split('T')[0],
+                  points: 0,
+                  tier: 'BLUE',
+                  totalSpent: 0,
+                  registeredStore: 'Online',
+                  lastStoreVisited: 'Online',
+                  createdAt: new Date().toISOString()
+                };
+                
+                await setDoc(userRef, newMember);
                 setLoggedInMemberId(user.uid);
               } catch (e: any) {
                 console.error("Google Sign-In Error", e);
                 showAlert('Gagal login dengan Google: ' + e.message, 'Login Gagal', 'error');
               }
-            }} 
+            }}
           />
         )
       } />
@@ -678,6 +775,7 @@ export default function App() {
               onClose={() => setIsCreateMemberOpen(false)}
               defaultStore={cashierStoreName || 'Puri Jakarta'}
               isStoreLocked={false}
+              members={members}
               onCreateMember={async (newMember) => {
                 let created: Member = {
                   id: newMember.id || 'mem_' + Date.now(),

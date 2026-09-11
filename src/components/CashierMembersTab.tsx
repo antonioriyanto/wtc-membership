@@ -114,18 +114,9 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
       };
 
       try {
-        const res = await fetch(`/api/members/${editingMember.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          const apiUpdated = await res.json();
-          if (apiUpdated && apiUpdated.id) {
-            updatedMemberData = { ...updatedMemberData, ...apiUpdated };
-          }
-        }
+        const { doc, setDoc } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        await setDoc(doc(db, 'members', updatedMemberData.id), updatedMemberData);
       } catch (err) {
         console.warn("Backend API unavailable, saved member edit locally:", err);
       }
