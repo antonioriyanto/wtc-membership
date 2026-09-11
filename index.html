@@ -12,6 +12,23 @@
   
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0f172a" />
+  
+    <script>
+      window.addEventListener('error', function(e) {
+        if (e.message && (e.message.includes('Unexpected token') || e.message.includes('SyntaxError') || e.message.includes('script error'))) {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+              for (let registration of registrations) {
+                registration.unregister();
+              }
+              if (registrations.length > 0) {
+                window.location.reload();
+              }
+            });
+          }
+        }
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

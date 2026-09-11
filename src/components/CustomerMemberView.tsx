@@ -494,35 +494,18 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         {store.name}
                       </h3>
                       {store.distance !== undefined && (
-                        <div className="flex items-center gap-1 text-[0.65rem] font-bold text-emerald-300 drop-shadow-md mt-0.5">
+                        <div className="flex items-center gap-1 text-[0.7rem] font-bold text-emerald-300 drop-shadow-md mt-1 bg-black/40 w-fit px-2 py-0.5 rounded-full backdrop-blur-sm">
                           <MapPin className="w-3 h-3" />
                           <span>
                             {store.distance < 1 
-                              ? `${Math.round(store.distance * 1000)} METER DARI ANDA` 
+                              ? `${Math.round(store.distance * 1000)} M DARI ANDA` 
                               : `${store.distance.toFixed(1)} KM DARI ANDA`}
                           </span>
                         </div>
                       )}
-                      {store.distance !== undefined && (
-                        <div className="flex items-center gap-1 text-[0.65rem] font-bold text-emerald-300 drop-shadow-md mt-0.5">
-                          <MapPin className="w-3 h-3" />
-                          <span>
-                            {store.distance < 1 
-                              ? `${Math.round(store.distance * 1000)} METER DARI ANDA` 
-                              : `${store.distance.toFixed(1)} KM DARI ANDA`}
-                          </span>
-                        </div>
-                      )}
-                      {store.distance !== undefined && (
-                        <div className="flex items-center gap-1 text-xs font-semibold text-white/90 drop-shadow-md mt-1">
-                          <MapPin className="w-3 h-3 text-emerald-400" />
-                          <span>
-                            {store.distance < 1 
-                              ? `${Math.round(store.distance * 1000)} m dari Anda` 
-                              : `${store.distance.toFixed(1)} km dari Anda`}
-                          </span>
-                        </div>
-                      )}
+                      
+                      
+                      
                     </div>
                   </div>
 
@@ -698,6 +681,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
           </div>
         )}
 
+        <PwaInstallPrompt />
         {isQrModalOpen && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
             <div className="bg-white rounded-[24px] text-center shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] w-[90%] max-w-[340px] p-7 relative animate-scaleUp">
