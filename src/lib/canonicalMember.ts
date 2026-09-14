@@ -131,53 +131,51 @@ export function resolveStoreCode(
     return trimmed.toUpperCase();
   }
 
-  // 3. Known luxury boutique mapping dictionary
+  // 3. Exact official mapping dictionary matching the 40 official boutiques + HO + Online
   const cleanKey = trimmed.toLowerCase();
   const KNOWN_STORE_CODES: Record<string, string> = {
-    'grand indonesia': 'GI',
-    'grand indonesia jakarta': 'GI',
-    '23 semarang': '23S',
-    'puri jakarta': 'PUR',
-    'puri indah': 'PUR',
-    'puri indah mall': 'PUR',
-    'kota kasablanka jakarta': 'KKJ',
-    'kota kasablanka': 'KKJ',
-    'level 21 bali': 'L2B',
-    'trans studio bali': 'TSMB',
-    'e-walk balikpapan': 'EWB',
-    'penta city balikpapan': 'PCB',
-    'tsm bandung': 'TSMBND',
-    'summarecon mall bandung': 'SMB',
-    '23 paskal bandung': '2PB',
-    'duta mall 1 banjarmasin': 'DUT',
-    'duta mall 2 banjarmasin': 'DM2',
+    '23 paskal bandung': '23PSC',
+    '23 semarang': '23SMG',
+    'aeon sentul': 'AMSC',
+    'alianyang singkawang': 'ALIAN',
+    'ambarukmo plaza jogja': 'AMB',
+    'ayani pontianak': 'AYANI',
+    'big mall samarinda': 'BIG',
+    'bogor botani': 'BOS',
     'cibinong city mall': 'CCM',
-    'aeon sentul': 'AEO',
-    'bogor botani': 'BOG',
-    'tsm cibubur': 'TSMC',
-    'the park sawangan depok': 'TPSD',
-    'panakukang': 'PAN',
-    'tsm makassar': 'TSM',
+    'ciputra semarang': 'CL',
+    'dp mall semarang': 'DPM',
+    'duta mall 1 banjarmasin': 'DTM1',
+    'duta mall 2 banjarmasin': 'DTM2',
+    'e-walk balikpapan': 'EWALK',
+    'gaia pontianak': 'GAIA',
+    'gorontalo': 'GTLO',
+    'jayapura': 'JYP',
+    'jogja city mall': 'JCM',
+    'kendari': 'KDI',
+    'kota kasablanka jakarta': 'KOKAS',
+    'kota kasablanka': 'KOKAS',
+    'level 21 bali': 'LVL21',
     'mall olympic garden 1 malang': 'MOG1',
     'mall olympic garden 2 malang': 'MOG2',
-    'manado town square': 'MTS',
+    'manado town square': 'MANTS',
+    'pakuwon mall yogya': 'PMJ',
+    'palu': 'PALU',
+    'panakukang': 'KUKA',
+    'paragon semarang': 'PRG',
+    'penta city balikpapan': 'PENTA',
+    'puri jakarta': 'PIM',
     'singkawang grand mall': 'SGM',
-    'palu': 'PAL',
-    'ayani pontianak': 'AYA',
-    'gaia pontianak': 'GAI',
-    'gorontalo': 'GOR',
-    'jayapura': 'JAY',
-    'kendari': 'KEN',
-    'paragon semarang': 'PAR',
-    'ciputra semarang': 'CIP',
-    'dp mall semarang': 'DMS',
-    'alianyang singkawang': 'ALI',
-    'solo square': 'SOLSQ',
-    'solo baru': 'SOLB',
-    'the park solo': 'TPS',
-    'ambarukmo plaza jogja': 'AMB',
-    'jogja city mall': 'JCM',
-    'pakuwon mall yogya': 'PMY',
+    'solo baru': 'SOBAR',
+    'solo square': 'SQ',
+    'summarecon mall bandung': 'SMB',
+    'the park sawangan depok': 'SWG',
+    'the park solo': 'PARK',
+    'tsm bali': 'BALI',
+    'tsm bandung': 'TSM',
+    'tsm cibubur': 'CBB',
+    'tsm makassar': 'FINE',
+    'head office': 'HO',
     'online': 'ONL'
   };
 
@@ -185,7 +183,7 @@ export function resolveStoreCode(
     return KNOWN_STORE_CODES[cleanKey];
   }
 
-  // 4. Fallback: initials from multi-word names (e.g. "Grand Indonesia" -> "GI")
+  // 4. Fallback: initials from multi-word names
   const words = cleanKey.split(/\s+/).filter(Boolean);
   if (words.length >= 2) {
     const acronym = words.map(w => w[0]).join('').toUpperCase().slice(0, 4);

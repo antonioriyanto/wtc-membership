@@ -91,21 +91,18 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
     return `${mins.toString().padStart(2, '0')}:${remainder.toString().padStart(2, '0')}`;
   };
 
-  // E.164 preview format
-  const e164Preview = phone ? toE164(phone) : '';
-
   // Handle Step 1: Submit Phone Number
   const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = phone.trim();
     if (!cleanPhone) {
-      setError('Silakan masukkan nomor handphone Anda.');
+      setError('Silakan masukkan nomor ponsel Anda.');
       return;
     }
 
     const localDigits = cleanPhone.replace(/[^0-9]/g, '');
     if (localDigits.length < 8) {
-      setError('Nomor handphone tidak valid (minimal 8-10 digit angka).');
+      setError('Nomor ponsel tidak valid (minimal 8-10 digit angka).');
       return;
     }
 
@@ -118,7 +115,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
       setMemberInfo(result);
 
       if (!result.exists) {
-        setError(`Nomor ${cleanPhone} belum terdaftar sebagai member.`);
+        setError(`Maaf, nomor ponsel ${cleanPhone} belum terdaftar. Mari bergabung bersama kami.`);
         return;
       }
 
@@ -505,14 +502,14 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             <div className="text-center">
               <h2 className="text-xl font-bold tracking-tight text-slate-900">Portal Member Eksklusif</h2>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Masukkan nomor handphone terdaftar untuk mengakses portofolio poin, voucher, dan riwayat jam tangan mewah Anda.
+                Selamat datang kembali. Masukkan nomor ponsel Anda untuk mengakses privilege member, poin reward, dan koleksi jam tangan Anda.
               </p>
             </div>
 
             <form onSubmit={handlePhoneSubmit} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Nomor Handphone Terdaftar
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Nomor Ponsel
                 </label>
                 <div className="relative">
                   <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -529,12 +526,6 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     autoFocus
                   />
                 </div>
-                {e164Preview && (
-                  <div className="text-[11px] text-slate-500 mt-1.5 flex items-center justify-between">
-                    <span>Format E.164 Standar:</span>
-                    <span className="font-mono text-slate-700 font-semibold">{e164Preview}</span>
-                  </div>
-                )}
               </div>
 
               <button
@@ -543,15 +534,15 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                 className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
               >
                 <ShieldCheck className="w-4 h-4 text-white" />
-                <span>{loading ? 'Memverifikasi...' : 'Lanjutkan ke Security PIN'}</span>
+                <span>{loading ? 'Memverifikasi...' : 'Lanjutkan ke PIN Keamanan'}</span>
               </button>
             </form>
 
-            {/* Unregistered Member Registration Link */}
+            {/* Unregistered Member Registration Prompt */}
             {memberInfo && !memberInfo.exists && (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-2.5 animate-fadeIn">
-                <p className="text-xs text-slate-700">
-                  Nomor <strong>{phone}</strong> belum terdaftar dalam direktori member.
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-3 animate-fadeIn">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Belum menjadi bagian dari Watch Club? Daftar sekarang untuk menikmati berbagai privilege eksklusif.
                 </p>
                 <button
                   type="button"
@@ -564,7 +555,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                   </svg>
-                  <span>Daftar Akun Baru dengan Google</span>
+                  <span>Daftar Member Baru via Google</span>
                 </button>
               </div>
             )}
@@ -633,7 +624,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   {formatLockoutTimer(lockoutSeconds)}
                 </p>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Untuk menjaga kerahasiaan portofolio dan kepemilikan poin Anda, input PIN dinonaktifkan sementara setelah beberapa percobaan tidak sesuai.
+                  Untuk menjaga keamanan dan kerahasiaan poin reward Anda, akses input PIN dinonaktifkan sementara setelah beberapa percobaan tidak sesuai.
                 </p>
                 <button
                   type="button"
@@ -763,7 +754,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   ? 'Verifikasi identitas berhasil. Tentukan 6-digit Security PIN baru Anda.'
                   : step === 'MANDATORY_PIN_CHANGE_CREATE'
                   ? 'PIN sementara dari kasir aktif. Buat 6-digit PIN permanen baru demi keamanan.'
-                  : 'Tentukan 6-digit Security PIN untuk melindungi portofolio poin & reward Anda.'}
+                  : 'Tentukan 6-digit Security PIN untuk melindungi poin reward dan data koleksi Anda.'}
               </p>
             </div>
 
@@ -911,25 +902,25 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
         {step === 'FIRST_PIN_LINK_GOOGLE' && (
           <div className="space-y-4 animate-fadeIn">
             <div className="text-center pt-2">
-              <div className="inline-flex p-3 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 mb-2">
-                <ShieldCheck className="w-6 h-6" />
+              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 mb-2">
+                <ShieldCheck className="w-6 h-6 text-slate-800" />
               </div>
               <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                Hubungkan Akun Pemulihan
+                Amankan Profil Anda
               </h2>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Tautkan akun Google resmi Anda sebagai instrumen verifikasi identitas dan pemulihan darurat portofolio member.
+                Hubungkan akun Google Anda untuk mempermudah akses masuk dan melindungi data keanggotaan Anda di masa mendatang.
               </p>
             </div>
 
-            {/* EXECUTIVE SECURITY COPY */}
+            {/* SECURITY BADGE & DESCRIPTION */}
             <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1.5 text-xs text-slate-700">
               <div className="flex items-center gap-2 font-semibold text-slate-900">
                 <ShieldCheck className="w-4 h-4 text-slate-800" />
-                <span>Standar Privasi &amp; Keamanan Eksklusif</span>
+                <span>Privasi &amp; Keamanan Terjamin</span>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Watch Club menerapkan standar enkripsi berstandar perbankan guna memastikan hak reward dan data kepemilikan jam tangan Anda terlindungi secara menyeluruh dari akses tanpa otorisasi.
+                Data koleksi jam tangan, poin reward, dan privasi Anda dilindungi dengan sistem enkripsi setara perbankan. Kenyamanan dan keamanan Anda adalah prioritas kami.
               </p>
             </div>
 
@@ -945,7 +936,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
               </svg>
-              <span>{loading ? 'Menghubungkan...' : 'Tautkan Akun Google & Selesai'}</span>
+              <span>{loading ? 'Menghubungkan...' : 'Hubungkan & Selesai'}</span>
             </button>
           </div>
         )}
@@ -987,8 +978,8 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                 <span className="font-semibold text-slate-900">{memberInfo?.name || 'Member Watch Club'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span>Nomor Handphone:</span>
-                <span className="font-mono text-slate-900 font-semibold">{toE164(phone)}</span>
+                <span>Nomor Ponsel:</span>
+                <span className="font-mono text-slate-900 font-semibold">{phone}</span>
               </div>
               {memberInfo?.memberDoc?.recoveryEmail && (
                 <div className="flex justify-between items-center">
