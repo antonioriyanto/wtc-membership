@@ -19,6 +19,8 @@ export default defineConfig(() => {
           name: 'Watch Club Membership',
           short_name: 'Watch Club',
           description: 'Official Watch Club Customer Portal',
+          start_url: '/member',
+          scope: '/',
           theme_color: '#0f172a',
           background_color: '#f8fafc',
           display: 'standalone',

@@ -2,7 +2,7 @@ import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, writeBatch, collection
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, db } from './lib/firebase';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { Member, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch, SupportTicket, Campaign, AuditLog } from './types';
 import { useCustomDialog } from './components/CustomDialogProvider';
 import { 
@@ -46,8 +46,20 @@ import { NationalActivityNotifications } from './components/NationalActivityNoti
 
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showAlert } = useCustomDialog();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  useEffect(() => {
+    const p = location.pathname.toLowerCase();
+    if (p.startsWith('/admin') || p.startsWith('/ho')) {
+      document.title = "Watch Club - HO Management Portal (Restricted)";
+    } else if (p.startsWith('/cashier') || p.startsWith('/pos') || p.startsWith('/kasir')) {
+      document.title = "Watch Club - Terminal Kasir POS";
+    } else {
+      document.title = "Watch Club - Loyalty Member Portal";
+    }
+  }, [location.pathname]);
   
   const [adminAuthenticated, setAdminAuthenticated] = useState(() => {
     try {
@@ -475,7 +487,7 @@ export default function App() {
   const handleSwitchPortal = (portal: 'HO' | 'CASHIER' | 'MEMBER') => {
     if (portal === 'HO') {
       setAdminAuthenticated(true);
-      navigate('/');
+      navigate('/admin');
     } else if (portal === 'CASHIER') {
       setAdminAuthenticated(true);
       navigate('/cashier');
@@ -513,7 +525,7 @@ export default function App() {
               } catch {}
               navigate('/cashier');
             }}
-            onSwitchPerspective={(p) => navigate(p === 'HO' ? '/' : '/' + p.toLowerCase())}
+            onSwitchPerspective={(p) => navigate(p === 'HO' ? '/admin' : '/' + p.toLowerCase())}
           />
         ) : (
           <AdminLogin 
@@ -691,7 +703,7 @@ export default function App() {
         )
       } />
       
-      <Route path="*" element={
+      <Route path="/admin" element={
         adminAuthenticated ? (
           <div className="flex h-screen bg-[#f8f9fc] text-slate-800 font-sans overflow-hidden">
             <Sidebar 
@@ -704,7 +716,7 @@ export default function App() {
               onLogout={() => {
                 setAdminAuthenticated(false);
                 try { localStorage.removeItem('wtc_admin_auth'); } catch {}
-                navigate('/');
+                navigate('/admin');
               }}
             />
 
@@ -824,7 +836,7 @@ export default function App() {
             <QuickStoreSwitchModal 
               isOpen={isQuickLauncherOpen} 
               onClose={() => setIsQuickLauncherOpen(false)} 
-              onSwitchView={(p) => navigate(p === 'HO' ? '/' : '/' + p.toLowerCase())} 
+              onSwitchView={(p) => navigate(p === 'HO' ? '/admin' : '/' + p.toLowerCase())} 
               currentView="HO" 
             />
 
@@ -988,9 +1000,36 @@ export default function App() {
             />
           </div>
         ) : (
-          <AdminLogin onLogin={() => setAdminAuthenticated(true)} title="HO Superadmin Portal" subtitle="Master control room and ledger." showStoreQuickSelect={false} />
+          <AdminLogin 
+            onLogin={() => setAdminAuthenticated(true)} 
+            title="Portal Manajemen HO" 
+            subtitle="Akses Terbatas. Masukkan kredensial otorisasi Kantor Pusat (HO)." 
+            showStoreQuickSelect={false} 
+          />
         )
       } />
+
+      {/* Redirect aliases for Head Office */}
+      <Route path="/ho" element={<Navigate to="/admin" replace />} />
+
+      {/* Redirect aliases for Store Cashier POS */}
+      <Route path="/pos" element={<Navigate to="/cashier" replace />} />
+      <Route path="/kasir" element={<Navigate to="/cashier" replace />} />
+
+      {/* Redirect aliases for Member Portal */}
+      <Route path="/members" element={<Navigate to="/member" replace />} />
+      <Route path="/loyalty" element={<Navigate to="/member" replace />} />
+      <Route path="/rewards" element={<Navigate to="/member" replace />} />
+      <Route path="/points" element={<Navigate to="/member" replace />} />
+      <Route path="/point" element={<Navigate to="/member" replace />} />
+      <Route path="/card" element={<Navigate to="/member" replace />} />
+      <Route path="/kartu" element={<Navigate to="/member" replace />} />
+
+      {/* Root URL point.watchclub.co.id always safely defaults to Member Portal (Customers & Android PWA) */}
+      <Route path="/" element={<Navigate to="/member" replace />} />
+
+      {/* Catch-all for any typos or unmatched URLs: NEVER lands on Admin, ALWAYS safe to Member Portal */}
+      <Route path="*" element={<Navigate to="/member" replace />} />
       </Routes>
 
       {/* FLOATING PORTAL SWITCHER (HO - KASIR - CUSTOMER) - Sementara disembunyikan */}

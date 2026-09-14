@@ -62,8 +62,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   subtitle, 
   showStoreQuickSelect = true 
 }) => {
-  const [username, setUsername] = useState(showStoreQuickSelect ? '' : 'admin');
-  const [password, setPassword] = useState(showStoreQuickSelect ? '' : 'wtc26');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isStoreDropdownOpen, setIsStoreDropdownOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -89,7 +89,20 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       return;
     }
 
-    // Check store accounts
+    // If on HO restricted portal (!showStoreQuickSelect) and entered store cashier credentials
+    if (!showStoreQuickSelect) {
+      const isStoreAccount = STORE_ACCOUNTS.some(
+        s => s.username.toUpperCase() === u.toUpperCase()
+      );
+      if (isStoreAccount) {
+        setError('Akun ini adalah akun Kasir Toko. Silakan masuk melalui portal kasir di point.watchclub.co.id/cashier');
+        return;
+      }
+      setError('Kredensial Admin Head Office tidak valid atau Anda tidak memiliki hak akses.');
+      return;
+    }
+
+    // Check store accounts for Cashier portal
     const foundStore = STORE_ACCOUNTS.find(
       s => s.username.toUpperCase() === u.toUpperCase() && s.password === password
     );
@@ -104,9 +117,17 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-slate-100">
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-5">
           <WatchClubLogo variant="dark" className="scale-110" />
         </div>
+
+        {!showStoreQuickSelect && (
+          <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold uppercase tracking-wider mb-4 mx-auto w-fit">
+            <Lock className="w-3.5 h-3.5 text-amber-600" />
+            <span>Restricted · Khusus Staf Head Office</span>
+          </div>
+        )}
+
         <h2 className="text-2xl font-extrabold text-center text-slate-900 tracking-tight">{title}</h2>
         <p className="text-center text-slate-500 text-sm mt-1 mb-6">{subtitle}</p>
         
@@ -202,7 +223,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           </button>
         </form>
 
-        <div className="mt-4 text-center">
+        <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col items-center gap-2">
+          <a 
+            href="/member" 
+            className="text-xs text-slate-500 hover:text-slate-900 font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
+          >
+            <span>←</span> {showStoreQuickSelect ? 'Buka Halaman Member Pelanggan' : 'Bukan Staf Head Office? Buka Portal Member'}
+          </a>
           <p className="text-[11px] text-slate-400">
             Sistem Loyalitas Resmi Watch Club Indonesia
           </p>

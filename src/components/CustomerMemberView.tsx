@@ -60,6 +60,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const member = liveProfile || initialMember;
 
   const [activeTab, setActiveTab] = useState<'MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE'>('MEMBERSHIP');
+  const [tabHistory, setTabHistory] = useState<('MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE')[]>([]);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedVoucherForQr, setSelectedVoucherForQr] = useState<Voucher | null>(null);
@@ -79,6 +80,58 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const [ticketReceipt, setTicketReceipt] = useState('');
   const [ticketMessage, setTicketMessage] = useState('');
   const [ticketSuccessNotice, setTicketSuccessNotice] = useState<string | null>(null);
+
+  const handleTabChange = (newTab: 'MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE') => {
+    if (newTab !== activeTab) {
+      setTabHistory(prev => [...prev, activeTab]);
+      setActiveTab(newTab);
+    }
+  };
+
+  const handleHeaderBack = () => {
+    // 1. Tutup modal / popup jika sedang terbuka
+    if (selectedVoucherForQr) {
+      setSelectedVoucherForQr(null);
+      return;
+    }
+    if (isQrModalOpen) {
+      setIsQrModalOpen(false);
+      return;
+    }
+    if (isHistoryModalOpen) {
+      setIsHistoryModalOpen(false);
+      return;
+    }
+    if (activeCampaignModal) {
+      setActiveCampaignModal(null);
+      return;
+    }
+    if (isSupportModalOpen) {
+      setIsSupportModalOpen(false);
+      return;
+    }
+
+    // 2. Kembali ke tab sebelumnya dari riwayat navigasi
+    if (tabHistory.length > 0) {
+      const prevTab = tabHistory[tabHistory.length - 1];
+      setTabHistory(prev => prev.slice(0, -1));
+      setActiveTab(prevTab);
+      return;
+    }
+
+    // 3. Jika sedang di tab selain MEMBERSHIP, kembali ke tab utama MEMBERSHIP
+    if (activeTab !== 'MEMBERSHIP') {
+      setActiveTab('MEMBERSHIP');
+      return;
+    }
+
+    // 4. Jika sudah di Beranda (MEMBERSHIP), jangan sign out - gunakan browser history bila ada
+    if (window.history.length > 1) {
+      window.history.back();
+    }
+  };
+
+  const canGoBack = activeTab !== 'MEMBERSHIP' || tabHistory.length > 0 || isQrModalOpen || isHistoryModalOpen || !!selectedVoucherForQr || !!activeCampaignModal || isSupportModalOpen;
 
   // Push-pop campaign detection
   const activePromoCampaign = useMemo(() => {
@@ -205,7 +258,17 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
       <div className="w-full max-w-[480px] min-h-screen mx-auto bg-slate-50 text-slate-900 pb-[100px] relative shadow-2xl">
         
         <header className="flex justify-between items-center p-5 bg-slate-50/90 backdrop-blur-md sticky top-0 z-50">
-          <button onClick={onBackToHO} className="text-slate-500 hover:text-slate-900 transition-colors">
+          <button 
+            type="button"
+            onClick={handleHeaderBack} 
+            className={`p-2 -ml-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
+              canGoBack 
+                ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/70 active:scale-95' 
+                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/40'
+            }`}
+            title={canGoBack ? "Kembali ke halaman sebelumnya" : "Beranda"}
+            aria-label="Kembali"
+          >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div className="w-[110px] text-slate-900 flex justify-center">
@@ -640,7 +703,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleTabChange(item.id)}
                 className={`flex flex-col items-center gap-1 w-[60px] transition-colors bg-transparent border-none cursor-pointer ${isActive ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 <div className={`w-10 h-10 rounded-full flex justify-center items-center text-[1.2rem] transition-colors ${isActive ? 'bg-slate-900 text-white shadow-sm' : ''}`}>
@@ -736,7 +799,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 className="relative w-full aspect-[3/4] bg-slate-950 overflow-hidden cursor-pointer group"
                 onClick={() => {
                   setActiveCampaignModal(null);
-                  setActiveTab('REWARDS');
+                  handleTabChange('REWARDS');
                 }}
               >
                 <img 
@@ -756,7 +819,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveCampaignModal(null);
-                      setActiveTab('REWARDS');
+                      handleTabChange('REWARDS');
                     }}
                     className="w-full py-3 bg-white hover:bg-slate-100 text-slate-950 font-bold rounded-xl transition-colors cursor-pointer shadow-lg text-xs"
                   >
