@@ -11,7 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+        includeAssets: ['favicon-32x32.png', 'favicon-16x16.png', 'apple-touch-icon.png', 'watch-club-icon.svg'],
         workbox: {
           maximumFileSizeToCacheInBytes: 5000000 // 5 MB
         },
@@ -21,8 +21,8 @@ export default defineConfig(() => {
           description: 'Official Watch Club Customer Portal',
           start_url: '/member',
           scope: '/',
-          theme_color: '#0f172a',
-          background_color: '#f8fafc',
+          theme_color: '#ffffff',
+          background_color: '#ffffff',
           display: 'standalone',
           icons: [
             {
