@@ -1,8 +1,50 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Master Stores Directory
+    match /stores/{storeId} {
+      allow read, write: if true;
+    }
+
+    // Members Loyalty Profiles & Balances
+    match /members/{memberId} {
+      allow read, write: if true;
+    }
+
+    // Vouchers & Promotional Discounts
+    match /vouchers/{voucherId} {
+      allow read, write: if true;
+    }
+
+    // POS & Loyalty Transaction Ledger
+    match /transactions/{transactionId} {
+      allow read, write: if true;
+    }
+
+    // Customer Care Support Tickets
+    match /support/{ticketId} {
+      allow read, write: if true;
+    }
+
+    // Marketing Campaigns & Announcements
+    match /campaigns/{campaignId} {
+      allow read, write: if true;
+    }
+
+    // System Audit Trail
+    match /audit/{auditId} {
+      allow read, write: if true;
+    }
+
+    // Loyalty System Configurations
+    match /config/{configId} {
+      allow read, write: if true;
+    }
+
+    // Global Fallback for nested subcollections or batch workers
     match /{document=**} {
       allow read, write: if true;
     }
   }
 }
+

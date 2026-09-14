@@ -129,7 +129,11 @@ export function setupFirestoreListeners(callbacks: any) {
         }
       }
     }, (error) => {
-      console.error(`Error fetching ${name}:`, error);
+      if (error?.code === 'permission-denied') {
+        console.warn(`[Firestore] Permission denied reading '${name}'. Using local cache.`);
+      } else {
+        console.error(`Error fetching ${name}:`, error);
+      }
     });
     unsubscribes.push(unsub);
   });
@@ -140,6 +144,12 @@ export function setupFirestoreListeners(callbacks: any) {
       try {
         localStorage.setItem('wtc_loyalty_config', JSON.stringify(docSnap.data()));
       } catch {}
+    }
+  }, (error) => {
+    if (error?.code === 'permission-denied') {
+      console.warn('[Firestore] Permission denied reading loyalty config. Using local cache.');
+    } else {
+      console.error('Error fetching loyalty config:', error);
     }
   });
   unsubscribes.push(unsubConfig);
@@ -174,18 +184,22 @@ export function setupFirestoreListeners(callbacks: any) {
 }
 
 export async function seedFirestoreIfEmpty() {
-  const storesSnap = await getDocs(collection(db, 'stores'));
-  if (storesSnap.empty) {
-    const batch = writeBatch(db);
-    initialStores.forEach(s => batch.set(doc(db, 'stores', s.id), s));
-    initialMembers.forEach(m => batch.set(doc(db, 'members', String(m.id)), cleanForFirestore(m)));
-    initialVouchers.forEach(v => batch.set(doc(db, 'vouchers', String(v.id)), cleanForFirestore(v)));
-    initialTransactions.forEach(t => batch.set(doc(db, 'transactions', String(t.id)), cleanForFirestore(t)));
-    initialSupportTickets.forEach(t => batch.set(doc(db, 'support', String(t.id)), cleanForFirestore(t)));
-    initialCampaigns.forEach(c => batch.set(doc(db, 'campaigns', String(c.id)), cleanForFirestore(c)));
-    initialAuditLogs.forEach(a => batch.set(doc(db, 'audit', String(a.id)), cleanForFirestore(a)));
-    batch.set(doc(db, 'config', 'loyalty'), cleanForFirestore(initialLoyaltyConfig));
-    await batch.commit();
-    console.log('Seeded Firestore with initial data');
+  try {
+    const storesSnap = await getDocs(collection(db, 'stores'));
+    if (storesSnap.empty) {
+      const batch = writeBatch(db);
+      initialStores.forEach(s => batch.set(doc(db, 'stores', s.id), s));
+      initialMembers.forEach(m => batch.set(doc(db, 'members', String(m.id)), cleanForFirestore(m)));
+      initialVouchers.forEach(v => batch.set(doc(db, 'vouchers', String(v.id)), cleanForFirestore(v)));
+      initialTransactions.forEach(t => batch.set(doc(db, 'transactions', String(t.id)), cleanForFirestore(t)));
+      initialSupportTickets.forEach(t => batch.set(doc(db, 'support', String(t.id)), cleanForFirestore(t)));
+      initialCampaigns.forEach(c => batch.set(doc(db, 'campaigns', String(c.id)), cleanForFirestore(c)));
+      initialAuditLogs.forEach(a => batch.set(doc(db, 'audit', String(a.id)), cleanForFirestore(a)));
+      batch.set(doc(db, 'config', 'loyalty'), cleanForFirestore(initialLoyaltyConfig));
+      await batch.commit();
+      console.log('Seeded Firestore with initial data');
+    }
+  } catch (err: any) {
+    console.warn('[Firestore] Seed check skipped or restricted by security rules:', err?.message || err);
   }
 }

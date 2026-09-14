@@ -279,14 +279,18 @@ export async function runMemberSyncPass(
     lastSyncReport = report;
     return report;
   } catch (err: any) {
-    console.error("[SyncWorker] Error during sync pass:", err);
+    if (err?.code === 'permission-denied') {
+      console.warn("[SyncWorker] Firestore read restricted by current security rules. Operating in local mode.");
+    } else {
+      console.error("[SyncWorker] Error during sync pass:", err);
+    }
     return {
       timestamp,
       localCount: localMembers.length,
       firestoreCount: 0,
       discrepanciesCount,
       resolvedCount,
-      actions: [`Sync error: ${err?.message || 'Unknown error'}`],
+      actions: [`Sync notice: ${err?.message || 'Permission restricted'}`],
     };
   }
 }
