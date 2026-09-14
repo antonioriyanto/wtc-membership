@@ -17,10 +17,19 @@ export interface AuditLog {
   id: string;
   timestamp: string;
   actorName: string;
-  actorRole: 'HO_ADMIN' | 'CASHIER' | 'SYSTEM';
+  actorRole: 'HO_ADMIN' | 'CASHIER' | 'SYSTEM' | 'CUSTOMER';
   action: string;
   details: string;
   module: 'LOYALTY' | 'VOUCHERS' | 'MEMBERS' | 'TRANSACTIONS' | 'SETTINGS' | 'SUPPORT_TICKETS' | 'SECURITY';
+  memberId?: string;
+  membershipId?: string;
+  performedBy?: string;
+  role?: 'CUSTOMER' | 'CASHIER' | 'ADMIN' | 'SYSTEM';
+  storeId?: string;
+  storeName?: string;
+  metadata?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 export interface SupportTicket {
@@ -73,6 +82,7 @@ export interface Member {
   membershipId: string;
   name: string;
   phone: string;
+  phoneE164?: string;
   email: string;
   password?: string;
   tier: MemberTier;
@@ -87,6 +97,18 @@ export interface Member {
   birthDate?: string;
   address?: string;
   status: 'ACTIVE' | 'SUSPENDED';
+
+  // Cryptographic Credential & Recovery Attributes
+  pinHash?: string;
+  pinSalt?: string;
+  isPinSet?: boolean;
+  failedPinAttempts?: number;
+  lockedUntil?: string | null;
+  recoveryEmail?: string;
+  googleUid?: string;
+  linkedAuthUids?: string[];
+  forcePinChangeOnNextLogin?: boolean;
+  tempPinExpiresAt?: string | null;
 }
 
 export interface StoreBranch {

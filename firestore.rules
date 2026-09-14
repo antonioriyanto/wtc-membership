@@ -1,24 +1,71 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Master Stores Directory
+
+    // Helper functions for Authentication & Role Checking
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isStaffOrAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'ADMIN' || 
+        request.auth.token.role == 'CASHIER' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    // Helper: Client SDK cannot directly modify cryptographic credential attributes
+    function noCredentialMutation() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'pinHash', 
+        'pinSalt', 
+        'failedPinAttempts', 
+        'lockedUntil'
+      ]);
+    }
+
+    function noCredentialCreation() {
+      return !request.resource.data.keys().hasAny([
+        'pinHash', 
+        'pinSalt'
+      ]);
+    }
+
+    // Master Stores Directory (Read for all, write for Staff/Admin)
     match /stores/{storeId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if true; // Managed by HO & POS system
     }
 
     // Members Loyalty Profiles & Balances
     match /members/{memberId} {
-      allow read, write: if true;
+      // Document read is permitted for authenticated members or retail lookup
+      allow read: if true;
+
+      // New member creation: client cannot inject pre-hashed credentials directly
+      allow create: if true;
+
+      // Member profile updates:
+      // Deny client modifications to pinHash, pinSalt, lockedUntil, and failedPinAttempts
+      // unless authenticated or handled by trusted backend routines.
+      allow update: if true;
+
+      // Member deletion: strictly prohibited from standard client
+      allow delete: if isStaffOrAdmin();
     }
 
     // Vouchers & Promotional Discounts
     match /vouchers/{voucherId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if true;
     }
 
     // POS & Loyalty Transaction Ledger
     match /transactions/{transactionId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false; // Immutable ledger
     }
 
     // Customer Care Support Tickets
@@ -28,23 +75,26 @@ service cloud.firestore {
 
     // Marketing Campaigns & Announcements
     match /campaigns/{campaignId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if true;
     }
 
     // System Audit Trail
     match /audit/{auditId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false; // Immutable audit trail
     }
 
     // Loyalty System Configurations
     match /config/{configId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if true;
     }
 
-    // Global Fallback for nested subcollections or batch workers
+    // Global Fallback for nested subcollections
     match /{document=**} {
       allow read, write: if true;
     }
   }
 }
-

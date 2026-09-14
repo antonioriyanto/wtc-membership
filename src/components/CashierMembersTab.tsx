@@ -23,24 +23,30 @@ import {
   FileText,
   Lock,
   ShieldCheck,
-  Map
+  Map,
+  KeyRound
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { TierBadge } from '../utils/tierBadge';
 import { safeSetDoc } from '../lib/syncFirestore';
+import { CashierPinResetModal } from './CashierPinResetModal';
 
 interface MembersTabProps {
   members: Member[];
   setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
   currentStore?: StoreBranch;
+  cashierName?: string;
   onOpenCreateMember: () => void;
 }
 
-export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembers, currentStore, onOpenCreateMember }) => {
+export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembers, currentStore, cashierName, onOpenCreateMember }) => {
   const { showAlert } = useCustomDialog();
   const [searchInput, setSearchInput] = useState('');
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // PIN Reset Modal state
+  const [pinResetMember, setPinResetMember] = useState<Member | null>(null);
   
   // Close export dropdown on outside click
   useEffect(() => {
@@ -386,6 +392,14 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
                       <PenLine className="w-3.5 h-3.5" />
                       <span>Edit</span>
                     </button>
+                    <button 
+                      onClick={() => setPinResetMember(member)}
+                      title="Otorisasi Reset PIN Kasir di Butik"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-200 dark:border-amber-800 text-xs font-semibold transition-colors shadow-xs"
+                    >
+                      <KeyRound className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>Reset PIN</span>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -454,16 +468,40 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
               </div>
 
               {/* Password & Security Protection */}
-              <div className="col-span-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                <div>
-                  <p className="text-[0.7rem] text-slate-500 dark:text-slate-400 mb-0.5 flex items-center gap-1.5 font-medium">
-                    <ShieldCheck className="w-3.5 h-3.5 text-slate-400" /> Password & Kredensial Member
-                  </p>
-                  <p className="font-mono font-bold text-slate-700 dark:text-slate-300 text-xs tracking-widest">••••••••••••</p>
+              <div className="col-span-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[0.7rem] text-slate-500 dark:text-slate-400 mb-0.5 flex items-center gap-1.5 font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5 text-slate-400" /> Security PIN & Kredensial Member
+                    </p>
+                    <p className="font-mono font-bold text-slate-700 dark:text-slate-300 text-xs tracking-widest">•••••• (6-Digit PBKDF2)</p>
+                  </div>
+                  <div className="text-right">
+                    {viewingMember.lockedUntil && new Date(viewingMember.lockedUntil) > new Date() ? (
+                      <span className="text-[0.68rem] px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-rose-500" /> Terkunci (5x Gagal)
+                      </span>
+                    ) : (
+                      <span className="text-[0.68rem] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-500" /> Status PIN Aktif
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className="text-[0.68rem] px-2.5 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border border-slate-300 dark:border-slate-700 flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-slate-500" /> Terenkripsi (Kasir Dilarang Akses)
-                </span>
+
+                {/* Reset PIN in Boutique Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = viewingMember;
+                    setViewingMember(null);
+                    setPinResetMember(target);
+                  }}
+                  className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Otorisasi Reset PIN Member di Butik</span>
+                </button>
               </div>
             </div>
 
@@ -634,6 +672,27 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
           </div>
         </div>
       )}
+
+      {/* CASHIER PIN RESET MODAL (OVERRIDE PROTOCOL) */}
+      <CashierPinResetModal
+        isOpen={!!pinResetMember}
+        onClose={() => setPinResetMember(null)}
+        member={pinResetMember}
+        currentStore={currentStore}
+        cashierUsername={cashierName || 'Kasir ' + (currentStore?.name || 'Butik')}
+        onSuccess={(updated) => {
+          setMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
+          try {
+            const saved = localStorage.getItem('wtc_members');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              const next = parsed.map((m: Member) => m.id === updated.id ? updated : m);
+              localStorage.setItem('wtc_members', JSON.stringify(next));
+            }
+          } catch {}
+          showAlert(`PIN untuk member ${updated.name} berhasil direset dan akun aktif kembali!`, 'Reset PIN Berhasil', 'success');
+        }}
+      />
 
     </div>
   );

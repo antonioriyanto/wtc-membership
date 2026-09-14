@@ -12,6 +12,7 @@ import { doc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { safeSetDoc } from '../lib/syncFirestore';
 import { CreateMemberModal } from './CreateMemberModal';
+import { CustomerPinPromptModal } from './CustomerPinPromptModal';
 import { useCustomDialog } from './CustomDialogProvider';
 
 interface CashierPOSViewProps {
@@ -48,6 +49,21 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateMemberOpen, setIsCreateMemberOpen] = useState(false);
   const [autoSelectMemberId, setAutoSelectMemberId] = useState<string | undefined>(undefined);
+
+  // Customer PIN Prompt State for POS Redemptions
+  const [pinPromptState, setPinPromptState] = useState<{
+    isOpen: boolean;
+    member: Member | null;
+    actionTitle: string;
+    actionDetails: string;
+    onVerified: () => void;
+  }>({
+    isOpen: false,
+    member: null,
+    actionTitle: '',
+    actionDetails: '',
+    onVerified: () => {}
+  });
 
   // Filter transactions specifically for this cashier's store
   const storeTransactions = React.useMemo(() => {
@@ -130,16 +146,31 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
     setIsSubmitting(false);
   };
 
-  const handleRedeemVoucher = async (memberId: string, voucherCode: string) => {
+  const handleRedeemVoucher = (memberId: string, voucherCode: string) => {
     if (isSubmitting) return;
-    setIsSubmitting(true);
     const member = members.find(m => m.id === memberId || m.membershipId === memberId || m.phone === memberId);
     if (!member) {
-      setIsSubmitting(false);
+      showAlert('Pilih member terlebih dahulu sebelum menukarkan voucher.', 'Perhatian', 'warning');
       return;
     }
 
     const cleanCode = voucherCode.trim().toUpperCase().replace(/^VOUCHER-/, '');
+
+    // Intercept with Customer PIN Authorization Modal
+    setPinPromptState({
+      isOpen: true,
+      member,
+      actionTitle: 'Otorisasi Klaim Voucher',
+      actionDetails: `Voucher: ${cleanCode} (-50 Poin)`,
+      onVerified: () => {
+        executeRedeemVoucher(member, cleanCode);
+      }
+    });
+  };
+
+  const executeRedeemVoucher = async (member: Member, cleanCode: string) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     let savedTrx: Transaction = {
       id: 'tx_' + Date.now(),
@@ -170,7 +201,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
       setVouchers(prev => {
         const next = prev.map(v => {
           const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
-          if (vCode === cleanCode || v.code.trim().toUpperCase() === voucherCode.trim().toUpperCase()) {
+          if (vCode === cleanCode) {
             const newUsed = (v.totalUsed || 0) + 1;
             return {
               ...v,
@@ -190,7 +221,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
           const parsed: Voucher[] = JSON.parse(saved);
           const next = parsed.map(v => {
             const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
-            if (vCode === cleanCode || v.code.trim().toUpperCase() === voucherCode.trim().toUpperCase()) {
+            if (vCode === cleanCode) {
               const newUsed = (v.totalUsed || 0) + 1;
               return {
                 ...v,
@@ -283,13 +314,25 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
             <CashierTab 
               isSubmitting={isSubmitting}
               members={members}
-        stores={stores}
+              stores={stores}
               transactions={storeTransactions}
               currentStore={currentStore}
+              cashierName={cashierName}
               autoSelectMemberId={autoSelectMemberId}
               onAddPoints={handleAddPoints}
               onRedeemVoucher={handleRedeemVoucher}
               onOpenCreateMember={() => setIsCreateMemberOpen(true)}
+              onMemberUpdated={(updated) => {
+                setMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
+                try {
+                  const saved = localStorage.getItem('wtc_members');
+                  if (saved) {
+                    const parsed = JSON.parse(saved);
+                    const next = parsed.map((m: Member) => m.id === updated.id ? updated : m);
+                    localStorage.setItem('wtc_members', JSON.stringify(next));
+                  }
+                } catch {}
+              }}
             />
           )}
 
@@ -298,6 +341,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
               members={members}
               setMembers={setMembers}
               currentStore={currentStore}
+              cashierName={cashierName}
               onOpenCreateMember={() => setIsCreateMemberOpen(true)}
             />
           )}
@@ -373,6 +417,20 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
           });
         }}
       />
+
+      {/* CUSTOMER PIN PROMPT MODAL FOR REDEMPTION */}
+      {pinPromptState.isOpen && pinPromptState.member && (
+        <CustomerPinPromptModal
+          isOpen={pinPromptState.isOpen}
+          onClose={() => setPinPromptState(prev => ({ ...prev, isOpen: false, member: null }))}
+          member={pinPromptState.member}
+          actionTitle={pinPromptState.actionTitle}
+          actionDetails={pinPromptState.actionDetails}
+          onVerified={() => {
+            pinPromptState.onVerified();
+          }}
+        />
+      )}
     </div>
   );
 };

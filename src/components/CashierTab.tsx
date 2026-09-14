@@ -1,24 +1,40 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Plus, Barcode, Camera, ShoppingCart, List, Tag, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Barcode, Camera, ShoppingCart, List, Tag, CheckCircle, AlertTriangle, KeyRound, ShieldAlert } from 'lucide-react';
 import { Member, Transaction, StoreBranch } from '../types';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { TierBadge } from '../utils/tierBadge';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { CashierPinResetModal } from './CashierPinResetModal';
 
 interface CashierTabProps {
   isSubmitting?: boolean;
   members: Member[];
   transactions: Transaction[];
   currentStore?: StoreBranch;
+  stores?: StoreBranch[];
+  cashierName?: string;
   autoSelectMemberId?: string;
   onAddPoints: (memberId: string, amount: number, receiptNo: string) => void;
   onRedeemVoucher: (memberId: string, voucherCode: string) => void;
   onOpenCreateMember: () => void;
+  onMemberUpdated?: (updated: Member) => void;
 }
 
-export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, currentStore, autoSelectMemberId, onAddPoints, onRedeemVoucher, onOpenCreateMember, isSubmitting }) => {
+export const CashierTab: React.FC<CashierTabProps> = ({ 
+  members, 
+  transactions, 
+  currentStore, 
+  cashierName,
+  autoSelectMemberId, 
+  onAddPoints, 
+  onRedeemVoucher, 
+  onOpenCreateMember, 
+  onMemberUpdated,
+  isSubmitting 
+}) => {
   const [searchInput, setSearchInput] = useState('');
   const [activeMember, setActiveMember] = useState<Member | null>(null);
+  const [isResetPinOpen, setIsResetPinOpen] = useState(false);
 
   useEffect(() => {
     if (autoSelectMemberId && members.length > 0) {
@@ -279,13 +295,31 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
                 <p className="text-[0.75rem] text-slate-500 dark:text-slate-400 font-medium">Total Poin</p>
                 <h3 className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{(activeMember.points || 0).toLocaleString('id-ID')} Pts</h3>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setActiveMember(null)}
-                className="text-[0.75rem] text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 underline transition-colors"
-              >
-                Ganti Member
-              </button>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsResetPinOpen(true)}
+                  className="text-[0.72rem] text-amber-700 dark:text-amber-400 hover:text-amber-600 font-bold flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800/80 transition-colors cursor-pointer shadow-xs"
+                  title="Otorisasi Reset PIN Kasir di Butik"
+                >
+                  <KeyRound className="w-3 h-3" />
+                  <span>Reset PIN</span>
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setActiveMember(null)}
+                  className="text-[0.75rem] text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 underline transition-colors"
+                >
+                  Ganti Member
+                </button>
+              </div>
+
+              {activeMember.lockedUntil && new Date(activeMember.lockedUntil) > new Date() && (
+                <span className="text-[0.68rem] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800 flex items-center gap-1 mt-0.5">
+                  <ShieldAlert className="w-3 h-3" /> Terkunci (5x Gagal)
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -560,6 +594,21 @@ export const CashierTab: React.FC<CashierTabProps> = ({ members, transactions, c
           </div>
         </div>
       )}
+
+      {/* CASHIER IN-STORE OVERRIDE PIN RESET MODAL */}
+      <CashierPinResetModal
+        isOpen={isResetPinOpen}
+        onClose={() => setIsResetPinOpen(false)}
+        member={activeMember}
+        currentStore={currentStore}
+        cashierUsername={cashierName || 'Kasir ' + (currentStore?.name || 'Butik')}
+        onSuccess={(updated) => {
+          setActiveMember(updated);
+          if (onMemberUpdated) {
+            onMemberUpdated(updated);
+          }
+        }}
+      />
 
       </div>
     </div>

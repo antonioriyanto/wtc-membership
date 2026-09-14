@@ -1,0 +1,1060 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { WatchClubLogo } from './WatchClubLogo';
+import { 
+  Smartphone, 
+  Lock, 
+  KeyRound, 
+  ShieldCheck, 
+  AlertCircle, 
+  ArrowLeft, 
+  RotateCcw, 
+  CheckCircle2, 
+  Sparkles,
+  Delete,
+  Fingerprint,
+  HelpCircle,
+  Store,
+  X,
+  ShieldAlert
+} from 'lucide-react';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../lib/firebase';
+import { toE164, toLocalPhone } from '../lib/canonicalMember';
+import { 
+  precheckCustomer, 
+  verifyCustomerPinClient, 
+  setCustomerPinClient, 
+  resetPinViaGoogleAuthClient,
+  PrecheckResult 
+} from '../lib/memberAuthClient';
+
+interface MemberLoginProps {
+  onLogin: (memberId: string, memberObj?: any) => void;
+  onRegisterGoogle: (phone: string) => Promise<void>;
+  members: any[];
+}
+
+type LoginStep = 
+  | 'PHONE' 
+  | 'PIN_INPUT' 
+  | 'FIRST_PIN_CREATE' 
+  | 'FIRST_PIN_CONFIRM' 
+  | 'FIRST_PIN_LINK_GOOGLE' 
+  | 'RECOVER_GOOGLE'
+  | 'RESET_PIN_CREATE'
+  | 'RESET_PIN_CONFIRM'
+  | 'MANDATORY_PIN_CHANGE_CREATE'
+  | 'MANDATORY_PIN_CHANGE_CONFIRM';
+
+export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoogle, members }) => {
+  const [step, setStep] = useState<LoginStep>('PHONE');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  
+  // Member Context from Pre-check
+  const [memberInfo, setMemberInfo] = useState<PrecheckResult | null>(null);
+  
+  // Lockout countdown
+  const [lockoutSeconds, setLockoutSeconds] = useState<number>(0);
+
+  // Recovery Modal State
+  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
+  const [recoveryError, setRecoveryError] = useState('');
+
+  // PIN inputs
+  const [enteredPin, setEnteredPin] = useState<string>('');
+  const [createdPin, setCreatedPin] = useState<string>('');
+  const [confirmedPin, setConfirmedPin] = useState<string>('');
+  
+  // Google Recovery context
+  const [verifiedGoogleAuth, setVerifiedGoogleAuth] = useState<{ uid: string; email: string } | null>(null);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutSeconds]);
+
+  // Format seconds to mm:ss
+  const formatLockoutTimer = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const remainder = sec % 60;
+    return `${mins.toString().padStart(2, '0')}:${remainder.toString().padStart(2, '0')}`;
+  };
+
+  // E.164 preview format
+  const e164Preview = phone ? toE164(phone) : '';
+
+  // Handle Step 1: Submit Phone Number
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPhone = phone.trim();
+    if (!cleanPhone) {
+      setError('Silakan masukkan nomor handphone Anda.');
+      return;
+    }
+
+    const localDigits = cleanPhone.replace(/[^0-9]/g, '');
+    if (localDigits.length < 8) {
+      setError('Nomor handphone tidak valid (minimal 8-10 digit angka).');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+
+    try {
+      const result = await precheckCustomer(cleanPhone);
+      setMemberInfo(result);
+
+      if (!result.exists) {
+        setError(`Nomor ${cleanPhone} belum terdaftar sebagai member.`);
+        return;
+      }
+
+      // Check lockout status
+      if (result.isLocked && result.remainingLockoutSeconds > 0) {
+        setLockoutSeconds(result.remainingLockoutSeconds);
+        setStep('PIN_INPUT');
+        return;
+      }
+
+      // If PIN is already configured
+      if (result.isPinSet) {
+        setEnteredPin('');
+        setStep('PIN_INPUT');
+      } else {
+        // First-Time PIN Setup Onboarding
+        setCreatedPin('');
+        setConfirmedPin('');
+        setStep('FIRST_PIN_CREATE');
+      }
+    } catch (err: any) {
+      console.error('Pre-check error:', err);
+      setError('Gagal memverifikasi status akun member. Periksa koneksi internet.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Keypad actions
+  const handleKeypadPress = useCallback((digit: string) => {
+    if (lockoutSeconds > 0 || loading) return;
+
+    if (step === 'PIN_INPUT') {
+      if (enteredPin.length < 6) {
+        const next = enteredPin + digit;
+        setEnteredPin(next);
+        if (next.length === 6) {
+          // Auto submit on 6th digit
+          submitPinVerification(next);
+        }
+      }
+    } else if (step === 'FIRST_PIN_CREATE' || step === 'RESET_PIN_CREATE' || step === 'MANDATORY_PIN_CHANGE_CREATE') {
+      if (createdPin.length < 6) {
+        setCreatedPin(prev => prev + digit);
+      }
+    } else if (step === 'FIRST_PIN_CONFIRM' || step === 'RESET_PIN_CONFIRM' || step === 'MANDATORY_PIN_CHANGE_CONFIRM') {
+      if (confirmedPin.length < 6) {
+        setConfirmedPin(prev => prev + digit);
+      }
+    }
+  }, [step, enteredPin, createdPin, confirmedPin, lockoutSeconds, loading]);
+
+  const handleKeypadBackspace = () => {
+    if (lockoutSeconds > 0 || loading) return;
+    if (step === 'PIN_INPUT') {
+      setEnteredPin(prev => prev.slice(0, -1));
+    } else if (step === 'FIRST_PIN_CREATE' || step === 'RESET_PIN_CREATE' || step === 'MANDATORY_PIN_CHANGE_CREATE') {
+      setCreatedPin(prev => prev.slice(0, -1));
+    } else if (step === 'FIRST_PIN_CONFIRM' || step === 'RESET_PIN_CONFIRM' || step === 'MANDATORY_PIN_CHANGE_CONFIRM') {
+      setConfirmedPin(prev => prev.slice(0, -1));
+    }
+  };
+
+  const handleKeypadClear = () => {
+    if (lockoutSeconds > 0 || loading) return;
+    if (step === 'PIN_INPUT') {
+      setEnteredPin('');
+    } else if (step === 'FIRST_PIN_CREATE' || step === 'RESET_PIN_CREATE' || step === 'MANDATORY_PIN_CHANGE_CREATE') {
+      setCreatedPin('');
+    } else if (step === 'FIRST_PIN_CONFIRM' || step === 'RESET_PIN_CONFIRM' || step === 'MANDATORY_PIN_CHANGE_CONFIRM') {
+      setConfirmedPin('');
+    }
+  };
+
+  // Physical Keyboard Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ([
+        'PIN_INPUT', 
+        'FIRST_PIN_CREATE', 
+        'FIRST_PIN_CONFIRM', 
+        'RESET_PIN_CREATE', 
+        'RESET_PIN_CONFIRM',
+        'MANDATORY_PIN_CHANGE_CREATE',
+        'MANDATORY_PIN_CHANGE_CONFIRM'
+      ].includes(step)) {
+        if (/^[0-9]$/.test(e.key)) {
+          e.preventDefault();
+          handleKeypadPress(e.key);
+        } else if (e.key === 'Backspace') {
+          e.preventDefault();
+          handleKeypadBackspace();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          handleKeypadClear();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [step, handleKeypadPress]);
+
+  // Submit PIN for verification
+  const submitPinVerification = async (pinToVerify: string) => {
+    if (!phone || pinToVerify.length !== 6 || loading) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await verifyCustomerPinClient(phone, pinToVerify);
+      if (res.success) {
+        // If customer account requires mandatory PIN change (e.g. from cashier temporary PIN)
+        if (res.memberDoc?.forcePinChangeOnNextLogin) {
+          setMemberInfo(prev => prev ? { ...prev, memberDoc: res.memberDoc } : null);
+          setCreatedPin('');
+          setConfirmedPin('');
+          setStep('MANDATORY_PIN_CHANGE_CREATE');
+          setSuccessMsg('PIN sementara valid. Demi keamanan saldo poin & akun Anda, buat 6-digit PIN permanen baru.');
+          return;
+        }
+
+        setSuccessMsg('Verifikasi berhasil! Mengalihkan ke dashboard...');
+        setTimeout(() => {
+          onLogin(res.memberId, res.memberDoc);
+        }, 500);
+      }
+    } catch (err: any) {
+      console.error('PIN verification error:', err);
+      const errMsg = err?.message || 'Verifikasi PIN gagal.';
+      setError(errMsg);
+      setEnteredPin('');
+
+      // Check if newly locked
+      if (errMsg.includes('15 menit') || errMsg.includes('terkunci')) {
+        setLockoutSeconds(15 * 60);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // First-Time or Reset PIN Setup: Step 1 -> Step 2
+  const handleProceedToConfirm = () => {
+    if (createdPin.length !== 6) {
+      setError('PIN harus berupa 6 angka numerik.');
+      return;
+    }
+    setError('');
+    setConfirmedPin('');
+    if (step === 'FIRST_PIN_CREATE') {
+      setStep('FIRST_PIN_CONFIRM');
+    } else if (step === 'RESET_PIN_CREATE') {
+      setStep('RESET_PIN_CONFIRM');
+    } else if (step === 'MANDATORY_PIN_CHANGE_CREATE') {
+      setStep('MANDATORY_PIN_CHANGE_CONFIRM');
+    }
+  };
+
+  // Step 2 Confirmation Handler
+  const handleProceedToGoogleLink = () => {
+    if (confirmedPin.length !== 6) {
+      setError('Masukkan 6 angka konfirmasi PIN.');
+      return;
+    }
+    if (createdPin !== confirmedPin) {
+      setError('Konfirmasi PIN tidak cocok dengan PIN pertama. Silakan coba kembali.');
+      setConfirmedPin('');
+      return;
+    }
+    setError('');
+    if (step === 'RESET_PIN_CONFIRM') {
+      // Finalize self-service Google reset
+      finalizeResetPin();
+    } else if (step === 'MANDATORY_PIN_CHANGE_CONFIRM') {
+      // Finalize mandatory PIN change
+      finalizeMandatoryPinChange();
+    } else {
+      setStep('FIRST_PIN_LINK_GOOGLE');
+    }
+  };
+
+  // First-Time PIN: Google Link & Final Save
+  const handleGoogleLinkAndSave = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      const updated = await setCustomerPinClient({
+        rawPhone: phone,
+        pin: createdPin,
+        recoveryEmail: user.email || '',
+        googleUid: user.uid
+      });
+
+      setSuccessMsg('PIN berhasil dibuat & Akun Google terhubung sebagai pemulihan!');
+      setTimeout(() => {
+        onLogin(updated.id, updated);
+      }, 700);
+    } catch (err: any) {
+      console.error('Google link error:', err);
+      setError(err?.message || 'Gagal menghubungkan akun Google untuk pemulihan.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Primary Self-Service Path: Instant verification via linked Google OAuth
+  const startGoogleRecovery = async () => {
+    setLoading(true);
+    setError('');
+    setRecoveryError('');
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      // Extract registered credential link info
+      const doc = memberInfo?.memberDoc;
+      const registeredGoogleUid = doc?.googleUid;
+      const linkedUids = Array.isArray(doc?.linkedAuthUids) ? doc.linkedAuthUids : [];
+      const registeredEmail = (doc?.recoveryEmail || doc?.email || '').toLowerCase().trim();
+      const userEmail = (user.email || '').toLowerCase().trim();
+
+      const isUidMatch = (registeredGoogleUid && registeredGoogleUid === user.uid) || linkedUids.includes(user.uid);
+      const isEmailMatch = registeredEmail && userEmail && registeredEmail === userEmail;
+
+      // If customer has a registered recovery account and current Google sign-in does not match
+      if (registeredGoogleUid && !isUidMatch && !isEmailMatch) {
+        const mismatchMsg = `Akun Google (${user.email}) tidak cocok dengan data pemulihan yang tersimpan untuk nomor ini. Silakan gunakan akun Google yang sesuai, atau kunjungi butik Watch Club terdekat untuk verifikasi KTP oleh kasir.`;
+        setError(mismatchMsg);
+        setRecoveryError(mismatchMsg);
+        return;
+      }
+
+      // Verification approved!
+      setVerifiedGoogleAuth({
+        uid: user.uid,
+        email: user.email || ''
+      });
+
+      setIsRecoveryModalOpen(false);
+      setLockoutSeconds(0);
+      setCreatedPin('');
+      setConfirmedPin('');
+      setStep('RESET_PIN_CREATE');
+      setSuccessMsg(`Verifikasi Google berhasil (${user.email}). Silakan buat 6-digit PIN baru.`);
+    } catch (err: any) {
+      console.error('Google recovery error:', err);
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        const msg = err?.message || 'Pemulihan gagal: Akun Google tidak dapat diverifikasi.';
+        setError(msg);
+        setRecoveryError(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Finalize Self-Service PIN Reset
+  const finalizeResetPin = async () => {
+    if (!verifiedGoogleAuth) {
+      setError('Sesi verifikasi Google telah kadaluarsa. Silakan ulangi.');
+      setStep('PHONE');
+      return;
+    }
+    setLoading(true);
+    setError('');
+
+    try {
+      const updated = await resetPinViaGoogleAuthClient({
+        rawPhone: phone,
+        googleUid: verifiedGoogleAuth.uid,
+        googleEmail: verifiedGoogleAuth.email,
+        newPin: createdPin
+      });
+
+      setSuccessMsg('PIN berhasil dipulihkan! Mengalihkan ke dashboard...');
+      setTimeout(() => {
+        onLogin(updated.id, updated);
+      }, 600);
+    } catch (err: any) {
+      console.error('Reset PIN error:', err);
+      setError(err?.message || 'Gagal memperbarui PIN.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Finalize Mandatory PIN Change
+  const finalizeMandatoryPinChange = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const updated = await setCustomerPinClient({
+        rawPhone: phone,
+        pin: createdPin,
+        recoveryEmail: memberInfo?.memberDoc?.recoveryEmail || memberInfo?.memberDoc?.email,
+        googleUid: memberInfo?.memberDoc?.googleUid
+      });
+
+      setSuccessMsg('PIN permanen berhasil disimpan! Selamat datang di Watch Club.');
+      setTimeout(() => {
+        onLogin(updated.id, updated);
+      }, 600);
+    } catch (err: any) {
+      console.error('Mandatory PIN change error:', err);
+      setError(err?.message || 'Gagal menyimpan PIN baru.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Google Onboarding for unregistered numbers
+  const handleNewGoogleRegister = async () => {
+    if (!phone) return;
+    setLoading(true);
+    setError('');
+    try {
+      await onRegisterGoogle(phone);
+    } catch (err: any) {
+      setError(err?.message || 'Gagal registrasi Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper to render PIN dots
+  const renderPinDots = (currentVal: string, isInputLocked: boolean) => {
+    return (
+      <div className="flex justify-center items-center gap-3.5 my-6">
+        {[0, 1, 2, 3, 4, 5].map((index) => {
+          const filled = index < currentVal.length;
+          const active = index === currentVal.length && !isInputLocked;
+          return (
+            <div
+              key={index}
+              className={`w-4 h-4 rounded-full transition-all duration-200 ${
+                filled
+                  ? 'bg-amber-400 scale-110 shadow-[0_0_12px_rgba(251,191,36,0.5)] border border-amber-300'
+                  : active
+                  ? 'border-2 border-amber-400/80 bg-slate-800 animate-pulse scale-105'
+                  : 'border border-slate-700 bg-slate-900/60'
+              }`}
+            />
+          );
+        })}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden font-sans select-none">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-80 h-80 bg-slate-800/20 rounded-full blur-2xl pointer-events-none" />
+
+      <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-2xl p-6 sm:p-8 border border-slate-800 relative z-10">
+        
+        {/* BRAND LOGO */}
+        <div className="flex justify-center mb-5">
+          <WatchClubLogo variant="light" className="scale-105" />
+        </div>
+
+        {/* FEEDBACK BANNERS */}
+        {error && (
+          <div className="bg-red-950/80 text-red-300 p-3.5 rounded-2xl text-xs font-semibold mb-4 border border-red-800/80 flex items-start gap-2.5 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <div className="flex-1">{error}</div>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="bg-emerald-950/80 text-emerald-300 p-3.5 rounded-2xl text-xs font-semibold mb-4 border border-emerald-800/80 flex items-center gap-2.5 animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex-1">{successMsg}</div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STEP 1: PHONE NUMBER INPUT */}
+        {/* ========================================================================= */}
+        {step === 'PHONE' && (
+          <div className="space-y-5 animate-fadeIn">
+            <div className="text-center">
+              <h2 className="text-xl font-bold tracking-tight text-white">Portal Member Eksklusif</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Masukkan nomor handphone Anda untuk mengakses saldo poin dan voucher.
+              </p>
+            </div>
+
+            <form onSubmit={handlePhoneSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Nomor Handphone Terdaftar
+                </label>
+                <div className="relative">
+                  <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (error) setError('');
+                    }}
+                    className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-sm font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/30 transition-all tracking-wide"
+                    placeholder="Contoh: 081288889999"
+                    required
+                    autoFocus
+                  />
+                </div>
+                {e164Preview && (
+                  <div className="text-[11px] text-slate-500 mt-1.5 flex items-center justify-between">
+                    <span>Format E.164 Standar:</span>
+                    <span className="font-mono text-amber-400/90 font-medium">{e164Preview}</span>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <ShieldCheck className="w-4 h-4 text-slate-950" />
+                <span>{loading ? 'Memverifikasi...' : 'Lanjutkan ke Security PIN'}</span>
+              </button>
+            </form>
+
+            {/* Unregistered Member Registration Link */}
+            {memberInfo && !memberInfo.exists && (
+              <div className="p-4 bg-slate-950/80 border border-amber-500/30 rounded-2xl text-center space-y-2.5 animate-fadeIn">
+                <p className="text-xs text-amber-200">
+                  Nomor <strong>{phone}</strong> belum terdaftar.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleNewGoogleRegister}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl border border-slate-700 flex items-center justify-center gap-2.5 transition-all"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Daftar Akun Baru dengan Google</span>
+                </button>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-slate-800 text-center">
+              <a
+                href="/admin"
+                className="text-[11px] text-slate-500 hover:text-slate-300 font-medium transition-colors"
+              >
+                Akses Khusus Admin & Kasir Toko →
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STEP 2B: RETURNING MEMBER PIN PROMPT (TACTILE NUMERIC KEYPAD) */}
+        {/* ========================================================================= */}
+        {step === 'PIN_INPUT' && (
+          <div className="space-y-4 animate-fadeIn">
+            {/* Header with Member Recognition */}
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('PHONE');
+                  setEnteredPin('');
+                  setError('');
+                }}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Ganti Nomor
+              </button>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-semibold">
+                <Lock className="w-3 h-3" />
+                <span>Security PIN Guard</span>
+              </div>
+            </div>
+
+            <div className="text-center pt-1">
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                Selamat Datang, {memberInfo?.name || 'Member'}
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Ketik 6-Digit PIN Anda untuk {toE164(phone)}
+              </p>
+            </div>
+
+            {/* BRUTE-FORCE LOCKOUT STATE */}
+            {lockoutSeconds > 0 ? (
+              <div className="p-4 bg-red-950/60 border border-red-800/80 rounded-2xl text-center space-y-2 animate-pulse">
+                <div className="inline-flex p-2 rounded-full bg-red-900/50 text-red-400 mb-1">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-red-300">
+                  Akun Terkunci Sementara (5x Gagal)
+                </h3>
+                <p className="text-2xl font-mono font-extrabold text-red-400">
+                  {formatLockoutTimer(lockoutSeconds)}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Demi keamanan poin & data Anda, input PIN dinonaktifkan sementara.
+                </p>
+                <button
+                  type="button"
+                  id="btn-lockout-open-recovery"
+                  onClick={() => {
+                    setRecoveryError('');
+                    setIsRecoveryModalOpen(true);
+                  }}
+                  className="mt-2 w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <Fingerprint className="w-3.5 h-3.5" />
+                  <span>Buka Kunci Segera dengan Google OAuth</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* 6-DIGIT MASKED PIN DOTS */}
+                {renderPinDots(enteredPin, lockoutSeconds > 0 || loading)}
+
+                {/* TACTILE NUMERIC KEYPAD */}
+                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                    <button
+                      key={digit}
+                      type="button"
+                      onClick={() => handleKeypadPress(digit)}
+                      disabled={loading || lockoutSeconds > 0}
+                      className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 active:text-slate-950 border border-slate-700/60 text-lg font-bold text-white transition-all duration-150 flex items-center justify-center shadow-md cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      {digit}
+                    </button>
+                  ))}
+                  
+                  {/* CLEAR BUTTON */}
+                  <button
+                    type="button"
+                    onClick={handleKeypadClear}
+                    disabled={loading || lockoutSeconds > 0 || !enteredPin}
+                    className="h-14 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
+                  >
+                    Clear
+                  </button>
+
+                  {/* ZERO BUTTON */}
+                  <button
+                    type="button"
+                    onClick={() => handleKeypadPress('0')}
+                    disabled={loading || lockoutSeconds > 0}
+                    className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 active:text-slate-950 border border-slate-700/60 text-lg font-bold text-white transition-all duration-150 flex items-center justify-center shadow-md cursor-pointer disabled:opacity-30"
+                  >
+                    0
+                  </button>
+
+                  {/* BACKSPACE BUTTON */}
+                  <button
+                    type="button"
+                    onClick={handleKeypadBackspace}
+                    disabled={loading || lockoutSeconds > 0 || !enteredPin}
+                    className="h-14 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
+                  >
+                    <Delete className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+
+                {/* PIN RECOVERY TRIGGER BENEATH KEYPAD */}
+                <div className="pt-3">
+                  <button
+                    type="button"
+                    id="btn-lupa-pin-trigger"
+                    onClick={() => {
+                      setRecoveryError('');
+                      setIsRecoveryModalOpen(true);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 hover:text-amber-300 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-800 hover:border-amber-500/40 transition-all cursor-pointer shadow-sm"
+                  >
+                    <HelpCircle className="w-4 h-4 text-amber-400" />
+                    <span>Lupa Security PIN? Pulihkan Akun</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STEP 2A: PIN SETUP / RESET / MANDATORY CHANGE - CREATE */}
+        {/* ========================================================================= */}
+        {(step === 'FIRST_PIN_CREATE' || step === 'RESET_PIN_CREATE' || step === 'MANDATORY_PIN_CHANGE_CREATE') && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setStep('PHONE')}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Batal
+              </button>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                Langkah 1 dari 2
+              </span>
+            </div>
+
+            <div className="text-center pt-1">
+              <div className="inline-flex p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-2">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                {step === 'RESET_PIN_CREATE' 
+                  ? 'Buat PIN Baru' 
+                  : step === 'MANDATORY_PIN_CHANGE_CREATE'
+                  ? 'Wajib Buat PIN Baru'
+                  : 'Aktivasi Keamanan PIN'}
+              </h2>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                {step === 'RESET_PIN_CREATE'
+                  ? 'Verifikasi Google berhasil. Tentukan 6-digit Security PIN baru Anda.'
+                  : step === 'MANDATORY_PIN_CHANGE_CREATE'
+                  ? 'PIN sementara dari kasir aktif. Buat 6-digit PIN permanen baru demi keamanan.'
+                  : 'Tentukan 6-digit Security PIN untuk melindungi saldo poin & voucher Anda.'}
+              </p>
+            </div>
+
+            {renderPinDots(createdPin, false)}
+
+            <div className="grid grid-cols-3 gap-2.5 pt-1">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                <button
+                  key={digit}
+                  type="button"
+                  onClick={() => handleKeypadPress(digit)}
+                  className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 active:text-slate-950 border border-slate-700/60 text-lg font-bold text-white transition-all flex items-center justify-center shadow-md cursor-pointer"
+                >
+                  {digit}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={handleKeypadClear}
+                className="h-14 rounded-2xl bg-slate-900/80 text-xs font-bold uppercase text-slate-400 flex items-center justify-center border border-slate-800"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => handleKeypadPress('0')}
+                className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 text-lg font-bold text-white flex items-center justify-center border border-slate-700/60"
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={handleKeypadBackspace}
+                className="h-14 rounded-2xl bg-slate-900/80 text-slate-300 flex items-center justify-center border border-slate-800"
+              >
+                <Delete className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleProceedToConfirm}
+              disabled={createdPin.length !== 6}
+              className="w-full py-3.5 mt-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span>Lanjut Konfirmasi PIN ({createdPin.length}/6)</span>
+            </button>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STEP 2B: PIN SETUP / RESET / MANDATORY CHANGE - CONFIRM */}
+        {/* ========================================================================= */}
+        {(step === 'FIRST_PIN_CONFIRM' || step === 'RESET_PIN_CONFIRM' || step === 'MANDATORY_PIN_CHANGE_CONFIRM') && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmedPin('');
+                  if (step === 'FIRST_PIN_CONFIRM') setStep('FIRST_PIN_CREATE');
+                  else if (step === 'RESET_PIN_CONFIRM') setStep('RESET_PIN_CREATE');
+                  else setStep('MANDATORY_PIN_CHANGE_CREATE');
+                }}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Ubah PIN
+              </button>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                Langkah 2 dari 2
+              </span>
+            </div>
+
+            <div className="text-center pt-1">
+              <div className="inline-flex p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-2">
+                <Lock className="w-5 h-5" />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                Konfirmasi Ulang PIN Anda
+              </h2>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                Ketik kembali 6-digit PIN yang baru saja Anda buat untuk memastikan tidak ada kesalahan.
+              </p>
+            </div>
+
+            {renderPinDots(confirmedPin, false)}
+
+            <div className="grid grid-cols-3 gap-2.5 pt-1">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                <button
+                  key={digit}
+                  type="button"
+                  onClick={() => handleKeypadPress(digit)}
+                  className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 active:text-slate-950 border border-slate-700/60 text-lg font-bold text-white transition-all flex items-center justify-center shadow-md cursor-pointer"
+                >
+                  {digit}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={handleKeypadClear}
+                className="h-14 rounded-2xl bg-slate-900/80 text-xs font-bold uppercase text-slate-400 flex items-center justify-center border border-slate-800"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => handleKeypadPress('0')}
+                className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 text-lg font-bold text-white flex items-center justify-center border border-slate-700/60"
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={handleKeypadBackspace}
+                className="h-14 rounded-2xl bg-slate-900/80 text-slate-300 flex items-center justify-center border border-slate-800"
+              >
+                <Delete className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleProceedToGoogleLink}
+              disabled={confirmedPin.length !== 6 || loading}
+              className="w-full py-3.5 mt-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>
+                {loading 
+                  ? 'Menyimpan...' 
+                  : step === 'RESET_PIN_CONFIRM'
+                  ? 'Simpan & Aktifkan PIN Baru'
+                  : step === 'MANDATORY_PIN_CHANGE_CONFIRM'
+                  ? 'Simpan PIN Permanen'
+                  : 'Simpan & Lanjut Tautkan Google'}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MANDATORY GOOGLE OAUTH RECOVERY LINKING (FIRST TIME SETUP) */}
+        {/* ========================================================================= */}
+        {step === 'FIRST_PIN_LINK_GOOGLE' && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="text-center pt-2">
+              <div className="inline-flex p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                Hubungkan Akun Pemulihan
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Tautkan akun Google Anda sebagai metode pemulihan resmi jika suatu saat Anda lupa PIN.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2 font-semibold text-amber-300">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>Standar Keamanan Watch Club</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                PIN dienkripsi secara irreversibel menggunakan algoritma PBKDF2 (100.000 iterasi). Akun Google yang terhubung adalah satu-satunya kunci reset otentik jika Anda terkunci.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleLinkAndSave}
+              disabled={loading}
+              className="w-full py-3.5 bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm rounded-xl transition-all shadow-lg flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+              </svg>
+              <span>{loading ? 'Menghubungkan...' : 'Tautkan Akun Google & Selesai'}</span>
+            </button>
+          </div>
+        )}
+
+      </div>
+
+      {/* ========================================================================= */}
+      {/* LUPA PIN / MULTI-CHANNEL RECOVERY MODAL */}
+      {/* ========================================================================= */}
+      {isRecoveryModalOpen && (
+        <div 
+          id="modal-lupa-pin-recovery"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+        >
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-slate-100 space-y-5">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Pemulihan Security PIN</h3>
+                  <p className="text-xs text-slate-400">Verifikasi multi-jalur resmi Watch Club</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRecoveryModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Member Card Snapshot */}
+            <div className="p-3.5 bg-slate-950/70 border border-slate-800/80 rounded-2xl space-y-1 text-xs">
+              <div className="flex justify-between items-center text-slate-400">
+                <span>Member:</span>
+                <span className="font-semibold text-white">{memberInfo?.name || 'Member Watch Club'}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-400">
+                <span>Nomor HP:</span>
+                <span className="font-mono text-amber-400 font-semibold">{toE164(phone)}</span>
+              </div>
+              {memberInfo?.memberDoc?.recoveryEmail && (
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>Google Pemulihan:</span>
+                  <span className="font-mono text-slate-300">
+                    {memberInfo.memberDoc.recoveryEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3')}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Mismatch / Rate-Limit Error in Modal */}
+            {recoveryError && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1.5 animate-shake">
+                <div className="flex items-center gap-2 font-bold text-rose-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Verifikasi Ditolak</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">{recoveryError}</p>
+              </div>
+            )}
+
+            {/* Path 1: Primary Self-Service (Google OAuth) */}
+            <div className="p-4 rounded-2xl bg-gradient-to-b from-slate-800/60 to-slate-850/60 border border-slate-700/60 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  Jalur Utama (Instan)
+                </span>
+                <span className="text-[11px] text-slate-400">Proses &lt; 30 Detik</span>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <span>Verifikasi Akun Google Terkait</span>
+                </h4>
+                <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                  Buka kunci akun dan buat 6-digit PIN baru secara mandiri dengan login akun Google yang telah ditautkan ke nomor ini.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                id="btn-confirm-google-recovery"
+                onClick={startGoogleRecovery}
+                disabled={loading}
+                className="w-full py-3 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>{loading ? 'Memverifikasi Google...' : 'Verifikasi Akun Google'}</span>
+              </button>
+            </div>
+
+            {/* Path 2: In-Store Retail Fallback (Cashier-assisted) */}
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                  Jalur Alternatif di Gerai
+                </span>
+                <Store className="w-4 h-4 text-amber-400" />
+              </div>
+              <h4 className="text-xs font-bold text-white">Bantuan Kasir di Butik Watch Club</h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Tidak memiliki akses ke akun Google? Kunjungi butik resmi Watch Club terdekat dengan membawa kartu identitas asli (KTP/SIM/Paspor). Kasir resmi kami akan memverifikasi fisik dan membantu mereset PIN akun Anda.
+              </p>
+            </div>
+
+            {/* Close action */}
+            <button
+              type="button"
+              onClick={() => setIsRecoveryModalOpen(false)}
+              className="w-full py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Kembali ke Halaman Login
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
