@@ -486,15 +486,10 @@ export default function App() {
 
   const handleSwitchPortal = (portal: 'HO' | 'CASHIER' | 'MEMBER') => {
     if (portal === 'HO') {
-      setAdminAuthenticated(true);
       navigate('/admin');
     } else if (portal === 'CASHIER') {
-      setAdminAuthenticated(true);
       navigate('/cashier');
     } else if (portal === 'MEMBER') {
-      if (!loggedInMemberId && members.length > 0) {
-        setLoggedInMemberId(members[0].id);
-      }
       navigate('/member');
     }
   };

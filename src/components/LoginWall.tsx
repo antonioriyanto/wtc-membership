@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WatchClubLogo } from './WatchClubLogo';
-import { Lock, User, KeyRound, Smartphone, ShieldCheck, Store, Search } from 'lucide-react';
+import { Lock, User, KeyRound, Smartphone, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { initialMembers } from '../data/mockData';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -64,6 +64,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isStoreDropdownOpen, setIsStoreDropdownOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -72,19 +73,21 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     s.username.toLowerCase().includes(username.toLowerCase())
   );
 
-  const selectedStoreObj = STORE_ACCOUNTS.find(s => s.username === username);
+  const selectedStoreObj = STORE_ACCOUNTS.find(s => s.username.toUpperCase() === username.toUpperCase());
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!username.trim() || !password) {
+    const u = username.trim();
+    const p = password.trim();
+
+    if (!u || !p) {
       setError('Silakan masukkan Username dan Password.');
       return;
     }
-    const u = username.trim();
 
     // Check superadmin HO
-    if ((u.toLowerCase() === 'admin' || u.toLowerCase() === 'ho') && password === 'wtc26') {
+    if ((u.toLowerCase() === 'admin' || u.toLowerCase() === 'ho') && (p === 'wtc26' || p.toLowerCase() === 'wtc26')) {
       onLogin(u, 'Puri Jakarta');
       return;
     }
@@ -102,15 +105,15 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       return;
     }
 
-    // Check store accounts for Cashier portal
+    // Check store accounts for Cashier portal (strict manual password check)
     const foundStore = STORE_ACCOUNTS.find(
-      s => s.username.toUpperCase() === u.toUpperCase() && s.password === password
+      s => s.username.toUpperCase() === u.toUpperCase() && (s.password === p || s.password.toUpperCase() === p.toUpperCase())
     );
 
     if (foundStore) {
       onLogin(foundStore.username, foundStore.name);
     } else {
-      setError('Login ID (Username) atau Password toko tidak valid. Silakan periksa kembali.');
+      setError('Login ID (Username) atau Password toko salah. Silakan periksa dan ketik kembali.');
     }
   };
 
@@ -137,9 +140,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Username</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              {showStoreQuickSelect ? "Login ID Cabang Toko" : "Username Head Office"}
+            </label>
             <div className="relative">
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
@@ -151,14 +156,25 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
                   if (showStoreQuickSelect) setIsStoreDropdownOpen(true);
                 }}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-slate-900 uppercase"
-                placeholder={showStoreQuickSelect ? "Ketikkan nama toko" : "Ketikkan login ID"}
+                placeholder={showStoreQuickSelect ? "Pilih / ketik kode cabang (contoh: PIM)" : "Ketik Username HO (contoh: admin)"}
                 autoComplete="off"
-                name="store_login_username"
+                data-lpignore="true"
+                name="wtc_user_field"
                 required
               />
 
               {showStoreQuickSelect && isStoreDropdownOpen && (
                 <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-56">
+                  <div className="p-2 bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-500 flex justify-between items-center">
+                    <span>Pilih Cabang (Hanya mengisi ID Toko)</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsStoreDropdownOpen(false)}
+                      className="text-slate-400 hover:text-slate-700 text-xs px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
                   <div className="overflow-y-auto p-1.5 space-y-1">
                     {filteredStores.map((acc) => {
                       const isSelected = username.toUpperCase() === acc.username.toUpperCase();
@@ -167,23 +183,27 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
                           key={acc.username}
                           onClick={() => {
                             setUsername(acc.username);
-                            setPassword(acc.password);
+                            setPassword(''); // STRICTLY NO FAST LOGIN: Cashier must type password manually!
                             setIsStoreDropdownOpen(false);
+                            setError('');
                           }}
-                          className={`p-2 rounded-lg border flex items-center gap-2.5 cursor-pointer transition-all ${
+                          className={`p-2 rounded-lg border flex items-center justify-between cursor-pointer transition-all ${
                             isSelected 
                               ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-sm' 
                               : 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50 text-slate-800'
                           }`}
                         >
-                          <div className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
-                            isSelected ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'
-                          }`}>
-                            {acc.username}
+                          <div className="flex items-center gap-2.5 truncate">
+                            <div className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
+                              isSelected ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}>
+                              {acc.username}
+                            </div>
+                            <div className="text-xs font-semibold truncate">
+                              {acc.name}
+                            </div>
                           </div>
-                          <div className="text-xs font-semibold truncate">
-                            {acc.name}
-                          </div>
+                          <span className="text-[10px] text-slate-400 shrink-0">Pilih ID</span>
                         </div>
                       );
                     })}
@@ -196,22 +216,49 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
                 </div>
               )}
             </div>
+            {showStoreQuickSelect && selectedStoreObj && (
+              <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                ✓ Cabang terpilih: {selectedStoreObj.name} ({selectedStoreObj.username})
+              </p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Password</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              {showStoreQuickSelect ? "Password Cabang (Input Manual)" : "Password Head Office"}
+            </label>
             <div className="relative">
               <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
-                type="password" 
+                type={showPassword ? "text" : "password"} 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-emerald-500 focus:bg-white transition-all text-slate-900"
-                placeholder="••••••••"
+                className="w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-slate-900"
+                placeholder={showStoreQuickSelect ? "Ketikkan password cabang Anda" : "••••••••"}
                 autoComplete="new-password"
+                data-lpignore="true"
+                name="wtc_pwd_field"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 cursor-pointer"
+                title={showPassword ? "Sembunyikan password" : "Lihat password"}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
+            {showStoreQuickSelect ? (
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Password tidak disimpan otomatis. Format: <strong>[KODE]2026</strong> (Contoh: PIM2026)
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Ketikkan password admin Head Office secara manual.
+              </p>
+            )}
           </div>
           
           <button 
@@ -219,7 +266,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer"
           >
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>{showStoreQuickSelect ? 'Masuk Kasir Toko' : 'Masuk Sistem Superadmin'}</span>
+            <span>{showStoreQuickSelect ? 'Verifikasi & Masuk Terminal Kasir' : 'Verifikasi & Masuk HO'}</span>
           </button>
         </form>
 

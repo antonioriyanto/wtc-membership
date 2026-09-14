@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   StoreBranch, 
   Member, 
@@ -55,10 +55,104 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   const isCurrentlyLoading = isLoading || isSkeletonLoading;
 
-  // Aggregate stats
-  const totalRevenueToday = stores.reduce((acc, s) => acc + s.todayRevenue, 0);
-  const totalTransactionsToday = stores.reduce((acc, s) => acc + s.todayTransactions, 0);
-  const totalPointsIssuedToday = stores.reduce((acc, s) => acc + s.todayPointsIssued, 0);
+  // Real database metrics aggregated per store today
+  const { storesWithRealMetrics, topStores, totalRevenueToday, totalTransactionsToday, totalPointsIssuedToday } = useMemo(() => {
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth();
+    const todayDate = today.getDate();
+
+    // Map store performance aggregated from real database transactions
+    const storeMetricsMap = new Map<string, { revenue: number; transactions: number; pointsIssued: number }>();
+
+    // Initialize with 0 for all stores
+    for (const store of stores) {
+      storeMetricsMap.set(store.id, { revenue: 0, transactions: 0, pointsIssued: 0 });
+      if (store.code && store.code !== store.id) {
+        storeMetricsMap.set(store.code, storeMetricsMap.get(store.id)!);
+      }
+    }
+
+    let hasAnyTransactionsToday = false;
+
+    for (const trx of transactions) {
+      if (!trx.timestamp) continue;
+      const tDate = new Date(trx.timestamp);
+      if (
+        tDate.getFullYear() === todayYear &&
+        tDate.getMonth() === todayMonth &&
+        tDate.getDate() === todayDate
+      ) {
+        hasAnyTransactionsToday = true;
+        // Identify matching store
+        const matchingStore = stores.find(s => 
+          (trx.storeId && (s.id.toLowerCase() === trx.storeId.toLowerCase() || s.code.toLowerCase() === trx.storeId.toLowerCase())) ||
+          (trx.storeName && s.name.toLowerCase() === trx.storeName.toLowerCase()) ||
+          (trx.storeName && s.name.toLowerCase().includes(trx.storeName.toLowerCase())) ||
+          (trx.storeName && trx.storeName.toLowerCase().includes(s.name.toLowerCase()))
+        );
+
+        const storeKey = matchingStore ? matchingStore.id : (trx.storeId || '');
+        if (storeKey) {
+          if (!storeMetricsMap.has(storeKey)) {
+            storeMetricsMap.set(storeKey, { revenue: 0, transactions: 0, pointsIssued: 0 });
+          }
+          const curr = storeMetricsMap.get(storeKey)!;
+          curr.transactions += 1;
+          if (trx.amount && trx.amount > 0) {
+            curr.revenue += trx.amount;
+          }
+          const ptsDelta = trx.pointsDelta || (trx.type === 'EARN' ? trx.points || 0 : 0);
+          if (ptsDelta > 0) {
+            curr.pointsIssued += ptsDelta;
+          }
+        }
+      }
+    }
+
+    // Attach real computed figures to stores
+    const enriched = stores.map(store => {
+      const realMetrics = storeMetricsMap.get(store.id) || (store.code ? storeMetricsMap.get(store.code) : null);
+      
+      // If transactions exist today for stores or database is populated, use real numbers from transactions.
+      // If no transactions have been logged today yet in transactions collection, smoothly fallback to store's documented todayRevenue.
+      const revenue = (realMetrics && realMetrics.transactions > 0) 
+        ? realMetrics.revenue 
+        : (hasAnyTransactionsToday ? (realMetrics?.revenue || 0) : (store.todayRevenue || 0));
+
+      const trxCount = (realMetrics && realMetrics.transactions > 0)
+        ? realMetrics.transactions
+        : (hasAnyTransactionsToday ? (realMetrics?.transactions || 0) : (store.todayTransactions || 0));
+
+      const ptsIssued = (realMetrics && realMetrics.pointsIssued > 0)
+        ? realMetrics.pointsIssued
+        : (hasAnyTransactionsToday ? (realMetrics?.pointsIssued || 0) : (store.todayPointsIssued || 0));
+
+      return {
+        ...store,
+        computedTodayRevenue: revenue,
+        computedTodayTransactions: trxCount,
+        computedTodayPointsIssued: ptsIssued,
+        hasRealLiveTrx: Boolean(realMetrics && realMetrics.transactions > 0)
+      };
+    });
+
+    // Top 5 stores sorted by today's real volume / revenue
+    const sorted = [...enriched].sort((a, b) => b.computedTodayRevenue - a.computedTodayRevenue).slice(0, 5);
+
+    const sumRev = enriched.reduce((acc, s) => acc + s.computedTodayRevenue, 0);
+    const sumTrx = enriched.reduce((acc, s) => acc + s.computedTodayTransactions, 0);
+    const sumPts = enriched.reduce((acc, s) => acc + s.computedTodayPointsIssued, 0);
+
+    return {
+      storesWithRealMetrics: enriched,
+      topStores: sorted,
+      totalRevenueToday: sumRev,
+      totalTransactionsToday: sumTrx,
+      totalPointsIssuedToday: sumPts
+    };
+  }, [stores, transactions]);
+
   const activeStoresCount = stores.filter(s => s.status === 'ONLINE').length;
   
   const blueCount = members.filter(m => m.tier === 'BLUE').length;
@@ -69,9 +163,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const blackCount = members.filter(m => m.tier === 'BLACK').length;
 
   const totalPointsInCirculation = members.reduce((acc, m) => acc + m.points, 0);
-
-  // Top 5 Performing Stores
-  const topStores = [...stores].sort((a, b) => b.todayRevenue - a.todayRevenue).slice(0, 5);
 
   if (isCurrentlyLoading) {
     return (
@@ -237,8 +328,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Top Performing Store Branches Today</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Real-time revenue, customer throughput, and points generated per branch</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900">Top Performing Store Branches Today</h2>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Live DB Sync
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">Real-time revenue, customer throughput, and points generated per branch from database transactions</p>
             </div>
             <button
               id="view-all-stores-transactions-btn"
@@ -253,8 +350,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
           <div className="divide-y divide-slate-100">
             {topStores.map((store, index) => {
-              const maxRev = topStores[0]?.todayRevenue || 1;
-              const percent = Math.min(100, Math.round((store.todayRevenue / maxRev) * 100));
+              const maxRev = topStores[0]?.computedTodayRevenue || 1;
+              const percent = Math.min(100, Math.round(((store.computedTodayRevenue || 0) / maxRev) * 100));
 
               return (
                 <div 
@@ -276,11 +373,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                         <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md shrink-0">
                           {store.region}
                         </span>
+                        {store.hasRealLiveTrx && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full shrink-0 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live Trx
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
-                        <span>{store.todayTransactions} receipts</span>
+                        <span>{store.computedTodayTransactions} receipts</span>
                         <span>•</span>
-                        <span className="text-emerald-600 font-semibold">+{store.todayPointsIssued} Pts Issued</span>
+                        <span className="text-emerald-600 font-semibold">+{store.computedTodayPointsIssued.toLocaleString('id-ID')} Pts Issued</span>
                       </div>
 
                       {/* Progress Bar */}
@@ -295,7 +398,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
                   <div className="text-right shrink-0 pl-12 sm:pl-0 flex flex-col items-end">
                     <div className="text-sm font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
-                      Rp {(store.todayRevenue || 0).toLocaleString('id-ID')}
+                      Rp {(store.computedTodayRevenue || 0).toLocaleString('id-ID')}
                     </div>
                     <div className="text-[11px] text-slate-400">Daily Volume</div>
                     <span className="text-[10px] text-amber-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 mt-0.5">
