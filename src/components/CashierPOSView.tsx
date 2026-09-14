@@ -11,6 +11,7 @@ import { CashierTabType } from '../types';
 import { doc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { safeSetDoc } from '../lib/syncFirestore';
+import { generateSequentialMembershipId } from '../lib/canonicalMember';
 import { CreateMemberModal } from './CreateMemberModal';
 import { CustomerPinPromptModal } from './CustomerPinPromptModal';
 import { useCustomDialog } from './CustomDialogProvider';
@@ -384,9 +385,10 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
           setActiveTab('cashier'); // Ensure we are on the cashier tab
         }}
         onCreateMember={async (newMember) => {
+          const assignedMembershipId = newMember.membershipId || (await generateSequentialMembershipId(newMember.registeredStore || currentStore?.name || 'Puri Jakarta', stores));
           let created: Member = {
             id: newMember.id || 'mem_' + Date.now(),
-            membershipId: newMember.membershipId || 'MBR-' + Math.floor(100000 + Math.random() * 900000),
+            membershipId: assignedMembershipId,
             name: newMember.name || '',
             phone: newMember.phone || '',
             email: newMember.email || '',

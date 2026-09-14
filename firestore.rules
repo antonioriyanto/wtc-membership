@@ -38,6 +38,11 @@ service cloud.firestore {
       allow write: if true; // Managed by HO & POS system
     }
 
+    // Sequential Membership ID Counters
+    match /store_counters/{storeCode} {
+      allow read, write: if true;
+    }
+
     // Members Loyalty Profiles & Balances
     match /members/{memberId} {
       // Document read is permitted for authenticated members or retail lookup

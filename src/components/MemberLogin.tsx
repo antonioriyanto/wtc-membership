@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { WatchClubLogo } from './WatchClubLogo';
 import { 
   Smartphone, 
@@ -7,19 +7,18 @@ import {
   ShieldCheck, 
   AlertCircle, 
   ArrowLeft, 
-  RotateCcw, 
   CheckCircle2, 
-  Sparkles,
-  Delete,
-  Fingerprint,
-  HelpCircle,
-  Store,
-  X,
-  ShieldAlert
+  Delete, 
+  Fingerprint, 
+  HelpCircle, 
+  Store, 
+  X, 
+  ShieldAlert,
+  Mail
 } from 'lucide-react';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
-import { toE164, toLocalPhone } from '../lib/canonicalMember';
+import { toE164 } from '../lib/canonicalMember';
 import { 
   precheckCustomer, 
   verifyCustomerPinClient, 
@@ -40,13 +39,12 @@ type LoginStep =
   | 'FIRST_PIN_CREATE' 
   | 'FIRST_PIN_CONFIRM' 
   | 'FIRST_PIN_LINK_GOOGLE' 
-  | 'RECOVER_GOOGLE'
   | 'RESET_PIN_CREATE'
   | 'RESET_PIN_CONFIRM'
   | 'MANDATORY_PIN_CHANGE_CREATE'
   | 'MANDATORY_PIN_CHANGE_CONFIRM';
 
-export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoogle, members }) => {
+export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoogle }) => {
   const [step, setStep] = useState<LoginStep>('PHONE');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -249,7 +247,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
       }
     } catch (err: any) {
       console.error('PIN verification error:', err);
-      const errMsg = err?.message || 'Verifikasi PIN gagal.';
+      const errMsg = err?.message || 'Verifikasi PIN tidak sesuai.';
       setError(errMsg);
       setEnteredPin('');
 
@@ -292,10 +290,8 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
     }
     setError('');
     if (step === 'RESET_PIN_CONFIRM') {
-      // Finalize self-service Google reset
       finalizeResetPin();
     } else if (step === 'MANDATORY_PIN_CHANGE_CONFIRM') {
-      // Finalize mandatory PIN change
       finalizeMandatoryPinChange();
     } else {
       setStep('FIRST_PIN_LINK_GOOGLE');
@@ -350,7 +346,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
 
       // If customer has a registered recovery account and current Google sign-in does not match
       if (registeredGoogleUid && !isUidMatch && !isEmailMatch) {
-        const mismatchMsg = `Akun Google (${user.email}) tidak cocok dengan data pemulihan yang tersimpan untuk nomor ini. Silakan gunakan akun Google yang sesuai, atau kunjungi butik Watch Club terdekat untuk verifikasi KTP oleh kasir.`;
+        const mismatchMsg = `Akun Google (${user.email}) tidak sesuai dengan data pemulihan yang tersimpan untuk nomor ini. Silakan gunakan akun Google yang tepat, atau kunjungi butik resmi Watch Club terdekat untuk verifikasi fisik oleh kasir.`;
         setError(mismatchMsg);
         setRecoveryError(mismatchMsg);
         return;
@@ -367,7 +363,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
       setCreatedPin('');
       setConfirmedPin('');
       setStep('RESET_PIN_CREATE');
-      setSuccessMsg(`Verifikasi Google berhasil (${user.email}). Silakan buat 6-digit PIN baru.`);
+      setSuccessMsg(`Verifikasi identitas berhasil (${user.email}). Silakan buat 6-digit PIN baru.`);
     } catch (err: any) {
       console.error('Google recovery error:', err);
       if (err?.code !== 'auth/popup-closed-by-user') {
@@ -383,7 +379,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
   // Finalize Self-Service PIN Reset
   const finalizeResetPin = async () => {
     if (!verifiedGoogleAuth) {
-      setError('Sesi verifikasi Google telah kadaluarsa. Silakan ulangi.');
+      setError('Sesi verifikasi Google telah kadaluarsa. Silakan ulangi proses pemulihan.');
       setStep('PHONE');
       return;
     }
@@ -398,13 +394,13 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
         newPin: createdPin
       });
 
-      setSuccessMsg('PIN berhasil dipulihkan! Mengalihkan ke dashboard...');
+      setSuccessMsg('Security PIN berhasil dipulihkan! Mengalihkan ke dashboard...');
       setTimeout(() => {
         onLogin(updated.id, updated);
       }, 600);
     } catch (err: any) {
       console.error('Reset PIN error:', err);
-      setError(err?.message || 'Gagal memperbarui PIN.');
+      setError(err?.message || 'Gagal memperbarui Security PIN.');
     } finally {
       setLoading(false);
     }
@@ -422,7 +418,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
         googleUid: memberInfo?.memberDoc?.googleUid
       });
 
-      setSuccessMsg('PIN permanen berhasil disimpan! Selamat datang di Watch Club.');
+      setSuccessMsg('PIN permanen berhasil disimpan. Selamat datang kembali di Watch Club.');
       setTimeout(() => {
         onLogin(updated.id, updated);
       }, 600);
@@ -448,22 +444,22 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
     }
   };
 
-  // Helper to render PIN dots
+  // Refined Luxury PIN dots indicator
   const renderPinDots = (currentVal: string, isInputLocked: boolean) => {
     return (
-      <div className="flex justify-center items-center gap-3.5 my-6">
+      <div className="flex justify-center items-center gap-3.5 my-4">
         {[0, 1, 2, 3, 4, 5].map((index) => {
           const filled = index < currentVal.length;
           const active = index === currentVal.length && !isInputLocked;
           return (
             <div
               key={index}
-              className={`w-4 h-4 rounded-full transition-all duration-200 ${
+              className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
                 filled
-                  ? 'bg-amber-400 scale-110 shadow-[0_0_12px_rgba(251,191,36,0.5)] border border-amber-300'
+                  ? 'bg-slate-900 border border-slate-900 scale-110 shadow-xs'
                   : active
-                  ? 'border-2 border-amber-400/80 bg-slate-800 animate-pulse scale-105'
-                  : 'border border-slate-700 bg-slate-900/60'
+                  ? 'border-2 border-slate-900 bg-white ring-2 ring-slate-400/25 scale-105'
+                  : 'border border-slate-300 bg-slate-100'
               }`}
             />
           );
@@ -473,30 +469,31 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden font-sans select-none">
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-80 h-80 bg-slate-800/20 rounded-full blur-2xl pointer-events-none" />
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-center items-center p-4 sm:p-6 relative font-sans select-none">
+      {/* Subtle Luxury Ambient Glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-slate-200/50 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-80 h-80 bg-slate-200/40 rounded-full blur-2xl pointer-events-none" />
 
-      <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-2xl p-6 sm:p-8 border border-slate-800 relative z-10">
+      {/* Main Luxury White Card Container */}
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-slate-200/90 p-6 sm:p-8 relative z-10 space-y-5 transition-shadow hover:shadow-md">
         
-        {/* BRAND LOGO */}
-        <div className="flex justify-center mb-5">
-          <WatchClubLogo variant="light" className="scale-105" />
+        {/* BRAND LOGO - Deep Obsidian Variant */}
+        <div className="flex justify-center mb-2">
+          <WatchClubLogo variant="dark" className="scale-105" />
         </div>
 
         {/* FEEDBACK BANNERS */}
         {error && (
-          <div className="bg-red-950/80 text-red-300 p-3.5 rounded-2xl text-xs font-semibold mb-4 border border-red-800/80 flex items-start gap-2.5 animate-fadeIn">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-            <div className="flex-1">{error}</div>
+          <div className="bg-rose-50 text-rose-800 p-3.5 rounded-2xl text-xs font-medium border border-rose-200 flex items-start gap-2.5 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="flex-1 leading-relaxed">{error}</div>
           </div>
         )}
 
         {successMsg && (
-          <div className="bg-emerald-950/80 text-emerald-300 p-3.5 rounded-2xl text-xs font-semibold mb-4 border border-emerald-800/80 flex items-center gap-2.5 animate-fadeIn">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <div className="flex-1">{successMsg}</div>
+          <div className="bg-emerald-50 text-emerald-800 p-3.5 rounded-2xl text-xs font-medium border border-emerald-200 flex items-center gap-2.5 animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="flex-1 leading-relaxed">{successMsg}</div>
           </div>
         )}
 
@@ -506,19 +503,19 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
         {step === 'PHONE' && (
           <div className="space-y-5 animate-fadeIn">
             <div className="text-center">
-              <h2 className="text-xl font-bold tracking-tight text-white">Portal Member Eksklusif</h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Masukkan nomor handphone Anda untuk mengakses saldo poin dan voucher.
+              <h2 className="text-xl font-bold tracking-tight text-slate-900">Portal Member Eksklusif</h2>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Masukkan nomor handphone terdaftar untuk mengakses portofolio poin, voucher, dan riwayat jam tangan mewah Anda.
               </p>
             </div>
 
             <form onSubmit={handlePhoneSubmit} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Nomor Handphone Terdaftar
                 </label>
                 <div className="relative">
-                  <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="tel"
                     value={phone}
@@ -526,7 +523,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                       setPhone(e.target.value);
                       if (error) setError('');
                     }}
-                    className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-sm font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/30 transition-all tracking-wide"
+                    className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:bg-white focus:ring-1 focus:ring-slate-800/20 transition-all tracking-wide"
                     placeholder="Contoh: 081288889999"
                     required
                     autoFocus
@@ -535,7 +532,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                 {e164Preview && (
                   <div className="text-[11px] text-slate-500 mt-1.5 flex items-center justify-between">
                     <span>Format E.164 Standar:</span>
-                    <span className="font-mono text-amber-400/90 font-medium">{e164Preview}</span>
+                    <span className="font-mono text-slate-700 font-semibold">{e164Preview}</span>
                   </div>
                 )}
               </div>
@@ -543,23 +540,23 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
               >
-                <ShieldCheck className="w-4 h-4 text-slate-950" />
+                <ShieldCheck className="w-4 h-4 text-white" />
                 <span>{loading ? 'Memverifikasi...' : 'Lanjutkan ke Security PIN'}</span>
               </button>
             </form>
 
             {/* Unregistered Member Registration Link */}
             {memberInfo && !memberInfo.exists && (
-              <div className="p-4 bg-slate-950/80 border border-amber-500/30 rounded-2xl text-center space-y-2.5 animate-fadeIn">
-                <p className="text-xs text-amber-200">
-                  Nomor <strong>{phone}</strong> belum terdaftar.
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-2.5 animate-fadeIn">
+                <p className="text-xs text-slate-700">
+                  Nomor <strong>{phone}</strong> belum terdaftar dalam direktori member.
                 </p>
                 <button
                   type="button"
                   onClick={handleNewGoogleRegister}
-                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl border border-slate-700 flex items-center justify-center gap-2.5 transition-all"
+                  className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-xl border border-slate-200 flex items-center justify-center gap-2.5 transition-all shadow-xs cursor-pointer"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -572,13 +569,20 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               </div>
             )}
 
-            <div className="pt-3 border-t border-slate-800 text-center">
-              <a
-                href="/admin"
-                className="text-[11px] text-slate-500 hover:text-slate-300 font-medium transition-colors"
-              >
-                Akses Khusus Admin & Kasir Toko →
-              </a>
+            {/* Strict Portal Isolation: Luxury Customer Care Footer (No /admin or /cashier) */}
+            <div className="pt-4 border-t border-slate-200/80 text-center space-y-2">
+              <div className="flex items-center justify-center text-xs font-medium text-slate-500">
+                <a 
+                  href="mailto:customercare@watchclub.co.id" 
+                  className="hover:text-slate-900 transition-colors flex items-center gap-1.5"
+                >
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Customer Care</span>
+                </a>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                &copy; {new Date().getFullYear()} Watch Club Indonesia. All rights reserved.
+              </p>
             </div>
           </div>
         )}
@@ -597,39 +601,39 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   setEnteredPin('');
                   setError('');
                 }}
-                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Ganti Nomor
               </button>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-semibold">
-                <Lock className="w-3 h-3" />
-                <span>Security PIN Guard</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-semibold">
+                <Lock className="w-3 h-3 text-slate-600" />
+                <span>Keamanan Akun Terenkripsi</span>
               </div>
             </div>
 
             <div className="text-center pt-1">
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
                 Selamat Datang, {memberInfo?.name || 'Member'}
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Ketik 6-Digit PIN Anda untuk {toE164(phone)}
               </p>
             </div>
 
             {/* BRUTE-FORCE LOCKOUT STATE */}
             {lockoutSeconds > 0 ? (
-              <div className="p-4 bg-red-950/60 border border-red-800/80 rounded-2xl text-center space-y-2 animate-pulse">
-                <div className="inline-flex p-2 rounded-full bg-red-900/50 text-red-400 mb-1">
+              <div className="p-5 bg-rose-50 border border-rose-200 rounded-2xl text-center space-y-2.5 animate-pulse">
+                <div className="inline-flex p-2.5 rounded-full bg-rose-100 text-rose-700 mb-1">
                   <Lock className="w-5 h-5" />
                 </div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-red-300">
-                  Akun Terkunci Sementara (5x Gagal)
+                <h3 className="text-xs font-bold uppercase tracking-wider text-rose-800">
+                  Akses Dihentikan Sementara Demi Keamanan
                 </h3>
-                <p className="text-2xl font-mono font-extrabold text-red-400">
+                <p className="text-2xl font-mono font-extrabold text-rose-700">
                   {formatLockoutTimer(lockoutSeconds)}
                 </p>
-                <p className="text-[11px] text-slate-400">
-                  Demi keamanan poin & data Anda, input PIN dinonaktifkan sementara.
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Untuk menjaga kerahasiaan portofolio dan kepemilikan poin Anda, input PIN dinonaktifkan sementara setelah beberapa percobaan tidak sesuai.
                 </p>
                 <button
                   type="button"
@@ -638,10 +642,10 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     setRecoveryError('');
                     setIsRecoveryModalOpen(true);
                   }}
-                  className="mt-2 w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  className="mt-2 w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
-                  <Fingerprint className="w-3.5 h-3.5" />
-                  <span>Buka Kunci Segera dengan Google OAuth</span>
+                  <Fingerprint className="w-4 h-4" />
+                  <span>Verifikasi Identitas dengan Akun Google</span>
                 </button>
               </div>
             ) : (
@@ -657,7 +661,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                       type="button"
                       onClick={() => handleKeypadPress(digit)}
                       disabled={loading || lockoutSeconds > 0}
-                      className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 active:text-slate-950 border border-slate-700/60 text-lg font-bold text-white transition-all duration-150 flex items-center justify-center shadow-md cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white border border-slate-200 text-lg font-bold text-slate-900 transition-all duration-150 flex items-center justify-center shadow-xs cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       {digit}
                     </button>
@@ -668,7 +672,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     type="button"
                     onClick={handleKeypadClear}
                     disabled={loading || lockoutSeconds > 0 || !enteredPin}
-                    className="h-14 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
+                    className="h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-600 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
                   >
                     Clear
                   </button>
@@ -678,7 +682,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     type="button"
                     onClick={() => handleKeypadPress('0')}
                     disabled={loading || lockoutSeconds > 0}
-                    className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 active:text-slate-950 border border-slate-700/60 text-lg font-bold text-white transition-all duration-150 flex items-center justify-center shadow-md cursor-pointer disabled:opacity-30"
+                    className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white border border-slate-200 text-lg font-bold text-slate-900 transition-all duration-150 flex items-center justify-center shadow-xs cursor-pointer disabled:opacity-30"
                   >
                     0
                   </button>
@@ -688,14 +692,14 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     type="button"
                     onClick={handleKeypadBackspace}
                     disabled={loading || lockoutSeconds > 0 || !enteredPin}
-                    className="h-14 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
+                    className="h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
                   >
-                    <Delete className="w-5 h-5 text-slate-400" />
+                    <Delete className="w-5 h-5 text-slate-600" />
                   </button>
                 </div>
 
                 {/* PIN RECOVERY TRIGGER BENEATH KEYPAD */}
-                <div className="pt-3">
+                <div className="pt-2">
                   <button
                     type="button"
                     id="btn-lupa-pin-trigger"
@@ -703,11 +707,22 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                       setRecoveryError('');
                       setIsRecoveryModalOpen(true);
                     }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 hover:text-amber-300 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-800 hover:border-amber-500/40 transition-all cursor-pointer shadow-sm"
+                    className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-200 transition-all cursor-pointer shadow-xs"
                   >
-                    <HelpCircle className="w-4 h-4 text-amber-400" />
+                    <HelpCircle className="w-4 h-4 text-slate-500" />
                     <span>Lupa Security PIN? Pulihkan Akun</span>
                   </button>
+                </div>
+
+                {/* LUXURY SECURITY BADGE MICROCOPY */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1 text-xs text-slate-700">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+                    <ShieldCheck className="w-4 h-4 text-slate-800" />
+                    <span>Proteksi Keamanan &amp; Privasi Member</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Security PIN Anda dilindungi dengan enkripsi berstandar perbankan untuk mengamankan hak reward poin serta kerahasiaan arsip transaksi jam tangan mewah Anda.
+                  </p>
                 </div>
               </>
             )}
@@ -723,32 +738,32 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               <button
                 type="button"
                 onClick={() => setStep('PHONE')}
-                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Batal
               </button>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
                 Langkah 1 dari 2
               </span>
             </div>
 
             <div className="text-center pt-1">
-              <div className="inline-flex p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-2">
+              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 mb-2">
                 <KeyRound className="w-5 h-5" />
               </div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
                 {step === 'RESET_PIN_CREATE' 
-                  ? 'Buat PIN Baru' 
+                  ? 'Buat Security PIN Baru' 
                   : step === 'MANDATORY_PIN_CHANGE_CREATE'
                   ? 'Wajib Buat PIN Baru'
                   : 'Aktivasi Keamanan PIN'}
               </h2>
-              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+              <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
                 {step === 'RESET_PIN_CREATE'
-                  ? 'Verifikasi Google berhasil. Tentukan 6-digit Security PIN baru Anda.'
+                  ? 'Verifikasi identitas berhasil. Tentukan 6-digit Security PIN baru Anda.'
                   : step === 'MANDATORY_PIN_CHANGE_CREATE'
                   ? 'PIN sementara dari kasir aktif. Buat 6-digit PIN permanen baru demi keamanan.'
-                  : 'Tentukan 6-digit Security PIN untuk melindungi saldo poin & voucher Anda.'}
+                  : 'Tentukan 6-digit Security PIN untuk melindungi portofolio poin & reward Anda.'}
               </p>
             </div>
 
@@ -760,7 +775,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   key={digit}
                   type="button"
                   onClick={() => handleKeypadPress(digit)}
-                  className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 active:text-slate-950 border border-slate-700/60 text-lg font-bold text-white transition-all flex items-center justify-center shadow-md cursor-pointer"
+                  className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white border border-slate-200 text-lg font-bold text-slate-900 transition-all flex items-center justify-center shadow-xs cursor-pointer"
                 >
                   {digit}
                 </button>
@@ -768,23 +783,23 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               <button
                 type="button"
                 onClick={handleKeypadClear}
-                className="h-14 rounded-2xl bg-slate-900/80 text-xs font-bold uppercase text-slate-400 flex items-center justify-center border border-slate-800"
+                className="h-14 rounded-2xl bg-slate-100 text-xs font-bold uppercase text-slate-600 flex items-center justify-center border border-slate-200 cursor-pointer"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={() => handleKeypadPress('0')}
-                className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 text-lg font-bold text-white flex items-center justify-center border border-slate-700/60"
+                className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white text-lg font-bold text-slate-900 flex items-center justify-center border border-slate-200 cursor-pointer"
               >
                 0
               </button>
               <button
                 type="button"
                 onClick={handleKeypadBackspace}
-                className="h-14 rounded-2xl bg-slate-900/80 text-slate-300 flex items-center justify-center border border-slate-800"
+                className="h-14 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center border border-slate-200 cursor-pointer"
               >
-                <Delete className="w-5 h-5 text-slate-400" />
+                <Delete className="w-5 h-5 text-slate-600" />
               </button>
             </div>
 
@@ -792,7 +807,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               type="button"
               onClick={handleProceedToConfirm}
               disabled={createdPin.length !== 6}
-              className="w-full py-3.5 mt-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-3.5 mt-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span>Lanjut Konfirmasi PIN ({createdPin.length}/6)</span>
             </button>
@@ -813,24 +828,24 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   else if (step === 'RESET_PIN_CONFIRM') setStep('RESET_PIN_CREATE');
                   else setStep('MANDATORY_PIN_CHANGE_CREATE');
                 }}
-                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Ubah PIN
               </button>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
                 Langkah 2 dari 2
               </span>
             </div>
 
             <div className="text-center pt-1">
-              <div className="inline-flex p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-2">
+              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 mb-2">
                 <Lock className="w-5 h-5" />
               </div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
                 Konfirmasi Ulang PIN Anda
               </h2>
-              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                Ketik kembali 6-digit PIN yang baru saja Anda buat untuk memastikan tidak ada kesalahan.
+              <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
+                Ketik kembali 6-digit PIN yang baru saja Anda buat untuk memastikan kesesuaian.
               </p>
             </div>
 
@@ -842,7 +857,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   key={digit}
                   type="button"
                   onClick={() => handleKeypadPress(digit)}
-                  className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 active:text-slate-950 border border-slate-700/60 text-lg font-bold text-white transition-all flex items-center justify-center shadow-md cursor-pointer"
+                  className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white border border-slate-200 text-lg font-bold text-slate-900 transition-all flex items-center justify-center shadow-xs cursor-pointer"
                 >
                   {digit}
                 </button>
@@ -850,23 +865,23 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               <button
                 type="button"
                 onClick={handleKeypadClear}
-                className="h-14 rounded-2xl bg-slate-900/80 text-xs font-bold uppercase text-slate-400 flex items-center justify-center border border-slate-800"
+                className="h-14 rounded-2xl bg-slate-100 text-xs font-bold uppercase text-slate-600 flex items-center justify-center border border-slate-200 cursor-pointer"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={() => handleKeypadPress('0')}
-                className="h-14 rounded-2xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-amber-500 text-lg font-bold text-white flex items-center justify-center border border-slate-700/60"
+                className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white text-lg font-bold text-slate-900 flex items-center justify-center border border-slate-200 cursor-pointer"
               >
                 0
               </button>
               <button
                 type="button"
                 onClick={handleKeypadBackspace}
-                className="h-14 rounded-2xl bg-slate-900/80 text-slate-300 flex items-center justify-center border border-slate-800"
+                className="h-14 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center border border-slate-200 cursor-pointer"
               >
-                <Delete className="w-5 h-5 text-slate-400" />
+                <Delete className="w-5 h-5 text-slate-600" />
               </button>
             </div>
 
@@ -874,7 +889,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               type="button"
               onClick={handleProceedToGoogleLink}
               disabled={confirmedPin.length !== 6 || loading}
-              className="w-full py-3.5 mt-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-3.5 mt-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ShieldCheck className="w-4 h-4" />
               <span>
@@ -896,24 +911,25 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
         {step === 'FIRST_PIN_LINK_GOOGLE' && (
           <div className="space-y-4 animate-fadeIn">
             <div className="text-center pt-2">
-              <div className="inline-flex p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+              <div className="inline-flex p-3 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 mb-2">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
                 Hubungkan Akun Pemulihan
               </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Tautkan akun Google Anda sebagai metode pemulihan resmi jika suatu saat Anda lupa PIN.
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Tautkan akun Google resmi Anda sebagai instrumen verifikasi identitas dan pemulihan darurat portofolio member.
               </p>
             </div>
 
-            <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2 text-xs text-slate-300">
-              <div className="flex items-center gap-2 font-semibold text-amber-300">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>Standar Keamanan Watch Club</span>
+            {/* EXECUTIVE SECURITY COPY */}
+            <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1.5 text-xs text-slate-700">
+              <div className="flex items-center gap-2 font-semibold text-slate-900">
+                <ShieldCheck className="w-4 h-4 text-slate-800" />
+                <span>Standar Privasi &amp; Keamanan Eksklusif</span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                PIN dienkripsi secara irreversibel menggunakan algoritma PBKDF2 (100.000 iterasi). Akun Google yang terhubung adalah satu-satunya kunci reset otentik jika Anda terkunci.
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Watch Club menerapkan standar enkripsi berstandar perbankan guna memastikan hak reward dan data kepemilikan jam tangan Anda terlindungi secara menyeluruh dari akses tanpa otorisasi.
               </p>
             </div>
 
@@ -921,7 +937,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               type="button"
               onClick={handleGoogleLinkAndSave}
               disabled={loading}
-              className="w-full py-3.5 bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm rounded-xl transition-all shadow-lg flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 bg-white hover:bg-slate-50 text-slate-900 font-semibold text-sm rounded-xl border border-slate-200 transition-all shadow-xs flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -933,52 +949,51 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             </button>
           </div>
         )}
-
       </div>
 
       {/* ========================================================================= */}
-      {/* LUPA PIN / MULTI-CHANNEL RECOVERY MODAL */}
+      {/* LUPA PIN / MULTI-CHANNEL RECOVERY MODAL (LUXURY WHITE/SLATE THEME) */}
       {/* ========================================================================= */}
       {isRecoveryModalOpen && (
         <div 
           id="modal-lupa-pin-recovery"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fadeIn"
         >
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-slate-100 space-y-5">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl text-slate-900 space-y-5 animate-scaleUp">
             {/* Modal Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 flex items-center justify-center">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">Pemulihan Security PIN</h3>
-                  <p className="text-xs text-slate-400">Verifikasi multi-jalur resmi Watch Club</p>
+                  <h3 className="font-bold text-slate-900 text-base">Pemulihan Security PIN</h3>
+                  <p className="text-xs text-slate-500">Verifikasi identitas resmi member Watch Club</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsRecoveryModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Member Card Snapshot */}
-            <div className="p-3.5 bg-slate-950/70 border border-slate-800/80 rounded-2xl space-y-1 text-xs">
-              <div className="flex justify-between items-center text-slate-400">
-                <span>Member:</span>
-                <span className="font-semibold text-white">{memberInfo?.name || 'Member Watch Club'}</span>
+            <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1 text-xs text-slate-600">
+              <div className="flex justify-between items-center">
+                <span>Member Terdaftar:</span>
+                <span className="font-semibold text-slate-900">{memberInfo?.name || 'Member Watch Club'}</span>
               </div>
-              <div className="flex justify-between items-center text-slate-400">
-                <span>Nomor HP:</span>
-                <span className="font-mono text-amber-400 font-semibold">{toE164(phone)}</span>
+              <div className="flex justify-between items-center">
+                <span>Nomor Handphone:</span>
+                <span className="font-mono text-slate-900 font-semibold">{toE164(phone)}</span>
               </div>
               {memberInfo?.memberDoc?.recoveryEmail && (
-                <div className="flex justify-between items-center text-slate-400">
-                  <span>Google Pemulihan:</span>
-                  <span className="font-mono text-slate-300">
+                <div className="flex justify-between items-center">
+                  <span>Google Pemulihan Terdaftar:</span>
+                  <span className="font-mono text-slate-700">
                     {memberInfo.memberDoc.recoveryEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3')}
                   </span>
                 </div>
@@ -987,29 +1002,29 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
 
             {/* Mismatch / Rate-Limit Error in Modal */}
             {recoveryError && (
-              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1.5 animate-shake">
-                <div className="flex items-center gap-2 font-bold text-rose-400">
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1 animate-shake">
+                <div className="flex items-center gap-2 font-bold text-rose-700">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Verifikasi Ditolak</span>
+                  <span>Verifikasi Identitas Ditolak</span>
                 </div>
                 <p className="text-[11px] leading-relaxed">{recoveryError}</p>
               </div>
             )}
 
             {/* Path 1: Primary Self-Service (Google OAuth) */}
-            <div className="p-4 rounded-2xl bg-gradient-to-b from-slate-800/60 to-slate-850/60 border border-slate-700/60 space-y-3">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
                   Jalur Utama (Instan)
                 </span>
-                <span className="text-[11px] text-slate-400">Proses &lt; 30 Detik</span>
+                <span className="text-[11px] text-slate-500 font-medium">Proses &lt; 30 Detik</span>
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <span>Verifikasi Akun Google Terkait</span>
                 </h4>
-                <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                  Buka kunci akun dan buat 6-digit PIN baru secara mandiri dengan login akun Google yang telah ditautkan ke nomor ini.
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                  Buka kunci akun dan buat 6-digit PIN baru secara mandiri dengan verifikasi akun Google yang telah ditautkan ke nomor ini.
                 </p>
               </div>
 
@@ -1018,7 +1033,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                 id="btn-confirm-google-recovery"
                 onClick={startGoogleRecovery}
                 disabled={loading}
-                className="w-full py-3 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+                className="w-full py-3 bg-white hover:bg-slate-50 text-slate-900 font-semibold text-xs rounded-xl border border-slate-200 transition-all shadow-xs flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -1026,20 +1041,20 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                 </svg>
-                <span>{loading ? 'Memverifikasi Google...' : 'Verifikasi Akun Google'}</span>
+                <span>{loading ? 'Memverifikasi...' : 'Verifikasi Akun Google'}</span>
               </button>
             </div>
 
             {/* Path 2: In-Store Retail Fallback (Cashier-assisted) */}
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-200/80 px-2 py-0.5 rounded-full border border-slate-300">
                   Jalur Alternatif di Gerai
                 </span>
-                <Store className="w-4 h-4 text-amber-400" />
+                <Store className="w-4 h-4 text-slate-600" />
               </div>
-              <h4 className="text-xs font-bold text-white">Bantuan Kasir di Butik Watch Club</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <h4 className="text-xs font-bold text-slate-900">Bantuan Kasir di Butik Watch Club</h4>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
                 Tidak memiliki akses ke akun Google? Kunjungi butik resmi Watch Club terdekat dengan membawa kartu identitas asli (KTP/SIM/Paspor). Kasir resmi kami akan memverifikasi fisik dan membantu mereset PIN akun Anda.
               </p>
             </div>
@@ -1048,7 +1063,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             <button
               type="button"
               onClick={() => setIsRecoveryModalOpen(false)}
-              className="w-full py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer"
+              className="w-full py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer"
             >
               Kembali ke Halaman Login
             </button>

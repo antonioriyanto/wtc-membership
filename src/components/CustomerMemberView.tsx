@@ -842,8 +842,8 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     <HelpCircle className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-slate-900">Pusat Bantuan & Tiket Member</h3>
-                    <p className="text-[10px] text-slate-500">Terhubung langsung dengan Tim Support Head Office</p>
+                    <h3 className="font-bold text-sm text-slate-900">Pusat Bantuan & Customer Care</h3>
+                    <p className="text-[10px] text-slate-500">Terhubung langsung dengan Watch Club Customer Care</p>
                   </div>
                 </div>
 
@@ -984,7 +984,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                       className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
                     >
                       <Send className="w-3.5 h-3.5" />
-                      <span>Kirim Tiket ke Support HO</span>
+                      <span>Kirim Tiket ke Customer Care</span>
                     </button>
                   </form>
                 ) : (
@@ -1014,7 +1014,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
                           {t.storeName && (
                             <div className="text-[11px] text-slate-500">
-                              Cabang: <strong>{t.storeName}</strong> {t.receiptNo ? `• Struk: ${t.receiptNo}` : ''}
+                              Butik: <strong>{t.storeName}</strong> {t.receiptNo ? `• Struk: ${t.receiptNo}` : ''}
                             </div>
                           )}
 
@@ -1023,7 +1023,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                             <div className="p-2 bg-emerald-100/70 border border-emerald-300 rounded-xl text-emerald-900 font-bold text-[11px] flex items-center gap-1.5">
                               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                               <span>
-                                HO menyalurkan {t.adjustmentMade.pointsDelta > 0 ? `+${t.adjustmentMade.pointsDelta}` : t.adjustmentMade.pointsDelta} Pts ({t.adjustmentMade.note})
+                                Customer Care menyalurkan {t.adjustmentMade.pointsDelta > 0 ? `+${t.adjustmentMade.pointsDelta}` : t.adjustmentMade.pointsDelta} Pts ({t.adjustmentMade.note})
                               </span>
                             </div>
                           )}
@@ -1032,7 +1032,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                           {t.messages.length > 0 && (
                             <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-[11px] text-slate-700">
                               <div className="font-bold text-blue-600 mb-0.5">
-                                {t.messages[t.messages.length - 1].sender === 'AGENT' ? (t.assignedTo || 'Tim Support HO') : 'Anda'}:
+                                {t.messages[t.messages.length - 1].sender === 'AGENT' ? (t.assignedTo || 'Watch Club Customer Care') : 'Anda'}:
                               </div>
                               <p className="italic">"{t.messages[t.messages.length - 1].text}"</p>
                             </div>

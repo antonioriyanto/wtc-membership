@@ -4,6 +4,8 @@
  */
 
 import { MemberTier } from '../types';
+import { doc, runTransaction } from 'firebase/firestore';
+import { db } from './firebase';
 
 export interface CanonicalMemberDocument {
   id: string;
@@ -101,3 +103,170 @@ export function isAccountLocked(member: Pick<CanonicalMemberDocument, 'lockedUnt
   const remainingSeconds = Math.ceil((lockedTime - now) / 1000);
   return { locked: true, remainingSeconds };
 }
+
+/**
+ * Standardizes a store identifier (store code or boutique name) into
+ * a standardized 2-to-4 character alphanumeric store code.
+ */
+export function resolveStoreCode(
+  storeIdentifier?: string,
+  stores?: Array<{ name: string; code?: string }>
+): string {
+  if (!storeIdentifier) return 'ONL';
+  const trimmed = storeIdentifier.trim();
+
+  // 1. Direct match with registered store branch list
+  if (stores && stores.length > 0) {
+    const found = stores.find(
+      s => (s.code && s.code.toUpperCase() === trimmed.toUpperCase()) ||
+           (s.name && s.name.toLowerCase() === trimmed.toLowerCase())
+    );
+    if (found?.code) {
+      return found.code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+  }
+
+  // 2. Exact code pattern: 2 to 5 alphanumeric characters (e.g., "GI", "23S", "PUR", "ONL")
+  if (/^[A-Z0-9]{2,5}$/i.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+
+  // 3. Known luxury boutique mapping dictionary
+  const cleanKey = trimmed.toLowerCase();
+  const KNOWN_STORE_CODES: Record<string, string> = {
+    'grand indonesia': 'GI',
+    'grand indonesia jakarta': 'GI',
+    '23 semarang': '23S',
+    'puri jakarta': 'PUR',
+    'puri indah': 'PUR',
+    'puri indah mall': 'PUR',
+    'kota kasablanka jakarta': 'KKJ',
+    'kota kasablanka': 'KKJ',
+    'level 21 bali': 'L2B',
+    'trans studio bali': 'TSMB',
+    'e-walk balikpapan': 'EWB',
+    'penta city balikpapan': 'PCB',
+    'tsm bandung': 'TSMBND',
+    'summarecon mall bandung': 'SMB',
+    '23 paskal bandung': '2PB',
+    'duta mall 1 banjarmasin': 'DUT',
+    'duta mall 2 banjarmasin': 'DM2',
+    'cibinong city mall': 'CCM',
+    'aeon sentul': 'AEO',
+    'bogor botani': 'BOG',
+    'tsm cibubur': 'TSMC',
+    'the park sawangan depok': 'TPSD',
+    'panakukang': 'PAN',
+    'tsm makassar': 'TSM',
+    'mall olympic garden 1 malang': 'MOG1',
+    'mall olympic garden 2 malang': 'MOG2',
+    'manado town square': 'MTS',
+    'singkawang grand mall': 'SGM',
+    'palu': 'PAL',
+    'ayani pontianak': 'AYA',
+    'gaia pontianak': 'GAI',
+    'gorontalo': 'GOR',
+    'jayapura': 'JAY',
+    'kendari': 'KEN',
+    'paragon semarang': 'PAR',
+    'ciputra semarang': 'CIP',
+    'dp mall semarang': 'DMS',
+    'alianyang singkawang': 'ALI',
+    'solo square': 'SOLSQ',
+    'solo baru': 'SOLB',
+    'the park solo': 'TPS',
+    'ambarukmo plaza jogja': 'AMB',
+    'jogja city mall': 'JCM',
+    'pakuwon mall yogya': 'PMY',
+    'online': 'ONL'
+  };
+
+  if (KNOWN_STORE_CODES[cleanKey]) {
+    return KNOWN_STORE_CODES[cleanKey];
+  }
+
+  // 4. Fallback: initials from multi-word names (e.g. "Grand Indonesia" -> "GI")
+  const words = cleanKey.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    const acronym = words.map(w => w[0]).join('').toUpperCase().slice(0, 4);
+    if (acronym.length >= 2) return acronym;
+  }
+
+  return cleanKey.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4) || 'ONL';
+}
+
+/**
+ * Deterministic Sequential Membership ID Generator
+ * Uses an atomic Firestore transaction against store_counters/{storeCode}
+ * to read and increment lastSequence.
+ * 
+ * Formats: {storeCode}{0001}
+ * Examples:
+ *   GI + sequence 1   -> GI0001
+ *   23S + sequence 1  -> 23S0001
+ *   PUR + sequence 12 -> PUR0012
+ *   ONL + sequence 1  -> ONL0001
+ * 
+ * First registered member of any store is guaranteed 0001.
+ */
+export async function generateSequentialMembershipId(
+  storeIdentifier?: string,
+  stores?: Array<{ name: string; code?: string }>
+): Promise<string> {
+  const storeCode = resolveStoreCode(storeIdentifier, stores);
+  const counterDocRef = doc(db, 'store_counters', storeCode);
+
+  try {
+    const nextSeq = await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(counterDocRef);
+      let seq = 1;
+      if (snap.exists()) {
+        const data = snap.data();
+        const current = data?.lastSequence;
+        seq = typeof current === 'number' && current >= 1 ? current + 1 : 1;
+        transaction.update(counterDocRef, {
+          lastSequence: seq,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        seq = 1;
+        transaction.set(counterDocRef, {
+          storeCode,
+          lastSequence: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+      return seq;
+    });
+
+    const formattedId = `${storeCode}${String(nextSeq).padStart(4, '0')}`;
+    return formattedId;
+  } catch (err) {
+    console.warn(`[SequentialID] Firestore transaction counter fallback for store ${storeCode}:`, err);
+
+    // Resilient local sequence fallback to guarantee 0001 start and sequential increment
+    let maxSeq = 0;
+    try {
+      const raw = localStorage.getItem('wtc_members');
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          for (const m of list) {
+            const mId = String(m.membershipId || '').toUpperCase().trim();
+            if (mId.startsWith(storeCode)) {
+              const numPart = parseInt(mId.slice(storeCode.length), 10);
+              if (!isNaN(numPart) && numPart > maxSeq) {
+                maxSeq = numPart;
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+
+    const nextSeq = maxSeq + 1;
+    return `${storeCode}${String(nextSeq).padStart(4, '0')}`;
+  }
+}
+

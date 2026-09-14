@@ -41,6 +41,7 @@ import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
 import { PortalSwitcher } from './components/PortalSwitcher';
 import { calculateTier } from './lib/loyalty';
+import { generateSequentialMembershipId } from './lib/canonicalMember';
 import { StoreTransactionsModal } from './components/StoreTransactionsModal';
 import { NationalActivityNotifications } from './components/NationalActivityNotifications';
 
@@ -656,8 +657,7 @@ export default function App() {
 
                 // 4. TRULY BRAND NEW MEMBER
                 // Neither this Google UID nor this phone number exist in Firestore
-                const shortUid = user.uid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).toUpperCase();
-                const membershipId = 'ONL' + (shortUid || Math.floor(1000 + Math.random() * 9000));
+                const membershipId = await generateSequentialMembershipId('Online', stores);
 
                 const newMember: Member = {
                   id: user.uid,
@@ -842,9 +842,10 @@ export default function App() {
               isStoreLocked={false}
               members={members}
               onCreateMember={async (newMember) => {
+                const assignedMembershipId = newMember.membershipId || (await generateSequentialMembershipId(newMember.registeredStore || 'Puri Jakarta', stores));
                 let created: Member = {
                   id: newMember.id || 'mem_' + Date.now(),
-                  membershipId: newMember.membershipId || 'MBR-' + Math.floor(100000 + Math.random() * 900000),
+                  membershipId: assignedMembershipId,
                   name: newMember.name || '',
                   phone: newMember.phone || '',
                   email: newMember.email || '',
