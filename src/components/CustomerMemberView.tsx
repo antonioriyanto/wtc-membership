@@ -570,7 +570,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   {/* Photo Placeholder */}
                   <div className="w-full h-32 bg-slate-100 overflow-hidden relative border-b border-slate-100">
                     <img 
-                      src={store.image || 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'} 
+                      src={store.imageUrl || (store as any).image || 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'} 
                       alt={store.name}
                       className="w-full h-full object-cover"
                     />

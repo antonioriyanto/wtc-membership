@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StoreBranch } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
+import { compressImage } from '../lib/image-compressor';
 import { Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, CheckCircle, AlertTriangle, ArrowLeft, Save, Receipt, Layers } from 'lucide-react';
 
 interface StoresSettingsTabProps {
@@ -29,6 +30,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
   }
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
+  const [isUploading, setIsUploading] = useState(false);
   
   // 'list' | 'create' | 'edit'
   const [mode, setMode] = useState<'list' | 'create' | 'edit'>('list');
@@ -87,6 +89,21 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const compressedBase64 = await compressImage(file, 1200, 800, 0.9);
+      setFormData({ ...formData, imageUrl: compressedBase64 });
+    } catch (err) {
+      console.error('Error compressing image:', err);
+      alert('Gagal mengupload dan mengkompres gambar.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.mallName) return;
@@ -110,7 +127,8 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
         todayPointsIssued: 0,
         activePromosCount: 2,
         operatingHours: formData.operatingHours || '10:00 - 22:00 WIB',
-        description: formData.description || 'Official Watch Club boutique.'
+        description: formData.description || 'Official Watch Club boutique.',
+        imageUrl: formData.imageUrl
       };
       try {
         const res = await fetch('/api/stores', {
@@ -345,6 +363,32 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
                 className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white resize-y min-h-[60px]"
                 placeholder="Description displayed on customer app store locator..."
               ></textarea>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+                Store Image (Appears in Customer App)
+              </label>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="file" 
+                  accept="image/png, image/jpeg, image/jpg, image/webp"
+                  onChange={handleImageUpload}
+                  disabled={isUploading}
+                  className="block w-full text-xs text-slate-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-xs file:font-semibold
+                    file:bg-slate-100 file:text-slate-700
+                    hover:file:bg-slate-200"
+                />
+                {isUploading && <span className="text-slate-600 font-bold text-xs animate-pulse">Compressing...</span>}
+              </div>
+              {formData.imageUrl && (
+                <div className="mt-3 relative rounded-xl overflow-hidden border border-slate-200 w-full max-w-[200px] aspect-[4/3]">
+                  <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
             </div>
 
             <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">

@@ -118,6 +118,7 @@ export interface StoreBranch {
   latitude?: number;
   longitude?: number;
   distance?: number; // Temporary UI field
+  imageUrl?: string;
   id: string;
   code: string;
   name: string;
