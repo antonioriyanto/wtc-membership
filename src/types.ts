@@ -68,8 +68,11 @@ export interface Campaign {
   targetAudience: 'ALL' | 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK' | 'INACTIVE';
   content: string;
   bannerImage?: string;
+  popupImage?: string;
   badgeText?: string;
   voucherCode?: string;
+  startAt?: string;
+  endAt?: string;
   scheduledAt?: string;
   sentCount: number;
   openCount?: number;

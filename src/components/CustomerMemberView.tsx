@@ -134,20 +134,34 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const canGoBack = activeTab !== 'MEMBERSHIP' || tabHistory.length > 0 || isQrModalOpen || isHistoryModalOpen || !!selectedVoucherForQr || !!activeCampaignModal || isSupportModalOpen;
 
   // Push-pop campaign detection
-  const activePromoCampaign = useMemo(() => {
-    if (!campaigns || campaigns.length === 0) return null;
-    return campaigns.find(c => 
+  const activePromoCampaigns = useMemo(() => {
+    if (!campaigns || campaigns.length === 0) return [];
+    return campaigns.filter(c => 
       c.status === 'ACTIVE' && 
-      (c.targetAudience === 'ALL' || c.targetAudience === member.tier)
-    ) || null;
+      (c.targetAudience === 'ALL' || c.targetAudience === member.tier) &&
+      (!c.endAt || new Date(c.endAt).getTime() >= Date.now()) // Double check expiration
+    );
   }, [campaigns, member.tier]);
 
+  const popupCampaign = useMemo(() => {
+    return activePromoCampaigns.find(c => c.showAsPopupOnApp) || null;
+  }, [activePromoCampaigns]);
+
   useEffect(() => {
-    if (!hasShownCampaignOnLoad && activePromoCampaign && activePromoCampaign.showAsPopupOnApp) {
-      setActiveCampaignModal(activePromoCampaign);
+    if (!hasShownCampaignOnLoad && popupCampaign) {
+      setActiveCampaignModal(popupCampaign);
       setHasShownCampaignOnLoad(true);
     }
-  }, [activePromoCampaign, hasShownCampaignOnLoad]);
+  }, [popupCampaign, hasShownCampaignOnLoad]);
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+  useEffect(() => {
+    if (activePromoCampaigns.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlide(s => (s + 1) % activePromoCampaigns.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activePromoCampaigns]);
 
   const myTickets = useMemo(() => {
     if (!tickets) return [];
@@ -283,33 +297,38 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
         {activeTab === 'MEMBERSHIP' && (
           <div className="animate-fadeIn pb-5">
-            {/* ACTIVE CAMPAIGN PROMO STRIP (IF ANY) */}
-            {activePromoCampaign && (
-              <div 
-                onClick={() => setActiveCampaignModal(activePromoCampaign)}
-                className="mx-5 mt-2 p-3 rounded-2xl text-white shadow-md cursor-pointer hover:scale-[1.01] transition-transform flex items-center justify-between gap-3 border border-white/20 relative overflow-hidden"
-                style={{
-                  backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.9)), url(${activePromoCampaign.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
-              >
-                <div className="flex items-center gap-2.5 min-w-0 relative z-10">
-                  <div className="w-7 h-7 rounded-lg bg-white/20 border border-white/30 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-amber-300">
-                      {activePromoCampaign.badgeText || 'PROMO KHUSUS MEMBER'}
+            {/* ACTIVE CAMPAIGN CAROUSEL */}
+            {activePromoCampaigns.length > 0 && (
+              <div className="mx-5 mt-4 relative rounded-2xl overflow-hidden bg-slate-100 aspect-[20/7] shadow-md group">
+                <div 
+                  className="flex w-full h-full transition-transform duration-500 ease-out"
+                  style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                >
+                  {activePromoCampaigns.map((camp, idx) => (
+                    <div 
+                      key={camp.id} 
+                      className="w-full h-full flex-shrink-0 relative cursor-pointer"
+                      onClick={() => setActiveCampaignModal(camp)}
+                    >
+                      <img 
+                        src={camp.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'} 
+                        alt={camp.name}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                    <div className="text-xs font-bold truncate text-white">
-                      {activePromoCampaign.headline || activePromoCampaign.name}
-                    </div>
-                  </div>
+                  ))}
                 </div>
-                <span className="text-[10px] font-bold px-2 py-1 bg-white/20 hover:bg-white/30 rounded-lg shrink-0 transition-colors relative z-10">
-                  Klaim Promo →
-                </span>
+                {/* Dots indicator */}
+                {activePromoCampaigns.length > 1 && (
+                  <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10">
+                    {activePromoCampaigns.map((_, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`h-1.5 rounded-full transition-all duration-300 ${currentSlide === idx ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -794,7 +813,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 <X className="w-4 h-4" />
               </button>
 
-              {/* 3:4 Banner Image Popup */}
+              {/* Banner Image Popup */}
               <div 
                 className="relative w-full aspect-[3/4] bg-slate-950 overflow-hidden cursor-pointer group"
                 onClick={() => {
@@ -803,29 +822,10 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 }}
               >
                 <img 
-                  src={activeCampaignModal.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'} 
-                  alt={activeCampaignModal.headline || activeCampaignModal.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  src={activeCampaignModal.popupImage || activeCampaignModal.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'} 
+                  alt={activeCampaignModal.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 block"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/20 to-transparent flex flex-col justify-end p-6 text-left">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-extrabold uppercase tracking-wider text-amber-300 mb-2 w-max">
-                    <Sparkles className="w-3 h-3 text-amber-300" />
-                    {activeCampaignModal.badgeText || 'PROMO SPESIAL'}
-                  </div>
-                  <h3 className="text-base font-black leading-tight text-white mb-3">
-                    {activeCampaignModal.headline || activeCampaignModal.name}
-                  </h3>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveCampaignModal(null);
-                      handleTabChange('REWARDS');
-                    }}
-                    className="w-full py-3 bg-white hover:bg-slate-100 text-slate-950 font-bold rounded-xl transition-colors cursor-pointer shadow-lg text-xs"
-                  >
-                    Gunakan & Lihat Rewards
-                  </button>
-                </div>
               </div>
             </div>
           </div>

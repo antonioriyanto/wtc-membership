@@ -17,6 +17,7 @@ import {
   AlertCircle,
   BellRing
 } from 'lucide-react';
+import { compressImage } from '../lib/image-compressor';
 import { Campaign, Voucher } from '../types';
 
 interface CampaignsTabProps {
@@ -53,46 +54,72 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
   }
   const [search, setSearch] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Form states for new campaign
   const [name, setName] = useState('');
-  const [headline, setHeadline] = useState('');
-  const [content, setContent] = useState('');
-  const [bannerImage, setBannerImage] = useState('https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80');
+  const [bannerImage, setBannerImage] = useState('');
+  const [popupImage, setPopupImage] = useState('');
   const [targetAudience, setTargetAudience] = useState<Campaign['targetAudience']>('ALL');
-  const [voucherCode, setVoucherCode] = useState('');
-  const [badgeText, setBadgeText] = useState('🔥 PROMO SPESIAL MEMBER');
+  const [startAt, setStartAt] = useState('');
+  const [endAt, setEndAt] = useState('');
   const [showAsPopupOnApp, setShowAsPopupOnApp] = useState(true);
-  const [initialActive, setInitialActive] = useState(true);
 
-  const filteredCampaigns = campaigns.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.headline && c.headline.toLowerCase().includes(search.toLowerCase())) ||
-    c.content.toLowerCase().includes(search.toLowerCase())
+  // Filter out expired campaigns automatically based on endAt
+  const validCampaigns = campaigns.map(c => {
+    if (c.endAt && new Date(c.endAt).getTime() < Date.now() && c.status === 'ACTIVE') {
+      return { ...c, status: 'COMPLETED' as const };
+    }
+    return c;
+  });
+
+  const filteredCampaigns = validCampaigns.filter(c => 
+    c.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const activeCount = campaigns.filter(c => c.status === 'ACTIVE').length;
-  const popupCount = campaigns.filter(c => c.status === 'ACTIVE' && c.showAsPopupOnApp).length;
+  const activeCount = validCampaigns.filter(c => c.status === 'ACTIVE').length;
+  const popupCount = validCampaigns.filter(c => c.status === 'ACTIVE' && c.showAsPopupOnApp).length;
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'popup') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      // Compress to max 1200px width/height for good quality, 90% quality jpeg
+      const compressedBase64 = await compressImage(file, 1200, 1200, 0.9);
+      if (type === 'banner') {
+        setBannerImage(compressedBase64);
+      } else {
+        setPopupImage(compressedBase64);
+      }
+    } catch (err) {
+      console.error('Error compressing image:', err);
+      alert('Gagal mengupload dan mengkompres gambar.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !content.trim()) return;
+    if (!name.trim() || !bannerImage || (showAsPopupOnApp && !popupImage)) {
+      alert('Mohon lengkapi gambar yang dibutuhkan.');
+      return;
+    }
 
     const newCamp: Campaign = {
       id: 'CMP-' + Math.floor(1000 + Math.random() * 9000),
       name: name.trim(),
-      headline: headline.trim() || name.trim(),
       type: 'POPUP_BANNER',
-      status: initialActive ? 'ACTIVE' : 'DRAFT',
+      status: 'ACTIVE',
       targetAudience,
-      content: content.trim(),
-      badgeText: badgeText.trim() || '🔥 PROMO SPESIAL',
-      voucherCode: voucherCode.trim() || '',
-      bannerImage: bannerImage.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80',
+      content: '', // No longer used
+      bannerImage,
+      popupImage,
       showAsPopupOnApp,
-      sentCount: initialActive ? 15420 : 0,
-      openCount: initialActive ? 8420 : 0,
-      clickCount: initialActive ? 3210 : 0
+      startAt: startAt || new Date().toISOString(),
+      endAt: endAt || '',
+      sentCount: 0,
     };
 
     onAddCampaign(newCamp);
@@ -100,10 +127,10 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
 
     // Reset form
     setName('');
-    setHeadline('');
-    setContent('');
-    setBannerImage('https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80');
-    setVoucherCode('');
+    setBannerImage('');
+    setPopupImage('');
+    setStartAt('');
+    setEndAt('');
   };
 
   return (
@@ -213,14 +240,18 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                     <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Name & Headline */}
                       <td className="py-4 px-5">
-                        <div className="font-bold text-slate-900 text-sm">{c.name}</div>
-                        {c.headline && (
-                          <div className="text-xs text-emerald-800 font-semibold mt-0.5">
-                            "{c.headline}"
+                        <div className="flex items-center gap-3">
+                          {c.bannerImage && (
+                            <img src={c.bannerImage} alt={c.name} className="w-16 h-9 object-cover rounded-md border border-slate-200" />
+                          )}
+                          <div>
+                            <div className="font-bold text-slate-900 text-sm">{c.name}</div>
+                            {(c.startAt || c.endAt) && (
+                              <div className="text-xs text-slate-500 mt-1">
+                                {c.startAt ? new Date(c.startAt).toLocaleDateString('id-ID') : '-'} s/d {c.endAt ? new Date(c.endAt).toLocaleDateString('id-ID') : '-'}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        <div className="text-slate-500 mt-1 line-clamp-1 max-w-md">
-                          {c.content}
                         </div>
                       </td>
 
@@ -313,101 +344,91 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                  Nama Kampanye (Internal HO) *
+                  Nama Kampanye (Internal) *
                 </label>
                 <input 
                   type="text" 
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Contoh: Promo Spesial Anniversary Watch Club 2026"
+                  placeholder="Contoh: Promo Diskon 50%"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
                 />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                  Judul Pop-up Banner (Dilihat Pelanggan) *
-                </label>
-                <input 
-                  type="text" 
-                  required
-                  value={headline}
-                  onChange={(e) => setHeadline(e.target.value)}
-                  placeholder="Contoh: Dapatkan Tambahan Diskon 20% Koleksi Eksklusif!"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-slate-400 focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                  Isi Pesan Promosi *
-                </label>
-                <textarea 
-                  required
-                  rows={3}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Contoh: Berlaku khusus untuk member setia di seluruh gerai Watch Club Indonesia. Tunjukkan kode voucher di kasir saat pembayaran."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                  URL Gambar Banner Pop-up (Rasio 3:4 JPG/PNG) *
-                </label>
-                <input 
-                  type="text" 
-                  required
-                  value={bannerImage}
-                  onChange={(e) => setBannerImage(e.target.value)}
-                  placeholder="https://images.unsplash.com/photo-..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white text-[11px]"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">Gambar vertikal rasio 3:4 yang akan muncul sebagai pop-up utama saat customer login & latar belakang notifikasi.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                    Target Audiens Tier
+                    Tanggal Mulai *
                   </label>
-                  <select 
-                    value={targetAudience}
-                    onChange={(e) => setTargetAudience(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none"
-                  >
-                    <option value="ALL">Semua Member (All)</option>
-                    <option value="BLUE">Khusus Blue</option>
-                    <option value="SILVER">Khusus Silver</option>
-                    <option value="GOLD">Khusus Gold</option>
-                    <option value="PLATINUM">Khusus Platinum</option>
-                    <option value="DIAMOND">Khusus Diamond</option>
-                    <option value="BLACK">Khusus Black</option>
-                  </select>
+                  <input 
+                    type="date"
+                    required
+                    value={startAt}
+                    onChange={(e) => setStartAt(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none"
+                  />
                 </div>
-
                 <div>
                   <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                    Tautkan Kode Voucher
+                    Tanggal Berakhir *
                   </label>
-                  <select
-                    value={voucherCode}
-                    onChange={(e) => setVoucherCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:outline-none"
-                  >
-                    <option value="">-- Tanpa Voucher --</option>
-                    {vouchers.map(v => (
-                      <option key={v.id} value={v.code}>
-                        {v.code} ({v.title})
-                      </option>
-                    ))}
-                  </select>
+                  <input 
+                    type="date"
+                    required
+                    value={endAt}
+                    onChange={(e) => setEndAt(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none"
+                  />
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Gambar Banner Promo (Landscape 20:7) *
+                </label>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="file" 
+                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    onChange={(e) => handleImageUpload(e, 'banner')}
+                    disabled={isUploading}
+                    className="block w-full text-xs text-slate-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-xs file:font-semibold
+                      file:bg-purple-50 file:text-purple-700
+                      hover:file:bg-purple-100"
+                  />
+                  {isUploading && <span className="text-purple-600 font-bold text-xs animate-pulse">Compressing...</span>}
+                </div>
+                {bannerImage && (
+                  <div className="mt-3 relative rounded-xl overflow-hidden border border-slate-200 w-full aspect-[20/7]">
+                    <img src={bannerImage} alt="Preview Banner" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Target Audiens Tier
+                </label>
+                <select 
+                  value={targetAudience}
+                  onChange={(e) => setTargetAudience(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none"
+                >
+                  <option value="ALL">Semua Member (All)</option>
+                  <option value="BLUE">Khusus Blue</option>
+                  <option value="SILVER">Khusus Silver</option>
+                  <option value="GOLD">Khusus Gold</option>
+                  <option value="PLATINUM">Khusus Platinum</option>
+                  <option value="DIAMOND">Khusus Diamond</option>
+                  <option value="BLACK">Khusus Black</option>
+                </select>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -416,20 +437,36 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                     className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4"
                   />
                   <span className="font-bold text-slate-800">
-                    Tampilkan Push-Pop Banner saat member buka web app
+                    Tampilkan Pop-up Banner saat member login
                   </span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={initialActive}
-                    onChange={(e) => setInitialActive(e.target.checked)}
-                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
-                  />
-                  <span className="font-bold text-slate-800">
-                    Aktifkan kampanye sekarang juga
-                  </span>
-                </label>
+
+                {showAsPopupOnApp && (
+                  <div className="pt-2 border-t border-slate-200/60">
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Gambar Pop-up (Potret 3:4) *
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="file" 
+                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                        onChange={(e) => handleImageUpload(e, 'popup')}
+                        disabled={isUploading}
+                        className="block w-full text-xs text-slate-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-xs file:font-semibold
+                          file:bg-emerald-50 file:text-emerald-700
+                          hover:file:bg-emerald-100"
+                      />
+                    </div>
+                    {popupImage && (
+                      <div className="mt-3 relative rounded-xl overflow-hidden border border-slate-200 max-w-[150px] aspect-[3/4]">
+                        <img src={popupImage} alt="Preview Pop-up" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
@@ -442,7 +479,8 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold cursor-pointer transition-colors shadow-xs"
+                  disabled={!bannerImage || isUploading}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold cursor-pointer transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Simpan & Luncurkan
                 </button>
