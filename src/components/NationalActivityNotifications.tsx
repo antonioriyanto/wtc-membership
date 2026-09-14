@@ -21,6 +21,7 @@ import {
   Receipt
 } from 'lucide-react';
 import { StoreBranch, Transaction, Member } from '../types';
+import { Portal } from './Portal';
 
 export interface StoreActivityItem {
   id: string;
@@ -78,9 +79,35 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
   // Generate a nationwide real-time activity stream combining transactions, members, and nationwide store events
   const activityList = useMemo<StoreActivityItem[]>(() => {
     const list: StoreActivityItem[] = [];
+    const seenTxIds = new Set<string>();
+    const seenReceipts = new Set<string>();
 
-    // 1. Map existing actual transactions across Indonesia
-    transactions.forEach((tx, idx) => {
+    const getRealTimeAgo = (isoDate: string) => {
+      const parsedTime = new Date(isoDate).getTime();
+      if (isNaN(parsedTime)) return 'Baru saja';
+      const diffMs = Date.now() - parsedTime;
+      const m = Math.floor(diffMs / 60000);
+      if (m < 1) return 'Baru saja';
+      if (m < 60) return `${m} menit lalu`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h} jam lalu`;
+      const d = Math.floor(h / 24);
+      return `${d} hari lalu`;
+    };
+
+    // 1. Map existing actual transactions across Indonesia with strict deduplication
+    transactions.forEach((tx) => {
+      if (!tx || !tx.id) return;
+      if (seenTxIds.has(tx.id)) return;
+      seenTxIds.add(tx.id);
+
+      // Deduplicate identical receipts within transactions
+      if (tx.receiptNo && tx.receiptNo.trim() !== '') {
+        const receiptKey = `${tx.receiptNo.trim().toUpperCase()}_${tx.memberId}`;
+        if (seenReceipts.has(receiptKey)) return;
+        seenReceipts.add(receiptKey);
+      }
+
       const storeObj = stores.find(s => s.id === tx.storeId || s.name === tx.storeName || s.code === tx.storeId);
       const isEarn = tx.type === 'EARN';
       const isRedeem = tx.type === 'REDEEM' || tx.type === 'VOUCHER_DISCOUNT';
@@ -105,7 +132,7 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
         amount: tx.amount,
         pointsDelta: tx.pointsDelta,
         timestamp: tx.timestamp,
-        timeAgo: idx === 0 ? 'Baru saja' : idx < 3 ? `${idx * 4} menit lalu` : `${idx * 15} menit lalu`,
+        timeAgo: getRealTimeAgo(tx.timestamp),
         isRead: effectiveReadIds.has(`tx-act-${tx.id}`),
         notes: tx.notes || `Diproses kasir ${tx.cashierName}`
       });
@@ -319,12 +346,13 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity cursor-pointer" 
-        onClick={onClose}
-      />
+    <Portal>
+      <div className="fixed inset-0 z-[9999] flex justify-end">
+        {/* Backdrop */}
+        <div 
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity cursor-pointer" 
+          onClick={onClose}
+        />
 
       {/* Drawer */}
       <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden transform transition-transform animate-slideInRight">
@@ -462,7 +490,7 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
 
       {/* DETAIL MODAL FOR SELECTED ACTIVITY */}
       {selectedActivity && (
-        <div className="fixed inset-0 z-60 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-scaleUp">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
@@ -567,6 +595,7 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </Portal>
   );
 };

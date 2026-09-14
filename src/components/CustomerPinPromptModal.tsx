@@ -3,6 +3,7 @@ import { Lock, ShieldCheck, AlertCircle, X, Delete } from 'lucide-react';
 import { Member } from '../types';
 import { verifyCustomerPinClient } from '../lib/memberAuthClient';
 import { isAccountLocked } from '../lib/canonicalMember';
+import { Portal } from './Portal';
 
 interface CustomerPinPromptModalProps {
   isOpen: boolean;
@@ -136,8 +137,9 @@ export const CustomerPinPromptModal: React.FC<CustomerPinPromptModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl p-6 text-white relative">
+    <Portal>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+        <div className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl p-6 text-white relative">
         
         {/* CLOSE BUTTON */}
         <button
@@ -279,5 +281,6 @@ export const CustomerPinPromptModal: React.FC<CustomerPinPromptModalProps> = ({
 
       </div>
     </div>
+    </Portal>
   );
 };

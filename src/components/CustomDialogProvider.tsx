@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, HelpCircle, X } from 'lucide-react';
+import { Portal } from './Portal';
 
 interface DialogOptions {
   title?: string;
@@ -73,8 +74,9 @@ export const CustomDialogProvider: React.FC<{ children: ReactNode }> = ({ childr
     <DialogContext.Provider value={{ showAlert, showConfirm }}>
       {children}
       {isOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[99999] flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 transform transition-all scale-100 animate-scaleUp overflow-hidden">
+        <Portal>
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[99999] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 transform transition-all scale-100 animate-scaleUp overflow-hidden">
             <div className="flex items-start gap-4">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
                 dialogConfig.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
@@ -126,6 +128,7 @@ export const CustomDialogProvider: React.FC<{ children: ReactNode }> = ({ childr
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </DialogContext.Provider>
   );

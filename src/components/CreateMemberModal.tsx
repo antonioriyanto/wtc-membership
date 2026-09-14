@@ -3,6 +3,7 @@ import { X, UserPlus, Phone, User, Mail, Calendar, AlertCircle, Store, Mars, Ven
 import { Member } from '../types';
 import { findMemberByPhoneInFirestore, isSamePhoneNumber, normalizePhoneNumber } from '../lib/syncFirestore';
 import { generateSequentialMembershipId } from '../lib/canonicalMember';
+import { Portal } from './Portal';
 
 export const OFFICIAL_STORES = [
   "23 Paskal Bandung",
@@ -168,8 +169,9 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scaleUp border border-slate-200 dark:border-slate-700">
+    <Portal>
+      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scaleUp border border-slate-200 dark:border-slate-700">
         <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-700">
           <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -323,5 +325,6 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
         </form>
       </div>
     </div>
+    </Portal>
   );
 };

@@ -5,6 +5,7 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 import { TierBadge } from '../utils/tierBadge';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { CashierPinResetModal } from './CashierPinResetModal';
+import { Portal } from './Portal';
 
 interface CashierTabProps {
   isSubmitting?: boolean;
@@ -35,6 +36,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
   const [searchInput, setSearchInput] = useState('');
   const [activeMember, setActiveMember] = useState<Member | null>(null);
   const [isResetPinOpen, setIsResetPinOpen] = useState(false);
+  const isSubmittingPointsRef = useRef(false);
 
   useEffect(() => {
     if (autoSelectMemberId && members.length > 0) {
@@ -138,11 +140,23 @@ export const CashierTab: React.FC<CashierTabProps> = ({
   });
 
   const handleAddPointsSubmit = () => {
-    if (!activeMember || !receiptInput || parsedAmount <= 0 || isSubmitting) return;
-    onAddPoints(activeMember.id, parsedAmount, receiptInput);
+    if (!activeMember || !receiptInput || parsedAmount <= 0 || isSubmitting || isSubmittingPointsRef.current) return;
+    isSubmittingPointsRef.current = true;
+    const currentMemberId = activeMember.id;
+    const currentAmount = parsedAmount;
+    const currentReceipt = receiptInput;
+
     setReceiptInput('');
     setAmountInput('');
     setActiveMember(null);
+
+    try {
+      onAddPoints(currentMemberId, currentAmount, currentReceipt);
+    } finally {
+      setTimeout(() => {
+        isSubmittingPointsRef.current = false;
+      }, 1000);
+    }
   };
 
   const executeClaimVoucher = (rawCode: string) => {
@@ -461,138 +475,146 @@ export const CashierTab: React.FC<CashierTabProps> = ({
 
       {/* MODAL SCANNER KAMERA */}
       {isScannerOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-[20px] p-6 max-w-sm w-full text-center border border-slate-200 dark:border-slate-700">
-            <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-white">Pindai QR Code Member</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Arahkan layar HP customer ke kamera ini.</p>
-            <div id="reader" className="w-full mb-4 rounded-xl overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-600"></div>
-            <button onClick={() => setIsScannerOpen(false)} className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200">
-              Tutup
-            </button>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex justify-center items-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-[20px] p-6 max-w-sm w-full text-center border border-slate-200 dark:border-slate-700">
+              <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-white">Pindai QR Code Member</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Arahkan layar HP customer ke kamera ini.</p>
+              <div id="reader" className="w-full mb-4 rounded-xl overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-600"></div>
+              <button onClick={() => setIsScannerOpen(false)} className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200">
+                Tutup
+              </button>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* MODAL NOT FOUND */}
       {isNotFoundOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-[20px] p-8 max-w-sm w-full text-center border border-slate-200 dark:border-slate-700">
-            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/60 text-amber-500 rounded-full flex justify-center items-center mx-auto mb-4 text-3xl font-bold">!</div>
-            <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-white">Member Tidak Ditemukan</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Nomor HP atau ID Member tidak terdaftar di sistem. Silakan daftarkan member baru.</p>
-            <div className="flex gap-3 justify-center">
-              <button onClick={() => setIsNotFoundOpen(false)} className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200">
-                Kembali
-              </button>
-              <button onClick={() => { setIsNotFoundOpen(false); onOpenCreateMember(); }} className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700">
-                Daftar Member
-              </button>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex justify-center items-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-[20px] p-8 max-w-sm w-full text-center border border-slate-200 dark:border-slate-700">
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/60 text-amber-500 rounded-full flex justify-center items-center mx-auto mb-4 text-3xl font-bold">!</div>
+              <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-white">Member Tidak Ditemukan</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Nomor HP atau ID Member tidak terdaftar di sistem. Silakan daftarkan member baru.</p>
+              <div className="flex gap-3 justify-center">
+                <button onClick={() => setIsNotFoundOpen(false)} className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200">
+                  Kembali
+                </button>
+                <button onClick={() => { setIsNotFoundOpen(false); onOpenCreateMember(); }} className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700">
+                  Daftar Member
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* MODAL REDEEM VOUCHER DENGAN TOMBOL KLAIM & SCANNER OTOMATIS */}
       {isRedeemOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-800 rounded-[24px] p-7 max-w-md w-full text-center border border-slate-200 dark:border-slate-700 shadow-2xl">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
-              <Tag className="w-6 h-6" />
-            </div>
-            
-            <h3 className="font-bold text-xl mb-1 text-slate-900 dark:text-white">Klaim & Redeem Voucher</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
-              Masukkan kode voucher atau pindai barcode dari layar handphone pelanggan.
-            </p>
-            
-            {activeMember && (
-              <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-left flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Pelanggan Aktif</p>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">{activeMember.name} ({activeMember.phone})</p>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex justify-center items-center p-4 animate-fadeIn">
+            <div className="bg-white dark:bg-slate-800 rounded-[24px] p-7 max-w-md w-full text-center border border-slate-200 dark:border-slate-700 shadow-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
+                <Tag className="w-6 h-6" />
+              </div>
+              
+              <h3 className="font-bold text-xl mb-1 text-slate-900 dark:text-white">Klaim & Redeem Voucher</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+                Masukkan kode voucher atau pindai barcode dari layar handphone pelanggan.
+              </p>
+              
+              {activeMember && (
+                <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-left flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Pelanggan Aktif</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{activeMember.name} ({activeMember.phone})</p>
+                  </div>
+                  <span className="text-xs font-bold px-2 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded">
+                    {(activeMember.points || 0).toLocaleString('id-ID')} Poin
+                  </span>
                 </div>
-                <span className="text-xs font-bold px-2 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded">
-                  {(activeMember.points || 0).toLocaleString('id-ID')} Poin
-                </span>
-              </div>
-            )}
+              )}
 
-            <div className="space-y-3 mb-6">
-              <div className="relative">
-                <Barcode className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                  ref={voucherInputRef}
-                  type="text" 
-                  value={voucherInput}
-                  onChange={(e) => setVoucherInput(e.target.value)}
-                  onKeyDown={handleVoucherKeyDown}
-                  className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-900 border-2 border-emerald-500 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-center font-mono font-bold text-lg tracking-wider"
-                  placeholder="Contoh: WTC-0826"
-                  autoComplete="off"
-                />
-              </div>
+              <div className="space-y-3 mb-6">
+                <div className="relative">
+                  <Barcode className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    ref={voucherInputRef}
+                    type="text" 
+                    value={voucherInput}
+                    onChange={(e) => setVoucherInput(e.target.value)}
+                    onKeyDown={handleVoucherKeyDown}
+                    className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-900 border-2 border-emerald-500 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-center font-mono font-bold text-lg tracking-wider"
+                    placeholder="Contoh: WTC-0826"
+                    autoComplete="off"
+                  />
+                </div>
 
-              <div className="flex gap-2">
-                <button
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVoucherInput('WTC-0826')}
+                    className="flex-1 py-1.5 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors"
+                  >
+                    WTC-0826 (17% Promo Kemerdekaan)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVoucherInput('WC-WELCOME20')}
+                    className="flex-1 py-1.5 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors"
+                  >
+                    WC-WELCOME20 (20% Welcome)
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button 
                   type="button"
-                  onClick={() => setVoucherInput('WTC-0826')}
-                  className="flex-1 py-1.5 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors"
+                  onClick={() => setIsRedeemOpen(false)} 
+                  className="flex-1 py-3 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                 >
-                  WTC-0826 (17% Promo Kemerdekaan)
+                  Batal
                 </button>
-                <button
+                <button 
                   type="button"
-                  onClick={() => setVoucherInput('WC-WELCOME20')}
-                  className="flex-1 py-1.5 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors"
+                  disabled={!voucherInput.trim()}
+                  onClick={() => executeClaimVoucher(voucherInput)}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                 >
-                  WC-WELCOME20 (20% Welcome)
+                  <CheckCircle className="w-4 h-4" /> Klaim
                 </button>
               </div>
+              <p className="text-[0.75rem] text-slate-400 dark:text-slate-500 mt-3">
+                *Scanner barcode akan otomatis memicu klaim saat selesai membaca kode, atau tekan Enter.
+              </p>
             </div>
-            
-            <div className="flex gap-3">
-              <button 
-                type="button"
-                onClick={() => setIsRedeemOpen(false)} 
-                className="flex-1 py-3 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                Batal
-              </button>
-              <button 
-                type="button"
-                disabled={!voucherInput.trim()}
-                onClick={() => executeClaimVoucher(voucherInput)}
-                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="w-4 h-4" /> Klaim
-              </button>
-            </div>
-            <p className="text-[0.75rem] text-slate-400 dark:text-slate-500 mt-3">
-              *Scanner barcode akan otomatis memicu klaim saat selesai membaca kode, atau tekan Enter.
-            </p>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* MODAL VOUCHER ERROR */}
       {isVoucherErrorOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-[20px] p-8 max-w-sm w-full text-center border border-slate-200 dark:border-slate-700">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-950/60 text-red-500 rounded-full flex justify-center items-center mx-auto mb-4 text-3xl font-bold">
-              <AlertTriangle className="w-8 h-8" />
+        <Portal>
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex justify-center items-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-[20px] p-8 max-w-sm w-full text-center border border-slate-200 dark:border-slate-700">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-950/60 text-red-500 rounded-full flex justify-center items-center mx-auto mb-4 text-3xl font-bold">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-white">Klaim Gagal</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                {voucherErrorMsg || 'Maaf, kode voucher ini sudah pernah digunakan sebelumnya atau tidak valid.'}
+              </p>
+              <button 
+                onClick={() => setIsVoucherErrorOpen(false)} 
+                className="px-8 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors"
+              >
+                Mengerti
+              </button>
             </div>
-            <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-white">Klaim Gagal</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-              {voucherErrorMsg || 'Maaf, kode voucher ini sudah pernah digunakan sebelumnya atau tidak valid.'}
-            </p>
-            <button 
-              onClick={() => setIsVoucherErrorOpen(false)} 
-              className="px-8 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors"
-            >
-              Mengerti
-            </button>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* CASHIER IN-STORE OVERRIDE PIN RESET MODAL */}

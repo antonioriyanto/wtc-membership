@@ -155,7 +155,25 @@ export default function App() {
       const saved = localStorage.getItem('wtc_transactions');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const seen = new Set<string>();
+          const seenReceipts = new Set<string>();
+          const deduped = parsed
+            .sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+            .filter((t: any) => {
+              if (!t || !t.id || seen.has(t.id)) return false;
+              
+              if (t.receiptNo && t.type === 'EARN') {
+                const rKey = `${t.receiptNo.trim().toUpperCase()}_${t.memberId}`;
+                if (seenReceipts.has(rKey)) return false;
+                seenReceipts.add(rKey);
+              }
+              
+              seen.add(t.id);
+              return true;
+            });
+          return deduped;
+        }
       }
     } catch {}
     return initialTransactions;

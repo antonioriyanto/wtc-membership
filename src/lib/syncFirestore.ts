@@ -119,8 +119,26 @@ export function setupFirestoreListeners(callbacks: any) {
 
   collections.forEach(({ name, set, storageKey }) => {
     const unsub = onSnapshot(collection(db, name), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (data.length > 0) {
+        if (name === 'transactions') {
+          const seenIds = new Set<string>();
+          const seenReceipts = new Set<string>();
+          data = data.sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+            .filter((t: any) => {
+              if (!t || !t.id || seenIds.has(t.id)) return false;
+              
+              // Deduplicate by receipt number and member to clean up past glitches
+              if (t.receiptNo && t.type === 'EARN') {
+                const rKey = `${t.receiptNo.trim().toUpperCase()}_${t.memberId}`;
+                if (seenReceipts.has(rKey)) return false;
+                seenReceipts.add(rKey);
+              }
+              
+              seenIds.add(t.id);
+              return true;
+            });
+        }
         set(data);
         if (storageKey) {
           try {

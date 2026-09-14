@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Member, Transaction, StoreBranch, Voucher } from '../types';
 import { calculateTier } from '../lib/loyalty';
 import { CashierSidebar } from './CashierSidebar';
@@ -48,6 +48,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
   const { showAlert } = useCustomDialog();
   const [activeTab, setActiveTab] = useState<CashierTabType>('cashier');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [isCreateMemberOpen, setIsCreateMemberOpen] = useState(false);
   const [autoSelectMemberId, setAutoSelectMemberId] = useState<string | undefined>(undefined);
 
@@ -88,63 +89,85 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
   }, [transactions, currentStore]);
 
   const handleAddPoints = async (memberId: string, amount: number, receiptNo: string) => {
-    if (isSubmitting) return;
+    if (isSubmittingRef.current || isSubmitting) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
-    const member = members.find(m => m.id === memberId || m.membershipId === memberId || m.phone === memberId);
-    if (!member) {
-      setIsSubmitting(false);
-      return;
-    }
-
-    const calculatedPoints = Math.max(1, Math.floor(amount / 1000));
-    const newPoints = (member.points || 0) + calculatedPoints;
-    const newLifetime = (member.lifetimePoints || 0) + calculatedPoints;
-    const newTotalSpend = (member.totalSpend || 0) + amount;
-
-    let savedTrx: Transaction = {
-      id: 'tx_' + Date.now(),
-      receiptNo,
-      memberId: member.id,
-      memberName: member.name,
-      memberPhone: member.phone,
-      storeId: currentStore?.id || currentStore?.code || 'PUR',
-      storeName: currentStore?.name || 'Puri Jakarta',
-      cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
-      type: 'EARN',
-      amount: amount,
-      pointsDelta: calculatedPoints,
-      timestamp: new Date().toISOString()
-    };
-
-    let updatedMember: Member = {
-      ...member,
-      points: newPoints,
-      lifetimePoints: newLifetime,
-      totalSpend: newTotalSpend,
-      tier: calculateTier(newPoints),
-      lastStoreVisited: currentStore?.name || member.lastStoreVisited,
-      lastVisitDate: new Date().toISOString()
-    };
 
     try {
-      await safeSetDoc('transactions', savedTrx.id, savedTrx);
-      await safeSetDoc('members', updatedMember.id, updatedMember);
-    } catch (e: any) {
-      console.warn("Backend API unavailable, transaction processed locally:", e);
-    }
+      const member = members.find(m => m.id === memberId || m.membershipId === memberId || m.phone === memberId);
+      if (!member) {
+        return;
+      }
 
-    setTransactions(prev => {
-      const next = [savedTrx, ...prev];
-      try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
-      return next;
-    });
-    setMembers(prev => {
-      const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
-      try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
-      return next;
-    });
-    showAlert(`Transaksi berhasil! +${savedTrx.pointsDelta} Poin ditambahkan ke ${updatedMember.name}.`, 'Transaksi Berhasil', 'success');
-    setIsSubmitting(false);
+      // Safeguard: Check if this exact receipt was already processed
+      const isDuplicateRecent = transactions.some(t => 
+        t.receiptNo && 
+        t.receiptNo.trim().toLowerCase() === receiptNo.trim().toLowerCase() && 
+        t.memberId === member.id
+      );
+      if (isDuplicateRecent) {
+        showAlert('Nomor struk ini sudah pernah ditukarkan poin sebelumnya.', 'Transaksi Ditolak', 'error');
+        return;
+      }
+
+      const calculatedPoints = Math.max(1, Math.floor(amount / 1000));
+      const newPoints = (member.points || 0) + calculatedPoints;
+      const newLifetime = (member.lifetimePoints || 0) + calculatedPoints;
+      const newTotalSpend = (member.totalSpend || 0) + amount;
+
+      const savedTrx: Transaction = {
+        id: 'tx_' + Date.now(),
+        receiptNo: receiptNo.trim(),
+        memberId: member.id,
+        memberName: member.name,
+        memberPhone: member.phone,
+        storeId: currentStore?.id || currentStore?.code || 'PUR',
+        storeName: currentStore?.name || 'Puri Jakarta',
+        cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
+        type: 'EARN',
+        amount: amount,
+        pointsDelta: calculatedPoints,
+        timestamp: new Date().toISOString()
+      };
+
+      const updatedMember: Member = {
+        ...member,
+        points: newPoints,
+        lifetimePoints: newLifetime,
+        totalSpend: newTotalSpend,
+        tier: calculateTier(newPoints),
+        lastStoreVisited: currentStore?.name || member.lastStoreVisited,
+        lastVisitDate: new Date().toISOString()
+      };
+
+      try {
+        await safeSetDoc('transactions', savedTrx.id, savedTrx);
+        await safeSetDoc('members', updatedMember.id, updatedMember);
+      } catch (e: any) {
+        console.warn("Backend API unavailable, transaction processed locally:", e);
+      }
+
+      setTransactions(prev => {
+        // Prevent duplicate if already in state by ID or identical receipt+member
+        if (prev.some(t => t.id === savedTrx.id || (t.receiptNo && t.receiptNo.trim().toLowerCase() === savedTrx.receiptNo.trim().toLowerCase() && t.memberId === savedTrx.memberId))) {
+          return prev;
+        }
+        const next = [savedTrx, ...prev.filter(t => t.id !== savedTrx.id)];
+        try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      setMembers(prev => {
+        const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
+        try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      showAlert(`Transaksi berhasil! +${savedTrx.pointsDelta} Poin ditambahkan ke ${updatedMember.name}.`, 'Transaksi Berhasil', 'success');
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const handleRedeemVoucher = (memberId: string, voucherCode: string) => {
@@ -262,7 +285,10 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
 
     // 4. Update Transactions & Members state
     setTransactions(prev => {
-      const next = [savedTrx, ...prev];
+      if (prev.some(t => t.id === savedTrx.id)) {
+        return prev;
+      }
+      const next = [savedTrx, ...prev.filter(t => t.id !== savedTrx.id)];
       try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
       return next;
     });

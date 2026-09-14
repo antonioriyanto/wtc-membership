@@ -30,6 +30,7 @@ import * as XLSX from 'xlsx';
 import { TierBadge } from '../utils/tierBadge';
 import { safeSetDoc } from '../lib/syncFirestore';
 import { CashierPinResetModal } from './CashierPinResetModal';
+import { Portal } from './Portal';
 
 interface MembersTabProps {
   members: Member[];
@@ -417,8 +418,10 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
 
       {/* MODAL VIEW MEMBER DETAILS */}
       {viewingMember && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-4 animate-fadeIn overflow-y-auto">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 my-auto">
+        <Portal>
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex justify-center items-center p-4 animate-fadeIn overflow-y-auto">
+            <div className="fixed inset-0" onClick={() => setViewingMember(null)} />
+            <div className="relative bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 my-auto z-10">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-700 mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-full bg-slate-900 dark:bg-emerald-600 text-white flex items-center justify-center font-bold text-base shadow-xs">
@@ -524,13 +527,16 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        </Portal>
       )}
 
       {/* MODAL EDIT MEMBER */}
       {editingMember && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-4 animate-fadeIn overflow-y-auto">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-700 my-auto">
+        <Portal>
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex justify-center items-center p-4 animate-fadeIn overflow-y-auto">
+            <div className="fixed inset-0" onClick={() => setEditingMember(null)} />
+            <div className="relative bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-700 my-auto z-10">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-700 mb-3.5">
               <div>
                 <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
@@ -670,7 +676,8 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </Portal>
       )}
 
       {/* CASHIER PIN RESET MODAL (OVERRIDE PROTOCOL) */}

@@ -19,6 +19,7 @@ import {
 import { Member, StoreBranch } from '../types';
 import { cashierAssistedPinResetClient } from '../lib/memberAuthClient';
 import { toE164, isAccountLocked } from '../lib/canonicalMember';
+import { Portal } from './Portal';
 
 interface CashierPinResetModalProps {
   isOpen: boolean;
@@ -164,12 +165,15 @@ export const CashierPinResetModal: React.FC<CashierPinResetModalProps> = ({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div 
-      id="modal-cashier-pin-override"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn overflow-y-auto"
-    >
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl text-slate-100 space-y-5 my-auto">
+    <Portal>
+      <div 
+        id="modal-cashier-pin-override"
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn overflow-y-auto"
+      >
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl text-slate-100 space-y-5 my-auto">
         
         {/* MODAL HEADER */}
         <div className="flex items-start justify-between border-b border-slate-800 pb-4">
@@ -472,5 +476,6 @@ export const CashierPinResetModal: React.FC<CashierPinResetModalProps> = ({
         )}
       </div>
     </div>
+    </Portal>
   );
 };
