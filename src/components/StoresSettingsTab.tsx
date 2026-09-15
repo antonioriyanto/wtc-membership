@@ -131,7 +131,9 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
         activePromosCount: 2,
         operatingHours: formData.operatingHours || '10:00 - 22:00 WIB',
         description: formData.description || 'Official Watch Club boutique.',
-        imageUrl: formData.imageUrl
+        imageUrl: formData.imageUrl,
+        latitude: formData.latitude,
+        longitude: formData.longitude
       };
       
       try {
@@ -315,6 +317,31 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
                 placeholder="Street address..."
                 required
               ></textarea>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">Latitude (GPS)</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={formData.latitude || ''}
+                  onChange={(e) => setFormData({ ...formData, latitude: Number(e.target.value) })}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white"
+                  placeholder="e.g. -6.200000"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">Longitude (GPS)</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={formData.longitude || ''}
+                  onChange={(e) => setFormData({ ...formData, longitude: Number(e.target.value) })}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white"
+                  placeholder="e.g. 106.816666"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

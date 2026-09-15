@@ -214,12 +214,66 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
   const progressPercent = Math.min(100, (member.points / nextTierPoints) * 100);
 
-  const filteredStores = stores.filter(s => 
-    s.name.toLowerCase().includes(storeSearch.toLowerCase()) ||
-    s.mallName.toLowerCase().includes(storeSearch.toLowerCase()) ||
-    s.city.toLowerCase().includes(storeSearch.toLowerCase()) ||
-    (s.code && s.code.toLowerCase().includes(storeSearch.toLowerCase()))
-  );
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  useEffect(() => {
+    if (activeTab === 'STORES') {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+          },
+          (error) => console.warn('Geolocation error:', error),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+        );
+      }
+    }
+  }, [activeTab]);
+
+  const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    return R * c; 
+  };
+
+  const filteredStores = useMemo(() => {
+    let result = stores.filter(s => 
+      s.name.toLowerCase().includes(storeSearch.toLowerCase()) ||
+      s.mallName.toLowerCase().includes(storeSearch.toLowerCase()) ||
+      s.city.toLowerCase().includes(storeSearch.toLowerCase()) ||
+      (s.code && s.code.toLowerCase().includes(storeSearch.toLowerCase()))
+    );
+
+    if (userLocation) {
+      result = result.map(s => {
+        if (s.latitude !== undefined && s.longitude !== undefined) {
+          return {
+            ...s,
+            distance: getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, s.latitude, s.longitude)
+          };
+        }
+        return s;
+      });
+
+      result.sort((a, b) => {
+        if (a.distance !== undefined && b.distance !== undefined) return a.distance - b.distance;
+        if (a.distance !== undefined) return -1;
+        if (b.distance !== undefined) return 1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [stores, storeSearch, userLocation]);
 
   // Map transactions using provided store dataset
     const memberTransactions = useMemo(() => {
@@ -568,13 +622,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               {filteredStores.map((store, idx) => (
                 <div key={store.id} className="bg-white rounded-[24px] shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col transition-transform hover:-translate-y-0.5 border border-slate-100">
                   {/* Photo Placeholder */}
-                  <div className="w-full h-32 bg-slate-100 overflow-hidden relative border-b border-slate-100">
+                  <div className="w-full aspect-[20/9] bg-slate-100 overflow-hidden relative border-b border-slate-100">
                     <img 
                       src={store.imageUrl || (store as any).image || 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'} 
                       alt={store.name}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                     <div className="absolute bottom-3 left-4 right-4">
                       <div className="text-[0.65rem] font-bold uppercase tracking-wider text-white/90 mb-0.5 shadow-sm">{store.region}</div>
                       <h3 className="text-base sm:text-lg font-bold text-white leading-snug drop-shadow-md">
@@ -585,8 +639,8 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                           <MapPin className="w-3 h-3" />
                           <span>
                             {store.distance < 1 
-                              ? `${Math.round(store.distance * 1000)} M DARI ANDA` 
-                              : `${store.distance.toFixed(1)} KM DARI ANDA`}
+                              ? `${Math.round(store.distance * 1000)}m` 
+                              : `${store.distance.toFixed(1)}km`}
                           </span>
                         </div>
                       )}
