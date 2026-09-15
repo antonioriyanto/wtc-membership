@@ -161,8 +161,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  const isCurrentlyLoading = isLoading || isSkeletonLoading || isMetricsLoading;
-
   // Fetch real database metrics aggregated per store today directly from Firestore
   const { 
     storesWithRealMetrics, 
@@ -172,6 +170,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     totalPointsIssuedToday,
     isMetricsLoading 
   } = useTodayStoreMetrics(stores);
+
+  const isCurrentlyLoading = isLoading || isSkeletonLoading || isMetricsLoading;
 
   const activeStoresCount = stores.filter(s => s.status === 'ONLINE').length;
   
