@@ -114,19 +114,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     const enriched = stores.map(store => {
       const realMetrics = storeMetricsMap.get(store.id) || (store.code ? storeMetricsMap.get(store.code) : null);
       
-      // If transactions exist today for stores or database is populated, use real numbers from transactions.
-      // If no transactions have been logged today yet in transactions collection, smoothly fallback to store's documented todayRevenue.
-      const revenue = (realMetrics && realMetrics.transactions > 0) 
-        ? realMetrics.revenue 
-        : (hasAnyTransactionsToday ? (realMetrics?.revenue || 0) : (store.todayRevenue || 0));
-
-      const trxCount = (realMetrics && realMetrics.transactions > 0)
-        ? realMetrics.transactions
-        : (hasAnyTransactionsToday ? (realMetrics?.transactions || 0) : (store.todayTransactions || 0));
-
-      const ptsIssued = (realMetrics && realMetrics.pointsIssued > 0)
-        ? realMetrics.pointsIssued
-        : (hasAnyTransactionsToday ? (realMetrics?.pointsIssued || 0) : (store.todayPointsIssued || 0));
+      const revenue = realMetrics?.revenue || 0;
+      const trxCount = realMetrics?.transactions || 0;
+      const ptsIssued = realMetrics?.pointsIssued || 0;
 
       return {
         ...store,
