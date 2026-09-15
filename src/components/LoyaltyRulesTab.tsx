@@ -129,7 +129,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">Rp</span>
                   <input
                     type="number"
-                    value={formData.amountUnit}
+                    value={formData.amountUnit || 0}
                     onChange={(e) => handleChange('amountUnit', parseInt(e.target.value) || 10000)}
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800"
                   />
@@ -143,7 +143,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={formData.pointsPerAmount}
+                  value={formData.pointsPerAmount || 0}
                   onChange={(e) => handleChange('pointsPerAmount', parseInt(e.target.value) || 1)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800"
                 />
@@ -211,7 +211,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <div className="text-xs font-semibold text-amber-900">Min. Points:</div>
                   <input
                     type="number"
-                    value={formData.goldThreshold}
+                    value={formData.goldThreshold || 0}
                     onChange={(e) => handleChange('goldThreshold', parseInt(e.target.value) || 500)}
                     className="w-24 px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-amber-900"
                   />
@@ -219,7 +219,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <input
                     type="number"
                     step="0.05"
-                    value={formData.goldMultiplier}
+                    value={formData.goldMultiplier || 0}
                     onChange={(e) => handleChange('goldMultiplier', parseFloat(e.target.value) || 1.25)}
                     className="w-20 px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-amber-900"
                   />
@@ -236,7 +236,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <div className="text-xs font-semibold text-slate-600">Min. Points:</div>
                   <input
                     type="number"
-                    value={formData.platinumThreshold}
+                    value={formData.platinumThreshold || 0}
                     onChange={(e) => handleChange('platinumThreshold', parseInt(e.target.value) || 30000)}
                     className="w-24 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
                   />
@@ -244,7 +244,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <input
                     type="number"
                     step="0.05"
-                    value={formData.platinumMultiplier}
+                    value={formData.platinumMultiplier || 0}
                     onChange={(e) => handleChange('platinumMultiplier', parseFloat(e.target.value) || 2.0)}
                     className="w-20 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
                   />
@@ -261,7 +261,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <div className="text-xs font-semibold text-cyan-900">Min. Points:</div>
                   <input
                     type="number"
-                    value={formData.diamondThreshold}
+                    value={formData.diamondThreshold || 0}
                     onChange={(e) => handleChange('diamondThreshold', parseInt(e.target.value) || 50000)}
                     className="w-24 px-3 py-1.5 bg-white border border-cyan-300 rounded-xl text-xs font-bold text-cyan-900"
                   />
@@ -269,7 +269,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <input
                     type="number"
                     step="0.05"
-                    value={formData.diamondMultiplier}
+                    value={formData.diamondMultiplier || 0}
                     onChange={(e) => handleChange('diamondMultiplier', parseFloat(e.target.value) || 2.5)}
                     className="w-20 px-3 py-1.5 bg-white border border-cyan-300 rounded-xl text-xs font-bold text-cyan-900"
                   />
@@ -286,7 +286,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <div className="text-xs font-semibold text-slate-300">Min. Points:</div>
                   <input
                     type="number"
-                    value={formData.blackThreshold}
+                    value={formData.blackThreshold || 0}
                     onChange={(e) => handleChange('blackThreshold', parseInt(e.target.value) || 100000)}
                     className="w-24 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white"
                   />
@@ -294,7 +294,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <input
                     type="number"
                     step="0.05"
-                    value={formData.blackMultiplier}
+                    value={formData.blackMultiplier || 0}
                     onChange={(e) => handleChange('blackMultiplier', parseFloat(e.target.value) || 3.0)}
                     className="w-20 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white"
                   />

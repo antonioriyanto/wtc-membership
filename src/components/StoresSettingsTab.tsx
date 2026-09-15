@@ -3,6 +3,8 @@ import { StoreBranch } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
 import { compressImage } from '../lib/image-compressor';
 import { Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, CheckCircle, AlertTriangle, ArrowLeft, Save, Receipt, Layers } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 interface StoresSettingsTabProps {
   stores: StoreBranch[];
@@ -12,7 +14,7 @@ interface StoresSettingsTabProps {
 }
 
 export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, setStores, onViewTransactions, isSkeletonLoading = false }) => {
-  const { showConfirm } = useCustomDialog();
+  const { showConfirm, showAlert } = useCustomDialog();
   if (isSkeletonLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -96,9 +98,10 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
     try {
       const compressedBase64 = await compressImage(file, 1200, 800, 0.9);
       setFormData({ ...formData, imageUrl: compressedBase64 });
+      showAlert('Gambar cabang berhasil diunggah dan dikompres.', 'Sukses', 'success');
     } catch (err) {
       console.error('Error compressing image:', err);
-      alert('Gagal mengupload dan mengkompres gambar.');
+      showAlert('Gagal mengupload dan mengkompres gambar.', 'Gagal', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -130,37 +133,25 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
         description: formData.description || 'Official Watch Club boutique.',
         imageUrl: formData.imageUrl
       };
+      
       try {
-        const res = await fetch('/api/stores', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(created)
-        });
-        if (res.ok) {
-          const saved = await res.json();
-          setStores([saved, ...stores.filter(s => s.id !== saved.id)]);
-        } else {
-          setStores([created, ...stores]);
-        }
-      } catch {
+        await setDoc(doc(db, 'stores', created.id), created);
+        setStores([created, ...stores]);
+        showAlert('Cabang baru berhasil disimpan.', 'Sukses', 'success');
+      } catch (err) {
+        console.error('Failed to create store', err);
         setStores([created, ...stores]);
       }
     } else if (mode === 'edit' && editingStoreId) {
-      const updatedData = { ...stores.find(s => s.id === editingStoreId), ...formData };
+      const updatedData = { ...stores.find(s => s.id === editingStoreId), ...formData } as StoreBranch;
+      
       try {
-        const res = await fetch(`/api/stores/${editingStoreId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedData)
-        });
-        if (res.ok) {
-          const saved = await res.json();
-          setStores(stores.map(s => s.id === editingStoreId ? saved : s));
-        } else {
-          setStores(stores.map(s => s.id === editingStoreId ? updatedData as StoreBranch : s));
-        }
-      } catch {
-        setStores(stores.map(s => s.id === editingStoreId ? updatedData as StoreBranch : s));
+        await setDoc(doc(db, 'stores', updatedData.id), updatedData);
+        setStores(stores.map(s => s.id === editingStoreId ? updatedData : s));
+        showAlert('Perubahan cabang berhasil disimpan.', 'Sukses', 'success');
+      } catch (err) {
+        console.error('Failed to update store', err);
+        setStores(stores.map(s => s.id === editingStoreId ? updatedData : s));
       }
     }
 
@@ -176,8 +167,10 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
       'Konfirmasi Hapus Cabang',
       async () => {
         try {
-          await fetch(`/api/stores/${id}`, { method: 'DELETE' });
-        } catch {}
+          await deleteDoc(doc(db, 'stores', id));
+        } catch (err) {
+          console.error('Failed to delete store', err);
+        }
         setStores(stores.filter(s => s.id !== id));
       },
       'Ya, Hapus',

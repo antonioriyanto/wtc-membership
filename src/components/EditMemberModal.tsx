@@ -203,7 +203,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.name}
+                    value={formData.name || ''}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:outline-none"
                     placeholder="Contoh: Budi Santoso"
@@ -217,7 +217,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.phone}
+                    value={formData.phone || ''}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs font-mono bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:outline-none"
                     placeholder="+62 812 3456 7890"
@@ -230,7 +230,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   </label>
                   <input
                     type="email"
-                    value={formData.email}
+                    value={formData.email || ''}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:outline-none"
                     placeholder="member@example.com"
@@ -288,7 +288,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   <input
                     type="text"
                     disabled
-                    value={formData.joinDate}
+                    value={formData.joinDate ? formData.joinDate.substring(0, 10) : ""}
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-100 text-slate-500 border border-slate-200 rounded-xl cursor-not-allowed"
                   />
                 </div>
@@ -326,7 +326,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     Level Tier Membership
                   </label>
                   <select
-                    value={formData.tier}
+                    value={formData.tier || "BLUE"}
                     onChange={(e) => setFormData({ ...formData, tier: e.target.value as MemberTier })}
                     className="w-full px-3.5 py-2.5 text-xs font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
                   >
@@ -344,7 +344,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.membershipId}
+                    value={formData.membershipId || ""}
                     onChange={(e) => setFormData({ ...formData, membershipId: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs font-mono font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   />
@@ -358,7 +358,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     <input
                       type="number"
                       min={0}
-                      value={formData.points}
+                      value={formData.points || 0}
                       onChange={(e) => setFormData({ ...formData, points: Number(e.target.value) })}
                       className="w-full px-3.5 py-2.5 text-xs font-mono font-bold text-emerald-600 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     />
@@ -374,7 +374,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     <input
                       type="number"
                       min={0}
-                      value={formData.lifetimePoints}
+                      value={formData.lifetimePoints || 0}
                       onChange={(e) => setFormData({ ...formData, lifetimePoints: Number(e.target.value) })}
                       className="w-full px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:outline-none"
                     />
@@ -392,7 +392,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       type="number"
                       min={0}
                       step={50000}
-                      value={formData.totalSpend}
+                      value={formData.totalSpend || 0}
                       onChange={(e) => setFormData({ ...formData, totalSpend: Number(e.target.value) })}
                       className="w-full pl-9 pr-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:outline-none"
                     />
@@ -404,7 +404,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     Store Terdaftar (Home Branch)
                   </label>
                   <select
-                    value={formData.registeredStore}
+                    value={formData.registeredStore || ""}
                     onChange={(e) => setFormData({ ...formData, registeredStore: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
                   >
