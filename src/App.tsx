@@ -744,7 +744,7 @@ export default function App() {
                 unreadNotificationsCount={unreadNotificationsCount}
               />
 
-              <div className="flex-1 overflow-y-auto p-4 md:p-8">
+              <div id="main-scroll-area" className="flex-1 overflow-y-auto p-4 md:p-8">
                 {activeTab === 'overview' && (
                   <OverviewTab 
                     stores={stores}

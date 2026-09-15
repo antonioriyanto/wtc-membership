@@ -34,6 +34,15 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
   const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
   const [isUploading, setIsUploading] = useState(false);
   
+  const scrollToTop = () => {
+    const scrollArea = document.getElementById('main-scroll-area');
+    if (scrollArea) {
+      scrollArea.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      scrollToTop();
+    }
+  };
+
   // 'list' | 'create' | 'edit'
   const [mode, setMode] = useState<'list' | 'create' | 'edit'>('list');
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
@@ -81,14 +90,14 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
       description: 'Official Watch Club boutique offering luxury timepieces.'
     });
     setMode('create');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
   };
 
   const handleOpenEdit = (store: StoreBranch) => {
     setFormData({ ...store });
     setEditingStoreId(store.id);
     setMode('edit');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,6 +113,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
       showAlert('Gagal mengupload dan mengkompres gambar.', 'Gagal', 'error');
     } finally {
       setIsUploading(false);
+      e.target.value = ''; // Reset input so same file can be uploaded again if needed
     }
   };
 
@@ -159,7 +169,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
 
     setMode('list');
     setEditingStoreId(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
   };
 
   const handleDeleteStore = (id: string) => {
