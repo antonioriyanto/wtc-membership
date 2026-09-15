@@ -110,7 +110,13 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
         return;
       }
 
-      const calculatedPoints = Math.max(1, Math.floor(amount / 1000));
+      let multiplier = 1.0;
+      if (member.tier === 'BLACK') multiplier = 3.0;
+      else if (member.tier === 'DIAMOND') multiplier = 2.5;
+      else if (member.tier === 'PLATINUM') multiplier = 2.0;
+      else if (member.tier === 'GOLD') multiplier = 1.5;
+
+      const calculatedPoints = Math.max(1, Math.floor(Math.floor(amount / 1000) * multiplier));
       const newPoints = (member.points || 0) + calculatedPoints;
       const newLifetime = (member.lifetimePoints || 0) + calculatedPoints;
       const newTotalSpend = (member.totalSpend || 0) + amount;
@@ -443,6 +449,8 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
             try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
             return next;
           });
+          setAutoSelectMemberId(created.id + '|' + Date.now());
+          setActiveTab('cashier');
         }}
       />
 

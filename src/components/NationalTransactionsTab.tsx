@@ -21,9 +21,12 @@ import {
   Building2,
   Users,
   Coins,
-  CreditCard
+  CreditCard,
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { TierBadge } from '../utils/tierBadge';
+import { useCustomDialog } from './CustomDialogProvider';
 
 interface NationalTransactionsTabProps {
   stores: StoreBranch[];
@@ -31,6 +34,8 @@ interface NationalTransactionsTabProps {
   members: Member[];
   initialSelectedStore?: StoreBranch | null;
   onSelectStore?: (store: StoreBranch | null) => void;
+  onUpdateTransaction?: (updatedTrx: Transaction) => void;
+  onDeleteTransaction?: (trxId: string) => void;
   isSkeletonLoading?: boolean;
 }
 
@@ -40,6 +45,8 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
   members,
   initialSelectedStore = null,
   onSelectStore,
+  onUpdateTransaction,
+  onDeleteTransaction,
   isSkeletonLoading = false
 }) => {
   if (isSkeletonLoading) {
@@ -60,6 +67,9 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
   const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
   const [selectedReceiptDetail, setSelectedReceiptDetail] = useState<Transaction | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  
+  const { showConfirm, showAlert } = useCustomDialog();
 
   // When parent updates selectedStore
   React.useEffect(() => {
@@ -513,16 +523,52 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                       </td>
 
                       {/* Action */}
-                      <td className="py-3.5 px-5 text-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedReceiptDetail(trx);
-                          }}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                        >
-                          Lihat Struk
-                        </button>
+                      <td className="py-3.5 px-5">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            title="Lihat Struk"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedReceiptDetail(trx);
+                            }}
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Receipt className="w-4 h-4" />
+                          </button>
+                          {onUpdateTransaction && (
+                            <button
+                              title="Edit Transaksi"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTransaction(trx);
+                              }}
+                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          {onDeleteTransaction && (
+                            <button
+                              title="Hapus Transaksi"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showConfirm(
+                                  `Apakah Anda yakin ingin menghapus transaksi ${trx.receiptNo}? Tindakan ini akan menghapusnya dari laporan HO, namun saldo poin member TIDAK akan dikurangi secara otomatis (harap kurangi secara manual jika perlu).`,
+                                  'Hapus Transaksi',
+                                  'Hapus (Audit Log)',
+                                  () => {
+                                    onDeleteTransaction(trx.id);
+                                    showAlert(`Transaksi ${trx.receiptNo} berhasil dihapus (Audit Log dicatat).`, 'Berhasil', 'success');
+                                  },
+                                  'danger'
+                                );
+                              }}
+                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -632,6 +678,81 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer ml-auto"
               >
                 Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT TRANSACTION MODAL */}
+      {editingTransaction && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                <Edit2 className="w-4 h-4 text-blue-600" />
+                Edit Transaksi (Admin HO)
+              </h3>
+              <button 
+                onClick={() => setEditingTransaction(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">No. Struk</label>
+                <input 
+                  type="text" 
+                  value={editingTransaction.receiptNo}
+                  onChange={(e) => setEditingTransaction({...editingTransaction, receiptNo: e.target.value})}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nominal Belanja (Rp)</label>
+                <input 
+                  type="number" 
+                  value={editingTransaction.amount}
+                  onChange={(e) => setEditingTransaction({...editingTransaction, amount: parseInt(e.target.value) || 0})}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Tambahan</label>
+                <input 
+                  type="text" 
+                  value={editingTransaction.notes || ''}
+                  onChange={(e) => setEditingTransaction({...editingTransaction, notes: e.target.value})}
+                  placeholder="Opsional"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:bg-white"
+                />
+              </div>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl mt-4">
+                <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                  <strong>Peringatan Audit:</strong> Perubahan ini tidak akan secara otomatis menghitung ulang tier/poin milik member terkait. Perubahan hanya berlaku untuk pelaporan HO.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setEditingTransaction(null)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  if (onUpdateTransaction) {
+                    onUpdateTransaction(editingTransaction);
+                    showAlert('Transaksi berhasil diperbarui.', 'Berhasil', 'success');
+                  }
+                  setEditingTransaction(null);
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Simpan (Audit Log)
               </button>
             </div>
           </div>

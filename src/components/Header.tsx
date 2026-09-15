@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus, RefreshCcw, Bell } from 'lucide-react';
 
 interface HeaderProps {
@@ -20,6 +20,21 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNotifications,
   unreadNotificationsCount
 }) => {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   return (
     <header className="bg-white px-8 py-4 flex justify-between items-center border-b border-slate-200 sticky top-0 z-20">
       <div className="relative w-96">
@@ -32,6 +47,30 @@ export const Header: React.FC<HeaderProps> = ({
         />
       </div>
       <div className="flex items-center gap-3">
+        <div 
+          className="flex items-center justify-center px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-help border border-transparent hover:border-slate-200 mr-1"
+          title={isOnline ? "Connected to Firestore: Real-time syncing active" : "Offline: Real-time syncing paused until connection restores"}
+        >
+          <div className="flex items-center gap-2">
+            <div className="relative flex h-2.5 w-2.5">
+              {isOnline ? (
+                <>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </>
+              ) : (
+                <>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" style={{ animationDuration: '2s' }}></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </>
+              )}
+            </div>
+            <span className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+          </div>
+        </div>
+
         <button onClick={onOpenManualAdjust} className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl shadow-sm transition-all cursor-pointer">
           Point Adjustment
         </button>

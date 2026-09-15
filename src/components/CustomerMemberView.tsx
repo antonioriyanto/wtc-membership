@@ -666,15 +666,15 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
                   <div className="p-4 flex flex-col gap-3">
                     <a 
-                      href={store.latitude && store.longitude ? `https://www.google.com/maps/search/?api=1&query=${store.latitude},${store.longitude}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([store.name, store.mallName, store.address, store.city].filter(Boolean).join(' '))}`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([store.mallName || store.name, store.city].filter(Boolean).join(' '))}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-slate-600 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100 block hover:bg-blue-50/50 hover:border-blue-100 transition-colors cursor-pointer group"
                     >
-                      <div className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">{store.mallName}</div>
+                      <div className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">{store.mallName || store.name}</div>
                       <div className="text-slate-500 mt-0.5 flex items-start gap-1 group-hover:text-blue-600/80 transition-colors">
                         <MapPin className="text-slate-400 group-hover:text-blue-500 w-3.5 h-3.5 mt-0.5 shrink-0 transition-colors" />
-                        <span>{store.address || `${store.mallName}, Indonesia`}</span>
+                        <span>{store.address || `${store.mallName || store.name}, Indonesia`}</span>
                       </div>
                     </a>
                     {store.whatsapp && (

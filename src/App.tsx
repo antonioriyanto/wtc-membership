@@ -430,6 +430,55 @@ export default function App() {
     handleUpdateMember(updatedMember);
   };
 
+  const handleUpdateTransaction = async (updatedTrx: Transaction) => {
+    try {
+      await setDoc(doc(db, 'transactions', updatedTrx.id), updatedTrx);
+
+      const auditSaved = localStorage.getItem('wtc_audit_logs');
+      const auditList = auditSaved ? JSON.parse(auditSaved) : [];
+      const newLog = {
+        id: 'AL-' + Date.now().toString().slice(-4),
+        timestamp: new Date().toISOString(),
+        actorName: 'HO Admin',
+        actorRole: 'ADMIN',
+        action: 'TRANSACTION_EDITED',
+        details: `Mengedit transaksi dengan No Struk: ${updatedTrx.receiptNo} (ID: ${updatedTrx.id})`,
+        module: 'TRANSACTIONS'
+      };
+      auditList.unshift(newLog);
+      localStorage.setItem('wtc_audit_logs', JSON.stringify(auditList));
+      setAuditLogs(auditList);
+      safeSetDoc('audit_logs', newLog.id, newLog).catch(() => {});
+    } catch (err) {
+      console.warn("Could not sync transaction update to Firestore:", err);
+    }
+  };
+
+  const handleDeleteTransaction = async (trxId: string) => {
+    try {
+      const trx = transactions.find(t => t.id === trxId);
+      await deleteDoc(doc(db, 'transactions', trxId));
+      
+      const auditSaved = localStorage.getItem('wtc_audit_logs');
+      const auditList = auditSaved ? JSON.parse(auditSaved) : [];
+      const newLog = {
+        id: 'AL-' + Date.now().toString().slice(-4),
+        timestamp: new Date().toISOString(),
+        actorName: 'HO Admin',
+        actorRole: 'ADMIN',
+        action: 'TRANSACTION_DELETED',
+        details: `Menghapus transaksi dengan No Struk: ${trx?.receiptNo || 'Unknown'} (ID: ${trxId})`,
+        module: 'TRANSACTIONS'
+      };
+      auditList.unshift(newLog);
+      localStorage.setItem('wtc_audit_logs', JSON.stringify(auditList));
+      setAuditLogs(auditList);
+      safeSetDoc('audit_logs', newLog.id, newLog).catch(() => {});
+    } catch (err) {
+      console.warn("Could not sync transaction delete to Firestore:", err);
+    }
+  };
+
   // Synchronize loyalty config changes to Firestore
   useEffect(() => {
     try {
@@ -817,6 +866,8 @@ export default function App() {
                     members={members}
                     initialSelectedStore={selectedStoreForTrx}
                     onSelectStore={(store) => setSelectedStoreForTrx(store)}
+                    onUpdateTransaction={handleUpdateTransaction}
+                    onDeleteTransaction={handleDeleteTransaction}
                     isSkeletonLoading={isRefreshingData}
                   />
                 )}
