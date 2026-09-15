@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   StoreBranch, 
   Member, 
@@ -23,6 +23,8 @@ import {
   ArrowRight,
   RefreshCw
 } from 'lucide-react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface OverviewTabProps {
   stores: StoreBranch[];
@@ -38,52 +40,44 @@ interface OverviewTabProps {
   onSelectStore: (store: StoreBranch) => void;
 }
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({
-  stores,
-  members,
-  transactions,
-  vouchers,
-  loyaltyConfig,
-  isSkeletonLoading = false,
-  onNavigateToStores,
-  onNavigateToMembers,
-  onNavigateToVouchers,
-  onOpenManualAdjust,
-  onSelectStore,
-}) => {
-  const [isLoading, setIsLoading] = useState(false);
+function useTodayStoreMetrics(stores: StoreBranch[]) {
+  const [metrics, setMetrics] = useState({
+    storesWithRealMetrics: stores,
+    topStores: [] as StoreBranch[],
+    totalRevenueToday: 0,
+    totalTransactionsToday: 0,
+    totalPointsIssuedToday: 0,
+    isMetricsLoading: true
+  });
 
-  const isCurrentlyLoading = isLoading || isSkeletonLoading;
-
-  // Real database metrics aggregated per store today
-  const { storesWithRealMetrics, topStores, totalRevenueToday, totalTransactionsToday, totalPointsIssuedToday } = useMemo(() => {
+  useEffect(() => {
+    // Determine the start of today in local time
     const today = new Date();
-    const todayYear = today.getFullYear();
-    const todayMonth = today.getMonth();
-    const todayDate = today.getDate();
+    today.setHours(0, 0, 0, 0);
+    const startOfDayISO = today.toISOString();
 
-    // Map store performance aggregated from real database transactions
-    const storeMetricsMap = new Map<string, { revenue: number; transactions: number; pointsIssued: number }>();
+    const q = query(
+      collection(db, 'transactions'),
+      where('timestamp', '>=', startOfDayISO)
+    );
 
-    // Initialize with 0 for all stores
-    for (const store of stores) {
-      storeMetricsMap.set(store.id, { revenue: 0, transactions: 0, pointsIssued: 0 });
-      if (store.code && store.code !== store.id) {
-        storeMetricsMap.set(store.code, storeMetricsMap.get(store.id)!);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const storeMetricsMap = new Map<string, { revenue: number; transactions: number; pointsIssued: number }>();
+      
+      // Initialize stores map
+      for (const store of stores) {
+        storeMetricsMap.set(store.id, { revenue: 0, transactions: 0, pointsIssued: 0 });
+        if (store.code && store.code !== store.id) {
+          storeMetricsMap.set(store.code, storeMetricsMap.get(store.id)!);
+        }
       }
-    }
 
-    let hasAnyTransactionsToday = false;
+      let hasAnyTransactionsToday = false;
 
-    for (const trx of transactions) {
-      if (!trx.timestamp) continue;
-      const tDate = new Date(trx.timestamp);
-      if (
-        tDate.getFullYear() === todayYear &&
-        tDate.getMonth() === todayMonth &&
-        tDate.getDate() === todayDate
-      ) {
+      snapshot.forEach(docSnap => {
+        const trx = docSnap.data() as Transaction;
         hasAnyTransactionsToday = true;
+        
         // Identify matching store
         const matchingStore = stores.find(s => 
           (trx.storeId && (s.id.toLowerCase() === trx.storeId.toLowerCase() || s.code.toLowerCase() === trx.storeId.toLowerCase())) ||
@@ -107,41 +101,77 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             curr.pointsIssued += ptsDelta;
           }
         }
-      }
-    }
+      });
 
-    // Attach real computed figures to stores
-    const enriched = stores.map(store => {
-      const realMetrics = storeMetricsMap.get(store.id) || (store.code ? storeMetricsMap.get(store.code) : null);
-      
-      const revenue = realMetrics?.revenue || 0;
-      const trxCount = realMetrics?.transactions || 0;
-      const ptsIssued = realMetrics?.pointsIssued || 0;
+      // Attach real computed figures to stores
+      const enriched = stores.map(store => {
+        const realMetrics = storeMetricsMap.get(store.id) || (store.code ? storeMetricsMap.get(store.code) : null);
+        
+        const revenue = realMetrics?.revenue || 0;
+        const trxCount = realMetrics?.transactions || 0;
+        const ptsIssued = realMetrics?.pointsIssued || 0;
 
-      return {
-        ...store,
-        computedTodayRevenue: revenue,
-        computedTodayTransactions: trxCount,
-        computedTodayPointsIssued: ptsIssued,
-        hasRealLiveTrx: Boolean(realMetrics && realMetrics.transactions > 0)
-      };
+        return {
+          ...store,
+          computedTodayRevenue: revenue,
+          computedTodayTransactions: trxCount,
+          computedTodayPointsIssued: ptsIssued,
+          hasRealLiveTrx: Boolean(realMetrics && realMetrics.transactions > 0)
+        };
+      });
+
+      // Top 5 stores sorted by today's real volume / revenue
+      const sorted = [...enriched].sort((a, b) => (b.computedTodayRevenue || 0) - (a.computedTodayRevenue || 0)).slice(0, 5);
+
+      const sumRev = enriched.reduce((acc, s) => acc + (s.computedTodayRevenue || 0), 0);
+      const sumTrx = enriched.reduce((acc, s) => acc + (s.computedTodayTransactions || 0), 0);
+      const sumPts = enriched.reduce((acc, s) => acc + (s.computedTodayPointsIssued || 0), 0);
+
+      setMetrics({
+        storesWithRealMetrics: enriched,
+        topStores: sorted,
+        totalRevenueToday: sumRev,
+        totalTransactionsToday: sumTrx,
+        totalPointsIssuedToday: sumPts,
+        isMetricsLoading: false
+      });
+    }, (error) => {
+      console.error("Error listening to today's transactions:", error);
+      setMetrics(prev => ({ ...prev, isMetricsLoading: false }));
     });
 
-    // Top 5 stores sorted by today's real volume / revenue
-    const sorted = [...enriched].sort((a, b) => b.computedTodayRevenue - a.computedTodayRevenue).slice(0, 5);
+    return () => unsubscribe();
+  }, [stores]);
 
-    const sumRev = enriched.reduce((acc, s) => acc + s.computedTodayRevenue, 0);
-    const sumTrx = enriched.reduce((acc, s) => acc + s.computedTodayTransactions, 0);
-    const sumPts = enriched.reduce((acc, s) => acc + s.computedTodayPointsIssued, 0);
+  return metrics;
+}
 
-    return {
-      storesWithRealMetrics: enriched,
-      topStores: sorted,
-      totalRevenueToday: sumRev,
-      totalTransactionsToday: sumTrx,
-      totalPointsIssuedToday: sumPts
-    };
-  }, [stores, transactions]);
+export const OverviewTab: React.FC<OverviewTabProps> = ({
+  stores,
+  members,
+  transactions,
+  vouchers,
+  loyaltyConfig,
+  isSkeletonLoading = false,
+  onNavigateToStores,
+  onNavigateToMembers,
+  onNavigateToVouchers,
+  onOpenManualAdjust,
+  onSelectStore,
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const isCurrentlyLoading = isLoading || isSkeletonLoading || isMetricsLoading;
+
+  // Fetch real database metrics aggregated per store today directly from Firestore
+  const { 
+    storesWithRealMetrics, 
+    topStores, 
+    totalRevenueToday, 
+    totalTransactionsToday, 
+    totalPointsIssuedToday,
+    isMetricsLoading 
+  } = useTodayStoreMetrics(stores);
 
   const activeStoresCount = stores.filter(s => s.status === 'ONLINE').length;
   
