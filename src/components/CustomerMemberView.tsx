@@ -215,6 +215,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const progressPercent = Math.min(100, (member.points / nextTierPoints) * 100);
 
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [geolocationError, setGeolocationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === 'STORES') {
@@ -225,10 +226,16 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               lat: position.coords.latitude,
               lng: position.coords.longitude
             });
+            setGeolocationError(null);
           },
-          (error) => console.warn('Geolocation error:', error),
+          (error) => {
+            console.warn('Geolocation error:', error);
+            setGeolocationError('Please enable GPS to see nearby stores, or use the search bar above.');
+          },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
         );
+      } else {
+        setGeolocationError('GPS is not supported on this device. Use the search bar to find stores.');
       }
     }
   }, [activeTab]);
@@ -617,6 +624,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 />
               </div>
             </div>
+
+            {geolocationError && (
+              <div className="mx-5 mb-2 p-3 bg-amber-50 text-amber-800 text-[13px] font-medium rounded-xl border border-amber-200/50 flex items-start gap-2.5">
+                <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                <p>{geolocationError}</p>
+              </div>
+            )}
 
             <div className="flex flex-col gap-4 px-5 py-2.5 pb-5">
               {filteredStores.map((store, idx) => (

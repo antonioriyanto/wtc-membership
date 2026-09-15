@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StoreBranch } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
 import { compressImage } from '../lib/image-compressor';
-import { Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, CheckCircle, AlertTriangle, ArrowLeft, Save, Receipt, Layers } from 'lucide-react';
+import { Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, CheckCircle, AlertTriangle, ArrowLeft, Save, Receipt, Layers, RefreshCw } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
@@ -46,6 +46,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
   // 'list' | 'create' | 'edit'
   const [mode, setMode] = useState<'list' | 'create' | 'edit'>('list');
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form state for create / edit
   const [formData, setFormData] = useState<Partial<StoreBranch>>({
@@ -120,56 +121,61 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
   const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.mallName) return;
+    
+    setIsSaving(true);
 
-    if (mode === 'create') {
-      const created: StoreBranch = {
-        id: 'store_' + Date.now(),
-        code: formData.code || 'WTC-' + Math.floor(100 + Math.random() * 900),
-        name: formData.name || '',
-        mallName: formData.mallName || '',
-        city: formData.city || 'Jakarta',
-        region: (formData.region as any) || 'Jabodetabek',
-        address: formData.address || '',
-        email: formData.email || 'contact@watchclub.co.id',
-        whatsapp: formData.whatsapp || '+628123456789',
-        managerName: formData.managerName || 'Store Manager',
-        cashierCount: Number(formData.cashierCount) || 3,
-        status: (formData.status as any) || 'ONLINE',
-        todayTransactions: 0,
-        todayRevenue: 0,
-        todayPointsIssued: 0,
-        activePromosCount: 2,
-        operatingHours: formData.operatingHours || '10:00 - 22:00 WIB',
-        description: formData.description || 'Official Watch Club boutique.',
-        imageUrl: formData.imageUrl,
-        latitude: formData.latitude,
-        longitude: formData.longitude
-      };
-      
-      try {
-        await setDoc(doc(db, 'stores', created.id), created);
-        setStores([created, ...stores]);
-        showAlert('Cabang baru berhasil disimpan.', 'Sukses', 'success');
-      } catch (err) {
-        console.error('Failed to create store', err);
-        setStores([created, ...stores]);
+    try {
+      if (mode === 'create') {
+        const created: StoreBranch = {
+          id: 'store_' + Date.now(),
+          code: formData.code || 'WTC-' + Math.floor(100 + Math.random() * 900),
+          name: formData.name || '',
+          mallName: formData.mallName || '',
+          city: formData.city || 'Jakarta',
+          region: (formData.region as any) || 'Jabodetabek',
+          address: formData.address || '',
+          email: formData.email || 'contact@watchclub.co.id',
+          whatsapp: formData.whatsapp || '+628123456789',
+          managerName: formData.managerName || 'Store Manager',
+          cashierCount: Number(formData.cashierCount) || 3,
+          status: (formData.status as any) || 'ONLINE',
+          todayTransactions: 0,
+          todayRevenue: 0,
+          todayPointsIssued: 0,
+          activePromosCount: 2,
+          operatingHours: formData.operatingHours || '10:00 - 22:00 WIB',
+          description: formData.description || 'Official Watch Club boutique.',
+          imageUrl: formData.imageUrl,
+          latitude: formData.latitude,
+          longitude: formData.longitude
+        };
+        
+        try {
+          await setDoc(doc(db, 'stores', created.id), created);
+          setStores([created, ...stores]);
+          showAlert('Cabang baru berhasil disimpan.', 'Sukses', 'success');
+        } catch (err) {
+          console.error('Failed to create store', err);
+          setStores([created, ...stores]);
+        }
+      } else if (mode === 'edit' && editingStoreId) {
+        const updatedData = { ...stores.find(s => s.id === editingStoreId), ...formData } as StoreBranch;
+        
+        try {
+          await setDoc(doc(db, 'stores', updatedData.id), updatedData);
+          setStores(stores.map(s => s.id === editingStoreId ? updatedData : s));
+          showAlert('Perubahan cabang berhasil disimpan.', 'Sukses', 'success');
+        } catch (err) {
+          console.error('Failed to update store', err);
+          setStores(stores.map(s => s.id === editingStoreId ? updatedData : s));
+        }
       }
-    } else if (mode === 'edit' && editingStoreId) {
-      const updatedData = { ...stores.find(s => s.id === editingStoreId), ...formData } as StoreBranch;
-      
-      try {
-        await setDoc(doc(db, 'stores', updatedData.id), updatedData);
-        setStores(stores.map(s => s.id === editingStoreId ? updatedData : s));
-        showAlert('Perubahan cabang berhasil disimpan.', 'Sukses', 'success');
-      } catch (err) {
-        console.error('Failed to update store', err);
-        setStores(stores.map(s => s.id === editingStoreId ? updatedData : s));
-      }
+    } finally {
+      setIsSaving(false);
+      setMode('list');
+      setEditingStoreId(null);
+      scrollToTop();
     }
-
-    setMode('list');
-    setEditingStoreId(null);
-    scrollToTop();
   };
 
   const handleDeleteStore = (id: string) => {
@@ -431,9 +437,22 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({ stores, se
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md hover:bg-slate-800"
+                disabled={isSaving || isUploading}
+                className={`px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md transition-all ${
+                  isSaving || isUploading
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                    : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800'
+                }`}
               >
-                <Save className="w-4 h-4" /> {mode === 'create' ? 'Save & Create Branch' : 'Save Changes'}
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" /> Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" /> {mode === 'create' ? 'Save & Create Branch' : 'Save Changes'}
+                  </>
+                )}
               </button>
             </div>
           </form>
