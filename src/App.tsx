@@ -613,6 +613,8 @@ export default function App() {
             setMembers={setMembers}
             transactions={transactions} 
             setTransactions={setTransactions}
+            vouchers={vouchers}
+            setVouchers={setVouchers}
             stores={stores}
             currentStore={
               (() => {
@@ -901,6 +903,7 @@ export default function App() {
                 {activeTab === 'vouchers' && (
                   <VouchersTab 
                     vouchers={vouchers} 
+                    transactions={transactions}
                     stores={stores}
                     onCreateVoucher={() => {
                       setEditingVoucher(null);
