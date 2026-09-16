@@ -131,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
           <input 
             type="text" 
             placeholder="Global Omnisearch (Members, Vouchers, Stores, Logs...)"
-            value={searchQuery}
+            value={searchQuery || ''}
             onChange={handleSearchChange}
             onFocus={() => { if (searchQuery.length > 1) setShowDropdown(true); }}
             onBlur={() => setTimeout(() => setShowDropdown(false), 200)}

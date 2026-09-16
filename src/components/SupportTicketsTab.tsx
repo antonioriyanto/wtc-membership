@@ -297,7 +297,7 @@ export const SupportTicketsTab: React.FC<SupportTicketsTabProps> = ({
             <input 
               type="text" 
               placeholder="Cari ID tiket, nama member, no HP, toko cabang, struk, atau judul..." 
-              value={search}
+              value={search || ''}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition-colors" 
             />
@@ -574,7 +574,7 @@ export const SupportTicketsTab: React.FC<SupportTicketsTabProps> = ({
 
                 <div className="flex items-center gap-2 pt-1">
                   <select
-                    value={assignedAgent}
+                    value={assignedAgent || ''}
                     onChange={(e) => setAssignedAgent(e.target.value)}
                     className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-slate-300"
                   >
@@ -630,7 +630,7 @@ export const SupportTicketsTab: React.FC<SupportTicketsTabProps> = ({
                     </label>
                     <input 
                       type="number" 
-                      value={adjustPoints}
+                      value={adjustPoints || ''}
                       onChange={(e) => setAdjustPoints(parseInt(e.target.value) || 0)}
                       placeholder="+500 atau -100"
                       className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -644,7 +644,7 @@ export const SupportTicketsTab: React.FC<SupportTicketsTabProps> = ({
                     <div className="flex gap-2">
                       <input 
                         type="text" 
-                        value={adjustReason}
+                        value={adjustReason || ''}
                         onChange={(e) => setAdjustReason(e.target.value)}
                         placeholder="Contoh: Kompensasi poin struk INV-092..."
                         className="flex-1 px-3 py-2 bg-white border border-amber-300 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -715,7 +715,7 @@ export const SupportTicketsTab: React.FC<SupportTicketsTabProps> = ({
                 <form onSubmit={handleSendReply} className="flex gap-2">
                   <input
                     type="text"
-                    value={replyText}
+                    value={replyText || ''}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Ketik balasan atau catatan investigasi teknis..."
                     className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-slate-400 focus:bg-white transition-colors"

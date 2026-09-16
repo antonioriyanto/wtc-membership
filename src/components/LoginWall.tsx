@@ -149,7 +149,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="text" 
-                value={username}
+                value={username || ''}
                 onFocus={() => showStoreQuickSelect && setIsStoreDropdownOpen(true)}
                 onChange={(e) => {
                   setUsername(e.target.value);
@@ -231,7 +231,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
               <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type={showPin ? "text" : "password"} maxLength={10} 
-                value={pin}
+                value={pin || ''}
                 onChange={(e) => setPin(e.target.value)}
                 className="w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-slate-900"
                 placeholder={showStoreQuickSelect ? "Ketikkan PIN cabang Anda" : "••••••••"}

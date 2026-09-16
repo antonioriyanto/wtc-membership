@@ -293,7 +293,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
           <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            value={searchInput}
+            value={searchInput || ''}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Cari nama, No HP, email, atau ID..."
             className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
@@ -579,7 +579,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nama Lengkap *</label>
                 <input 
                   type="text" 
-                  value={editName}
+                  value={editName || ''}
                   onChange={(e) => setEditName(e.target.value)}
                   required
                   placeholder="Nama lengkap pelanggan"
@@ -592,7 +592,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nomor HP *</label>
                   <input 
                     type="tel" 
-                    value={editPhone}
+                    value={editPhone || ''}
                     onChange={(e) => setEditPhone(e.target.value)}
                     required
                     placeholder="08xxxxxxxxxx"
@@ -603,7 +603,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Tanggal Lahir</label>
                   <input 
                     type="date" 
-                    value={editBirthDate}
+                    value={editBirthDate || ''}
                     onChange={(e) => setEditBirthDate(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-xs"
                   />
@@ -615,7 +615,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Email</label>
                   <input 
                     type="email" 
-                    value={editEmail}
+                    value={editEmail || ''}
                     onChange={(e) => setEditEmail(e.target.value)}
                     placeholder="contoh@email.com"
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-xs"
@@ -624,7 +624,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Jenis Kelamin</label>
                   <select 
-                    value={editGender}
+                    value={editGender || ''}
                     onChange={(e) => setEditGender(e.target.value as any)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-xs"
                   >
@@ -638,7 +638,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Alamat Domisili (Opsional)</label>
                 <input 
                   type="text" 
-                  value={editAddress}
+                  value={editAddress || ''}
                   onChange={(e) => setEditAddress(e.target.value)}
                   placeholder="Alamat tempat tinggal member..."
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-xs"

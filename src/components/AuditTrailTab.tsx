@@ -208,7 +208,7 @@ export const AuditTrailTab: React.FC<AuditTrailTabProps> = ({ logs: propLogs, is
             <input 
               type="text" 
               placeholder="Cari pelaku (actor), ID log, jenis aksi, atau detail perubahan..." 
-              value={search}
+              value={search || ''}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition-colors" 
             />
@@ -217,7 +217,7 @@ export const AuditTrailTab: React.FC<AuditTrailTabProps> = ({ logs: propLogs, is
           <div className="flex flex-wrap items-center gap-2">
             {/* Role filter */}
             <select
-              value={selectedRole}
+              value={selectedRole || ''}
               onChange={(e) => setSelectedRole(e.target.value)}
               className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none"
             >
@@ -229,7 +229,7 @@ export const AuditTrailTab: React.FC<AuditTrailTabProps> = ({ logs: propLogs, is
 
             {/* Module filter */}
             <select
-              value={selectedModule}
+              value={selectedModule || ''}
               onChange={(e) => setSelectedModule(e.target.value)}
               className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none"
             >

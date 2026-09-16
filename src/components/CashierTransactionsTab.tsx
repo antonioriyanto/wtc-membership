@@ -249,7 +249,7 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
-                value={searchInput}
+                value={searchInput || ''}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Cari struk, member, HP, email..."
                 className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-colors"
@@ -264,7 +264,7 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
 
             {/* Transaction Type Filter */}
             <select 
-              value={typeFilter}
+              value={typeFilter || ''}
               onChange={e => setTypeFilter(e.target.value)}
               className="w-full sm:w-auto px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-sm bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer font-medium"
             >
@@ -277,7 +277,7 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
             <div className="flex items-center gap-1.5 w-full sm:w-auto">
               <input 
                 type="date" 
-                value={startDate}
+                value={startDate || ''}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs sm:text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-emerald-500" 
                 title="Tanggal Mulai" 
@@ -285,7 +285,7 @@ export const CashierTransactionsTab: React.FC<TransactionsTabProps> = ({
               <span className="text-slate-400 text-xs">-</span>
               <input 
                 type="date" 
-                value={endDate}
+                value={endDate || ''}
                 onChange={(e) => setEndDate(e.target.value)}
                 className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs sm:text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-emerald-500" 
                 title="Tanggal Selesai" 

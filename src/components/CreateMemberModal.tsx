@@ -196,7 +196,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="text" 
-                value={name}
+                value={name || ''}
                 onChange={(e) => setName(e.target.value)}
                 required
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-sm"
@@ -211,7 +211,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="tel" 
-                value={phone}
+                value={phone || ''}
                 onChange={(e) => setPhone(e.target.value)}
                 required
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-sm"
@@ -226,7 +226,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="email" 
-                value={email}
+                value={email || ''}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-sm"
                 placeholder="andi.pratama@gmail.com"
@@ -240,7 +240,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="date" 
-                value={birthDate}
+                value={birthDate || ''}
                 onChange={(e) => setBirthDate(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 text-sm"
               />
@@ -256,7 +256,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
               {isStoreLocked ? (
                 <input
                   type="text"
-                  value={registeredStore}
+                  value={registeredStore || ''}
                   readOnly
                   disabled
                   tabIndex={-1}
@@ -264,7 +264,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
                 />
               ) : (
                 <select
-                  value={registeredStore}
+                  value={registeredStore || ''}
                   onChange={(e) => setRegisteredStore(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                 >

@@ -97,7 +97,7 @@ export const ManualPointAdjustmentModal: React.FC<ManualPointAdjustmentModalProp
               Select Member
             </label>
             <select
-              value={selectedMemberId}
+              value={selectedMemberId || ''}
               onChange={(e) => { setSelectedMemberId(e.target.value); setError(''); }}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800"
             >
@@ -174,7 +174,7 @@ export const ManualPointAdjustmentModal: React.FC<ManualPointAdjustmentModalProp
             </label>
             <textarea
               rows={2}
-              value={reason}
+              value={reason || ''}
               onChange={(e) => { setReason(e.target.value); setError(''); }}
               placeholder="E.g., Customer compensation for delayed invoice sync at Puri Indah Mall"
               className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800"

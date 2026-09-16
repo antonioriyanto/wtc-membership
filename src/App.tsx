@@ -615,10 +615,10 @@ export default function App() {
             stores={stores}
             currentStore={
               stores.find(s => 
-                s.name.toLowerCase().includes(cashierStoreName.toLowerCase()) || 
-                cashierStoreName.toLowerCase().includes(s.name.toLowerCase()) ||
-                s.code?.toLowerCase() === cashierStoreName.toLowerCase() ||
-                s.id?.toLowerCase() === cashierStoreName.toLowerCase()
+                s.name?.toLowerCase().includes((cashierStoreName || '').toLowerCase()) || 
+                (cashierStoreName || '').toLowerCase().includes(s.name?.toLowerCase() || '') ||
+                s.code?.toLowerCase() === (cashierStoreName || '').toLowerCase() ||
+                s.id?.toLowerCase() === (cashierStoreName || '').toLowerCase()
               ) || stores[0] || initialStores[0]
             }
             cashierName={cashierName}

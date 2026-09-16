@@ -202,7 +202,7 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
           <input 
             type="text" 
             placeholder="Cari kampanye berdasarkan nama atau isi promo..." 
-            value={search}
+            value={search || ''}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition-colors" 
           />
@@ -349,7 +349,7 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                 <input 
                   type="text" 
                   required
-                  value={name}
+                  value={name || ''}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Contoh: Promo Diskon 50%"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
@@ -364,7 +364,7 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                   <input 
                     type="date"
                     required
-                    value={startAt}
+                    value={startAt || ''}
                     onChange={(e) => setStartAt(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none"
                   />
@@ -376,7 +376,7 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                   <input 
                     type="date"
                     required
-                    value={endAt}
+                    value={endAt || ''}
                     onChange={(e) => setEndAt(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none"
                   />
@@ -414,7 +414,7 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                   Target Audiens Tier
                 </label>
                 <select 
-                  value={targetAudience}
+                  value={targetAudience || ''}
                   onChange={(e) => setTargetAudience(e.target.value as any)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none"
                 >

@@ -340,7 +340,7 @@ export const CashierPinResetModal: React.FC<CashierPinResetModalProps> = ({
 
               <input
                 type="text"
-                value={notes}
+                value={notes || ''}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Catatan verifikasi (opsional, contoh: NIK sesuai, HP baru)"
                 className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
@@ -407,7 +407,7 @@ export const CashierPinResetModal: React.FC<CashierPinResetModalProps> = ({
                   <input
                     type="text"
                     maxLength={6}
-                    value={temporaryPin}
+                    value={temporaryPin || ''}
                     onChange={(e) => setTemporaryPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="flex-1 font-mono text-center text-xl font-bold tracking-widest px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-amber-400 focus:outline-none focus:border-amber-500"
                     placeholder="6 Digit PIN"
@@ -431,7 +431,7 @@ export const CashierPinResetModal: React.FC<CashierPinResetModalProps> = ({
                   <label className="text-xs text-slate-400 block mb-1">Ketik 6-Digit PIN Baru Member:</label>
                   <input
                     type="password" maxLength={6} pattern="[0-9]*" inputMode="numeric"
-                    value={directPin}
+                    value={directPin || ''}
                     onChange={(e) => setDirectPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="w-full font-mono text-center text-lg font-bold tracking-widest px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-emerald-500"
                     placeholder="••••••"
@@ -441,7 +441,7 @@ export const CashierPinResetModal: React.FC<CashierPinResetModalProps> = ({
                   <label className="text-xs text-slate-400 block mb-1">Konfirmasi Ulang PIN:</label>
                   <input
                     type="password" maxLength={6} pattern="[0-9]*" inputMode="numeric"
-                    value={directPinConfirm}
+                    value={directPinConfirm || ''}
                     onChange={(e) => setDirectPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="w-full font-mono text-center text-lg font-bold tracking-widest px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-emerald-500"
                     placeholder="••••••"

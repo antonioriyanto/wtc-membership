@@ -314,7 +314,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              value={searchTerm}
+              value={searchTerm || ''}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cari no struk (INV-...), nama member, nomor HP, kasir, atau nama toko..."
               className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition-colors"

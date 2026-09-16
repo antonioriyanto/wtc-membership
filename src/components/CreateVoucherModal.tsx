@@ -481,7 +481,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
                   <input
                     type="url"
                     placeholder="https://images.unsplash.com/..."
-                    value={customUrl}
+                    value={customUrl || ''}
                     onChange={(e) => setCustomUrl(e.target.value)}
                     className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900"
                   />
@@ -504,7 +504,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={code}
+                  value={code || ''}
                   onChange={(e) => { setCode(e.target.value); setError(''); }}
                   placeholder="Contoh: WC-SPECIAL-25"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold font-mono text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs"
@@ -550,7 +550,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={title}
+                  value={title || ''}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Contoh: 20% OFF Swiss Mechanical Collection"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs"
@@ -563,7 +563,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={discountValue}
+                  value={discountValue || ''}
                   onChange={(e) => setDiscountValue(parseInt(e.target.value) || 0)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs font-mono"
                 />
@@ -578,7 +578,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={minPurchase}
+                  value={minPurchase || ''}
                   onChange={(e) => setMinPurchase(parseInt(e.target.value) || 0)}
                   placeholder="0 jika tanpa minimum"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs font-mono"
@@ -591,7 +591,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
                 </label>
                 <input
                   type="date"
-                  value={validUntil}
+                  value={validUntil || ''}
                   onChange={(e) => setValidUntil(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs"
                 />
@@ -653,7 +653,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
               </label>
               <textarea
                 rows={3}
-                value={termsText}
+                value={termsText || ''}
                 onChange={(e) => setTermsText(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 font-mono shadow-2xs"
               />

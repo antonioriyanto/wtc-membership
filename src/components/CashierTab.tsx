@@ -348,7 +348,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
               <Barcode className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
-                value={searchInput}
+                value={searchInput || ''}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={handleSearch}
                 className="w-full pl-11 pr-4 py-3 bg-emerald-50/70 dark:bg-slate-900 border-2 border-emerald-500 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 font-medium"
@@ -446,7 +446,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
             <label className="block text-slate-700 dark:text-slate-300 font-semibold text-[0.85rem] mb-2">Nomor Struk (Receipt No)</label>
             <input 
               type="text" 
-              value={receiptInput}
+              value={receiptInput || ''}
               disabled={!activeMember || isSubmitting}
               onChange={(e) => setReceiptInput(e.target.value)}
               className="w-full px-4 py-3 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-emerald-500 disabled:bg-slate-100 dark:disabled:bg-slate-900/40"
@@ -457,7 +457,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
             <label className="block text-slate-700 dark:text-slate-300 font-semibold text-[0.85rem] mb-2">Nominal Transaksi (Rp)</label>
             <input 
               type="text" 
-              value={amountInput}
+              value={amountInput || ''}
               disabled={!activeMember}
               onChange={(e) => {
                 const val = e.target.value.replace(/[^0-9]/g, '');
@@ -631,7 +631,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
                   <input 
                     ref={voucherInputRef}
                     type="text" 
-                    value={voucherInput}
+                    value={voucherInput || ''}
                     onChange={(e) => setVoucherInput(e.target.value)}
                     onKeyDown={handleVoucherKeyDown}
                     className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-900 border-2 border-emerald-500 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-center font-mono font-bold text-lg tracking-wider"

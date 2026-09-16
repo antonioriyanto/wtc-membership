@@ -339,7 +339,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
               <input 
                 type="text" 
                 placeholder="Cari nama, no HP, membership ID, email, atau cabang..." 
-                value={search}
+                value={search || ''}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" 
               />
@@ -355,7 +355,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
 
             {/* TIER FILTER */}
             <select
-              value={filterTier}
+              value={filterTier || ''}
               onChange={(e) => setFilterTier(e.target.value)}
               className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer"
             >
@@ -369,7 +369,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
 
             {/* STATUS FILTER */}
             <select
-              value={filterStatus}
+              value={filterStatus || ''}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer"
             >

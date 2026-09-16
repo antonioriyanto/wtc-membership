@@ -99,7 +99,7 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            value={searchQuery}
+            value={searchQuery || ''}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search voucher title, code..."
             className="w-full pl-10 pr-4 py-2 bg-slate-50 text-sm text-slate-900 placeholder:text-slate-400 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all"

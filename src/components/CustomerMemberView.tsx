@@ -436,7 +436,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               className="w-10 h-10 rounded-full border border-slate-300 bg-slate-200 flex justify-center items-center font-bold text-slate-500 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 shadow-sm"
             >
               {member.avatarUrl ? (
-                <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" />
+                <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover object-center" />
               ) : (
                 member.name.charAt(0).toUpperCase()
               )}
@@ -462,7 +462,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                       <img 
                         src={camp.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'} 
                         alt={camp.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-center"
                       />
                     </div>
                   ))}
@@ -716,7 +716,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     <img 
                       src={store.imageUrl || (store as any).image || 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'} 
                       alt={store.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover object-center"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                     <div className="absolute bottom-3 left-4 right-4">
@@ -786,13 +786,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             <section className="px-5 pt-2.5 pb-[30px]">
               <div className="bg-white rounded-[20px] shadow-sm p-6 sm:p-8 flex flex-col items-center border border-slate-200/80">
                 
-                <div className="relative mb-6">
+                <div className="relative mb-6 flex flex-col items-center">
                   <div 
                     className="w-[80px] h-[80px] rounded-full bg-slate-900 text-white flex justify-center items-center text-2xl font-bold shadow-sm overflow-hidden group relative cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     {member.avatarUrl ? (
-                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" />
+                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover object-center" />
                     ) : (
                       member.name.charAt(0).toUpperCase()
                     )}
@@ -1114,7 +1114,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         <input
                           type="text"
                           required
-                          value={ticketSubject}
+                          value={ticketSubject || ''}
                           onChange={(e) => setTicketSubject(e.target.value)}
                           placeholder="Contoh: Transaksi kemarin poin belum bertambah"
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
@@ -1127,7 +1127,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         </label>
                         <input
                           type="text"
-                          value={ticketReceipt}
+                          value={ticketReceipt || ''}
                           onChange={(e) => setTicketReceipt(e.target.value)}
                           placeholder="Contoh: INV-20260820-PUR-001"
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
@@ -1142,7 +1142,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                       <textarea
                         required
                         rows={3}
-                        value={ticketMessage}
+                        value={ticketMessage || ''}
                         onChange={(e) => setTicketMessage(e.target.value)}
                         placeholder="Jelaskan detail transaksi Anda, jam berapa, atau kendala voucher..."
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
