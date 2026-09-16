@@ -120,6 +120,14 @@ export function setupFirestoreListeners(callbacks: any) {
   collections.forEach(({ name, set, storageKey }) => {
     const unsub = onSnapshot(collection(db, name), (snapshot) => {
       let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      if (name === 'stores') {
+        const storeMap = new Map();
+        initialStores.forEach(s => storeMap.set(s.id, s));
+        data.forEach(s => storeMap.set(s.id, s));
+        data = Array.from(storeMap.values());
+      }
+
       if (data.length > 0) {
         if (name === 'transactions') {
           const seenIds = new Set<string>();
