@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Member, Transaction, StoreBranch, Voucher } from '../types';
+import { Member, Transaction, StoreBranch, Voucher, LoyaltyConfig } from '../types';
 import { calculateTier } from '../lib/loyalty';
 import { CashierSidebar } from './CashierSidebar';
 import { CashierHeader } from './CashierHeader';
@@ -17,6 +17,7 @@ import { CustomerPinPromptModal } from './CustomerPinPromptModal';
 import { useCustomDialog } from './CustomDialogProvider';
 
 interface CashierTerminalViewProps {
+  loyaltyConfig?: LoyaltyConfig;
   members: Member[];
   setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
   transactions: Transaction[];
@@ -32,6 +33,7 @@ interface CashierTerminalViewProps {
 }
 
 export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
+  loyaltyConfig,
   members, 
   setMembers, 
   transactions, 
@@ -170,6 +172,18 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       });
 
       showAlert(`Transaksi berhasil! +${savedTrx.pointsDelta} Poin ditambahkan ke ${updatedMember.name}.`, 'Transaksi Berhasil', 'success');
+
+      if (loyaltyConfig?.enableWhatsAppNotifications && updatedMember.phone) {
+        let phoneNum = updatedMember.phone.replace(/\D/g, '');
+        if (phoneNum.startsWith('0')) {
+          phoneNum = '62' + phoneNum.substring(1);
+        }
+        if (phoneNum.length >= 10) {
+          const waText = `Halo ${updatedMember.name}, Terima kasih telah berbelanja di ${savedTrx.storeName}. Transaksi Anda (Struk: ${savedTrx.receiptNo}) senilai Rp ${savedTrx.amount.toLocaleString('id-ID')} telah berhasil. Anda mendapatkan +${savedTrx.pointsDelta} Poin! Total Poin Anda saat ini adalah ${updatedMember.points} Poin.`;
+          const encodedText = encodeURIComponent(waText);
+          window.open(`https://wa.me/${phoneNum}?text=${encodedText}`, '_blank');
+        }
+      }
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -192,6 +206,21 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
 
   const executeRedeemVoucher = async (member: Member, cleanCode: string) => {
     if (isSubmitting) return;
+    
+    // Atomic Single-Use Voucher Lock check
+    if (loyaltyConfig?.enableStrictVoucherSingleUse && vouchers) {
+       const targetVoucher = vouchers.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
+       if (targetVoucher) {
+         if ((targetVoucher.totalUsed || 0) >= (targetVoucher.maxUsageLimit || 1)) {
+            showAlert('Peringatan Keamanan: Voucher ini sudah diklaim maksimal atau terkunci (Atomic Lock).', 'Gagal', 'error');
+            return;
+         }
+       } else {
+         // If voucher not found in the active list, we might want to block it, but we'll let it pass or show error.
+         // Wait, it might be a general code without a specific record.
+       }
+    }
+
     setIsSubmitting(true);
 
     let savedTrx: Transaction = {

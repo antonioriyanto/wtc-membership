@@ -609,6 +609,7 @@ export default function App() {
         <Route path="/cashier" element={
         cashierAuthenticated ? (
           <CashierTerminalView 
+            loyaltyConfig={loyaltyConfig}
             members={members} 
             setMembers={setMembers}
             transactions={transactions} 
