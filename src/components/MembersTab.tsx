@@ -25,6 +25,7 @@ import * as XLSX from 'xlsx';
 import { TierBadge } from '../utils/tierBadge';
 import { EditMemberModal } from './EditMemberModal';
 import { MemberPreviewModal } from './MemberPreviewModal';
+import { DeleteMemberModal } from './DeleteMemberModal';
 
 export type MemberSortField = 'id' | 'name' | 'phone' | 'email' | 'tier' | 'points' | 'store';
 export type SortDirection = 'asc' | 'desc';
@@ -78,6 +79,8 @@ export const MembersTab: React.FC<MembersTabProps> = ({
   // Modals state
   const [previewMember, setPreviewMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
@@ -589,13 +592,8 @@ export const MembersTab: React.FC<MembersTabProps> = ({
                         {/* DELETE BUTTON */}
                         <button
                           onClick={() => {
-                            showConfirm(
-                              `Hapus akun member ${m.name} (${m.membershipId}) secara permanen?`,
-                              'Konfirmasi Hapus Member',
-                              () => handleDeleteMember(m.id),
-                              'Ya, Hapus Permanen',
-                              'Batal'
-                            );
+                            setMemberToDelete(m);
+                            setIsDeleteModalOpen(true);
                           }}
                           className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                           title="Hapus Akun Member"

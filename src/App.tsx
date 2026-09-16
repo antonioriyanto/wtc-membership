@@ -431,6 +431,7 @@ export default function App() {
       });
       
       await Promise.all(deletePromises);
+      showAlert('Akun member dan seluruh data terkait telah dihapus secara permanen dari sistem.', 'Penghapusan Berhasil', 'success');
 
       // Audit Log 
       const auditSaved = localStorage.getItem('wtc_audit_logs');

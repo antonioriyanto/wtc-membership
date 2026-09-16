@@ -68,6 +68,18 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const [tabHistory, setTabHistory] = useState<('MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE')[]>([]);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
+  const redeemedVoucherCodes = new Set(
+    transactions
+      .filter(t => t.memberId === member.id && (t.type === 'REDEEM' || t.type === 'VOUCHER_DISCOUNT') && t.voucherCode)
+      .map(t => t.voucherCode?.trim().toUpperCase().replace(/^VOUCHER-/, ''))
+  );
+
+  const activeCustomerVouchers = vouchers.filter(v => 
+    v.status === 'ACTIVE' && 
+    (v.totalClaimed || 0) < (v.maxUsageLimit || Infinity) &&
+    !redeemedVoucherCodes.has(v.code.trim().toUpperCase().replace(/^VOUCHER-/, ''))
+  );
   const [selectedVoucherForQr, setSelectedVoucherForQr] = useState<Voucher | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
 
@@ -605,7 +617,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             <section className="m-5">
               <h2 className="text-base font-bold mb-4 pl-1 text-slate-900">Your Active Vouchers</h2>
               <div className="flex overflow-x-auto snap-x snap-mandatory gap-5 pb-2.5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {vouchers.map((v, i) => (
+                {activeCustomerVouchers.map((v, i) => (
                   <div key={v.id} className="flex-[0_0_calc(100%-40px)] max-w-[400px] bg-slate-900 text-white rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] snap-start flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
                     backgroundImage: v.imagePath ? `url('${v.imagePath}')` : 'linear-gradient(to bottom right, #fef08a, #c7d2fe)',
                     backgroundSize: 'cover',
@@ -648,7 +660,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
             <section className="m-5">
               <div className="flex flex-col gap-6">
-                {vouchers.map(v => (
+                {activeCustomerVouchers.map(v => (
                   <div key={v.id} className="w-full bg-slate-900 rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
                     backgroundImage: v.imagePath ? `url('${v.imagePath}')` : 'linear-gradient(to bottom right, #0f172a, #1e293b)',
                     backgroundSize: 'cover',

@@ -185,17 +185,9 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
     }
 
     const cleanCode = voucherCode.trim().toUpperCase().replace(/^VOUCHER-/, '');
-
-    // Intercept with Customer PIN Authorization Modal
-    setPinPromptState({
-      isOpen: true,
-      member,
-      actionTitle: 'Otorisasi Klaim Voucher',
-      actionDetails: `Voucher: ${cleanCode} (-50 Poin)`,
-      onVerified: () => {
-        executeRedeemVoucher(member, cleanCode);
-      }
-    });
+    
+    // Auto-execute redemption without PIN authorization
+    executeRedeemVoucher(member, cleanCode);
   };
 
   const executeRedeemVoucher = async (member: Member, cleanCode: string) => {
@@ -272,11 +264,16 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
 
     // 2. Increment voucher quota in Firestore
     try {
-      
-      
-      // We don't have the exact voucher ID here safely, but we can query it if needed.
-      // However, keeping the quota sync local is fine if we are not strict. 
-      // A better approach is querying by code if needed, but let's just skip the fetch error for now.
+      if (vouchers) {
+        const targetVoucher = vouchers.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
+        if (targetVoucher) {
+          const voucherRef = doc(db, 'vouchers', targetVoucher.id);
+          await updateDoc(voucherRef, {
+            totalUsed: increment(1),
+            totalClaimed: increment(1)
+          });
+        }
+      }
     } catch (e: any) {
       console.warn("Firestore update failed:", e);
     }
