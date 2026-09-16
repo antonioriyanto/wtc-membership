@@ -46,11 +46,19 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
   const [isSaved, setIsSaved] = useState(false);
 
   const handleChange = (field: keyof LoyaltyConfig, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    setIsSaved(false);
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      // Auto-save for toggles for better UX
+      if (typeof value === 'boolean') {
+        if (typeof onSaveConfig === 'function') onSaveConfig(next);
+        if (typeof setConfig === 'function') setConfig(next);
+        setIsSaved(true);
+      }
+      return next;
+    });
+    if (typeof value !== 'boolean') {
+      setIsSaved(false);
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -323,7 +331,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                 </div>
                 <input
                   type="checkbox"
-                  checked={formData.enableStrictVoucherSingleUse}
+                  checked={formData.enableStrictVoucherSingleUse || false}
                   onChange={(e) => handleChange('enableStrictVoucherSingleUse', e.target.checked)}
                   className="w-5 h-5 accent-slate-900 mt-1 cursor-pointer"
                 />
@@ -336,7 +344,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                 </div>
                 <input
                   type="checkbox"
-                  checked={formData.enableWhatsAppNotifications}
+                  checked={formData.enableWhatsAppNotifications || false}
                   onChange={(e) => handleChange('enableWhatsAppNotifications', e.target.checked)}
                   className="w-5 h-5 accent-emerald-600 mt-1 cursor-pointer"
                 />

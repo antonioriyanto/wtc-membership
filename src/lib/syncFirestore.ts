@@ -122,17 +122,17 @@ export function setupFirestoreListeners(callbacks: any) {
       let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       if (name === 'stores') {
-        const storeMap = new Map();
-        // Use name to strictly deduplicate since IDs might differ (e.g. Firestore auto-ids vs fixed codes)
-        initialStores.forEach(s => storeMap.set(s.name.trim().toLowerCase(), s));
-        data.forEach(s => {
-          const key = (s.name || '').trim().toLowerCase();
-          if (key) {
-             storeMap.set(key, { ...storeMap.get(key), ...s, id: s.id || storeMap.get(key)?.id });
-          }
-        });
-        
-        data = Array.from(storeMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        if (data.length >= 20) {
+          // If Firestore is already populated with the real store directory,
+          // trust Firestore as the single source of truth to avoid duplicates.
+          data = data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        } else {
+          // Fallback to initialStores if Firestore is somehow empty or unseeded
+          const storeMap = new Map();
+          initialStores.forEach(s => storeMap.set(s.id, s));
+          data.forEach(s => storeMap.set(s.id, s));
+          data = Array.from(storeMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        }
       }
 
       if (data.length > 0) {
