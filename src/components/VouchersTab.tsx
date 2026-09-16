@@ -212,9 +212,9 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                 {/* Details & Limits */}
                 <div className="space-y-2 text-xs text-slate-600 my-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Min. Belanja:</span>
+                    <span className="text-slate-400">Min. Transaksi:</span>
                     <span className="font-semibold text-slate-800">
-                      {voucher.minPurchase > 0 ? `Rp ${(voucher.minPurchase).toLocaleString('id-ID')}` : 'Tanpa Min. Belanja'}
+                      {voucher.minPurchase > 0 ? `Rp ${(voucher.minPurchase).toLocaleString('id-ID')}` : 'Tanpa Min. Transaksi'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

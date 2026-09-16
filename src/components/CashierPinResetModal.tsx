@@ -430,8 +430,7 @@ export const CashierPinResetModal: React.FC<CashierPinResetModalProps> = ({
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Ketik 6-Digit PIN Baru Member:</label>
                   <input
-                    type="password"
-                    maxLength={6}
+                    type="password" maxLength={6} pattern="[0-9]*" inputMode="numeric"
                     value={directPin}
                     onChange={(e) => setDirectPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="w-full font-mono text-center text-lg font-bold tracking-widest px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-emerald-500"
@@ -441,8 +440,7 @@ export const CashierPinResetModal: React.FC<CashierPinResetModalProps> = ({
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Konfirmasi Ulang PIN:</label>
                   <input
-                    type="password"
-                    maxLength={6}
+                    type="password" maxLength={6} pattern="[0-9]*" inputMode="numeric"
                     value={directPinConfirm}
                     onChange={(e) => setDirectPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="w-full font-mono text-center text-lg font-bold tracking-widest px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-emerald-500"

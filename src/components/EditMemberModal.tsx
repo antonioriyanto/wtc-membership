@@ -50,7 +50,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
   
   // Form state
   const [formData, setFormData] = useState<Member>({ ...member });
-  const [passwordInput, setPasswordInput] = useState(member.password || 'watchclub123');
+  const [passwordInput, setPasswordInput] = useState(member.pin || '123456');
   const [showPassword, setShowPassword] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
@@ -63,14 +63,14 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setPasswordInput(result);
-    setFormData(prev => ({ ...prev, password: result }));
+    setFormData(prev => ({ ...prev, pin: result }));
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     const updated: Member = {
       ...formData,
-      password: passwordInput,
+      pin: passwordInput,
       points: Number(formData.points) || 0,
       lifetimePoints: Number(formData.lifetimePoints) || 0,
       totalSpend: Number(formData.totalSpend) || 0,
@@ -94,7 +94,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
       <div 
-        className="bg-white rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden"
+        className="bg-white rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-modalIn"
         onClick={(e) => e.stopPropagation()}
       >
         {/* MODAL HEADER */}
@@ -192,7 +192,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
             <div className="space-y-4 animate-fadeIn">
               <div className="bg-slate-50/60 p-4 rounded-2xl border border-slate-200/80 mb-4">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Data Identitas Pribadi Pelanggan</h4>
-                <p className="text-xs text-slate-500">Kelola identitas resmi member sesuai KTP/SIM untuk verifikasi saat klaim garansi jam tangan dan reward.</p>
+                <p className="text-xs text-slate-500">Kelola identitas resmi member sesuai KTP/SIM untuk verifikasi saat penggunaan poin dan reward.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -384,7 +384,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Total Belanja Akumulatif (Rp)
+                    Total Transaksi Akumulatif (Rp)
                   </label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
@@ -440,16 +440,16 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                 </div>
 
                 <p className="text-xs text-slate-500">
-                  Password ini digunakan oleh member untuk login ke Customer Member App (`/member`) serta otentikasi saat verifikasi kupon di POS kasir.
+                  Password ini digunakan oleh member untuk login ke Customer Member App (`/member`) serta otentikasi saat verifikasi kupon di kasir.
                 </p>
 
                 <div className="relative max-w-md">
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? 'text' : 'text'} maxLength={6} pattern="[0-9]*" inputMode="numeric"
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
                     className="w-full pl-3.5 pr-20 py-2.5 text-xs font-mono font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="Masukkan password baru..."
+                    placeholder="Masukkan PIN baru (6 digit angka)..."
                   />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     <button
@@ -485,7 +485,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       </div>
                       <p className="text-xs text-slate-600 mt-1 max-w-lg">
                         {isSuspended 
-                          ? 'Akun ini sedang disuspend. Member tidak dapat login ke aplikasi, tidak dapat menggunakan poin belanja, dan kasir akan menerima notifikasi blokir saat memindai ID ini.'
+                          ? 'Akun ini sedang disuspend. Member tidak dapat login ke aplikasi, tidak dapat menggunakan poin loyalty, dan kasir akan menerima notifikasi blokir saat memindai ID ini.'
                           : 'Akun berstatus aktif normal. Member dapat mengumpulkan poin, menukarkan voucher, dan bertransaksi di 41 cabang Watch Club.'}
                       </p>
                     </div>
@@ -522,7 +522,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   <div>
                     <h4 className="text-sm font-bold text-rose-900">Hapus Akun Member Secara Permanen</h4>
                     <p className="text-xs text-rose-700 mt-1">
-                      Menghapus akun <strong>{member.name}</strong> ({member.membershipId}) akan menghapus seluruh data profil, hak poin sejumlah <strong>{(member.points || 0).toLocaleString('id-ID')} Pts</strong>, dan akses masuk member dari sistem.
+                      Menghapus akun <strong>{member.name}</strong> ({member.membershipId}) akan menghapus akun secara permanen dari database, termasuk hak poin sejumlah <strong>{(member.points || 0).toLocaleString('id-ID')} Pts</strong>, dan seluruh riwayat transaksi terkait otomatis dihapus dari sistem tanpa bisa dipulihkan.
                     </p>
                   </div>
                 </div>

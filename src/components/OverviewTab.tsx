@@ -25,6 +25,18 @@ import {
 } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line
+} from 'recharts';
+
 
 interface OverviewTabProps {
   stores: StoreBranch[];
@@ -96,7 +108,7 @@ function useTodayStoreMetrics(stores: StoreBranch[]) {
           if (trx.amount && trx.amount > 0) {
             curr.revenue += trx.amount;
           }
-          const ptsDelta = trx.pointsDelta || (trx.type === 'EARN' ? trx.points || 0 : 0);
+          const ptsDelta = trx.pointsDelta || 0;
           if (ptsDelta > 0) {
             curr.pointsIssued += ptsDelta;
           }

@@ -117,10 +117,10 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
         type: isRedeem ? 'REDEEM_VOUCHER' : 'EARN_POINTS',
         title: isRedeem 
           ? `Penukaran Voucher di ${tx.storeName}` 
-          : `Transaksi Belanja di ${tx.storeName}`,
+          : `Penambahan Poin di ${tx.storeName}`,
         description: isRedeem 
           ? `${tx.memberName} menukarkan reward loyalty (${Math.abs(tx.pointsDelta)} Pts)`
-          : `${tx.memberName} berbelanja senilai Rp ${(tx.amount || 0).toLocaleString('id-ID')} (+${tx.pointsDelta} Pts)`,
+          : `${tx.memberName} mendapatkan +${tx.pointsDelta} Pts dari struk ${tx.receiptNo}`,
         storeId: tx.storeId,
         storeName: tx.storeName,
         storeCity: storeObj?.city || 'DKI Jakarta',
@@ -163,143 +163,7 @@ export const NationalActivityNotifications: React.FC<NationalActivityNotificatio
     });
 
     // 3. Add nationwide multi-region dynamic activities from +40 stores across Indonesia
-    const nationwideFeed: Omit<StoreActivityItem, 'isRead'>[] = [
-      {
-        id: 'nw-act-1',
-        type: 'TIER_UPGRADE',
-        title: 'Tier Upgrade Member VIP di Level 21 Bali',
-        description: 'I Putu Arya dinaikkan ke level PLATINUM VIP setelah akumulasi belanja 25 Juta.',
-        storeId: 'L2B',
-        storeName: 'Level 21 Bali',
-        storeCity: 'Denpasar',
-        storeRegion: 'Bali & Nusa Tenggara',
-        memberName: 'I Putu Arya Pratama',
-        memberPhone: '+62 812-3849-1122',
-        cashierName: 'Wayan Suardana',
-        pointsDelta: 1500,
-        timestamp: new Date(Date.now() - 3 * 60000).toISOString(),
-        timeAgo: '3 menit lalu',
-        notes: 'Promosi tier otomatis loyalty rule: Lifetime spend > Rp 20.000.000'
-      },
-      {
-        id: 'nw-act-2',
-        type: 'EARN_POINTS',
-        title: 'Transaksi Belanja di Trans Studio Makassar',
-        description: 'Andi M. Ridwan berbelanja Alexandre Christie senilai Rp 3.750.000 (+375 Pts).',
-        storeId: 'TSMM',
-        storeName: 'Trans Studio Mall Makassar',
-        storeCity: 'Makassar',
-        storeRegion: 'Sulawesi',
-        memberName: 'Andi M. Ridwan',
-        memberPhone: '+62 821-9988-7711',
-        cashierName: 'Nurhaliza (KASIR-01)',
-        receiptNo: 'INV-TSM-MAK-0982',
-        amount: 3750000,
-        pointsDelta: 375,
-        timestamp: new Date(Date.now() - 7 * 60000).toISOString(),
-        timeAgo: '7 menit lalu',
-        notes: 'Metode Pembayaran: QRIS BCA • Kasir: Nurhaliza'
-      },
-      {
-        id: 'nw-act-3',
-        type: 'NEW_MEMBER',
-        title: 'Pendaftaran Member Baru di Ayani Pontianak',
-        description: 'Suryani Hartono terdaftar langsung di outlet Watch Club Ayani Mega Mall.',
-        storeId: 'AMM',
-        storeName: 'Ayani Pontianak',
-        storeCity: 'Pontianak',
-        storeRegion: 'Kalimantan',
-        memberName: 'Suryani Hartono',
-        memberPhone: '+62 852-4411-9876',
-        timestamp: new Date(Date.now() - 12 * 60000).toISOString(),
-        timeAgo: '12 menit lalu',
-        notes: 'Verifikasi nomor WhatsApp instan berhasil terkirim.'
-      },
-      {
-        id: 'nw-act-4',
-        type: 'REDEEM_VOUCHER',
-        title: 'Klaim Voucher Diskon di Grand City Surabaya',
-        description: 'Bambang Soeprapto menukarkan Voucher Diskon Rp 100.000 untuk pembelian jam tangan.',
-        storeId: 'GCS',
-        storeName: 'Grand City Surabaya',
-        storeCity: 'Surabaya',
-        storeRegion: 'Jawa Timur',
-        memberName: 'Bambang Soeprapto',
-        memberPhone: '+62 813-3344-5566',
-        cashierName: 'Dian Permata',
-        receiptNo: 'VOUCH-GCS-4019',
-        pointsDelta: -100,
-        timestamp: new Date(Date.now() - 19 * 60000).toISOString(),
-        timeAgo: '19 menit lalu',
-        notes: 'Kode Voucher: SURABAYA-REWARD-100K'
-      },
-      {
-        id: 'nw-act-5',
-        type: 'EARN_POINTS',
-        title: 'Transaksi Premium di Senayan City Jakarta',
-        description: 'David Kurniawan membeli Seiko Prospex Diver senilai Rp 11.200.000 (+1.120 Pts).',
-        storeId: 'SCJ',
-        storeName: 'Senayan City Jakarta',
-        storeCity: 'Jakarta Pusat',
-        storeRegion: 'Jabodetabek',
-        memberName: 'David Kurniawan',
-        memberPhone: '+62 811-9876-5432',
-        cashierName: 'Aditya Pratama',
-        receiptNo: 'INV-SCJ-2026-0044',
-        amount: 11200000,
-        pointsDelta: 1120,
-        timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
-        timeAgo: '25 menit lalu',
-        notes: 'Tier Member: GOLD (Mendapat bonus multiplier poin 1.5x)'
-      },
-      {
-        id: 'nw-act-6',
-        type: 'STORE_STATUS',
-        title: 'Rekap Transaksi Harian di Centre Point Medan',
-        description: 'Outlet mencapai milestone 35 transaksi hari ini dengan total omzet Rp 48.900.000.',
-        storeId: 'CPM',
-        storeName: 'Centre Point Medan',
-        storeCity: 'Medan',
-        storeRegion: 'Sumatera',
-        timestamp: new Date(Date.now() - 34 * 60000).toISOString(),
-        timeAgo: '34 menit lalu',
-        notes: 'Performa toko online aktif dengan 2 kasir bertugas.'
-      },
-      {
-        id: 'nw-act-7',
-        type: 'EARN_POINTS',
-        title: 'Transaksi Belanja di 23 Paskal Bandung',
-        description: 'Rina Marlina berbelanja jam tangan Bonia senilai Rp 2.850.000 (+285 Pts).',
-        storeId: '23P',
-        storeName: '23 Paskal Bandung',
-        storeCity: 'Bandung',
-        storeRegion: 'Jawa Barat',
-        memberName: 'Rina Marlina',
-        memberPhone: '+62 878-2233-4411',
-        cashierName: 'Asep Ridwan',
-        receiptNo: 'INV-23P-8890',
-        amount: 2850000,
-        pointsDelta: 285,
-        timestamp: new Date(Date.now() - 41 * 60000).toISOString(),
-        timeAgo: '41 menit lalu',
-        notes: 'Poin ditambahkan langsung ke akun member.'
-      },
-      {
-        id: 'nw-act-8',
-        type: 'NEW_MEMBER',
-        title: 'Member Baru di Manado Town Square',
-        description: 'Claudia Runtuwene mendaftar program loyalty di cabang Manado Town Square.',
-        storeId: 'MTS',
-        storeName: 'Manado Town Square',
-        storeCity: 'Manado',
-        storeRegion: 'Sulawesi',
-        memberName: 'Claudia Runtuwene',
-        memberPhone: '+62 823-9900-1122',
-        timestamp: new Date(Date.now() - 50 * 60000).toISOString(),
-        timeAgo: '50 menit lalu',
-        notes: 'Pendaftaran mandiri di store kasir.'
-      }
-    ];
+    const nationwideFeed: Omit<StoreActivityItem, 'isRead'>[] = [];
 
     nationwideFeed.forEach(item => {
       list.push({

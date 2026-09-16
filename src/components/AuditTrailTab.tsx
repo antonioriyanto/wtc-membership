@@ -65,7 +65,7 @@ export const AuditTrailTab: React.FC<AuditTrailTabProps> = ({ logs: propLogs, is
       actorName: 'Superadmin HO (PIK)', 
       actorRole: 'HO_ADMIN', 
       action: 'VOUCHER_PUBLISHED', 
-      details: 'Menerbitkan kupon diskon baru "SUMMER20" (Potongan 20% Min. Belanja Rp 1.500.000, Kuota 500 klaim).', 
+      details: 'Menerbitkan kupon diskon baru "SUMMER20" (Potongan 20% Min. Transaksi Rp 1.500.000, Kuota 500 klaim).', 
       module: 'VOUCHERS' 
     },
     { 
@@ -74,7 +74,7 @@ export const AuditTrailTab: React.FC<AuditTrailTabProps> = ({ logs: propLogs, is
       actorName: 'System Loyalty Engine', 
       actorRole: 'SYSTEM', 
       action: 'AUTO_TIER_PROMOTION', 
-      details: 'Menaikkan tier member MBR-1029 dari GOLD ke PLATINUM otomatis setelah total belanja melampaui Rp 20.000.000.', 
+      details: 'Menaikkan tier member MBR-1029 dari GOLD ke PLATINUM otomatis setelah total transaksi melampaui Rp 20.000.000.', 
       module: 'MEMBERS' 
     },
     { 
@@ -192,7 +192,7 @@ export const AuditTrailTab: React.FC<AuditTrailTabProps> = ({ logs: propLogs, is
                   <span>Transaksi Toko Kasir (Commercial Ledger):</span>
                 </div>
                 <p>
-                  Mencatat <strong>aktivitas transaksi belanja konsumen</strong> di kasir cabang (No. Struk belanja Rp 2.500.000, perolehan +250 Pts, pembayaran, serta penukaran kode voucher di mesin POS). Berfungsi untuk rekonsiliasi omzet dan saldo kartu member.
+                  Mencatat <strong>aktivitas loyalty konsumen</strong> di kasir cabang (No. Struk transaksi Rp 2.500.000, perolehan +250 Pts, pembayaran, serta penukaran kode voucher di sistem kasir). Berfungsi untuk rekonsiliasi omzet dan saldo kartu member.
                 </p>
               </div>
             </div>

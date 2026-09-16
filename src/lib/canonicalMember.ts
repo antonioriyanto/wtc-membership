@@ -1,6 +1,6 @@
 /**
  * Canonical Member Document Schema and E.164 Normalization
- * Watch Club Loyalty & POS System
+ * Watch Club Loyalty  System
  */
 
 import { MemberTier } from '../types';

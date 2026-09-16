@@ -502,7 +502,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             <div className="text-center">
               <h2 className="text-xl font-bold tracking-tight text-slate-900">Portal Member Eksklusif</h2>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Selamat datang kembali. Masukkan nomor ponsel Anda untuk mengakses privilege member, poin reward, dan koleksi jam tangan Anda.
+                Selamat datang kembali. Masukkan nomor ponsel Anda untuk mengakses privilege member, poin reward, dan reward Anda.
               </p>
             </div>
 
@@ -712,7 +712,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     <span>Proteksi Keamanan &amp; Privasi Member</span>
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Security PIN Anda dilindungi dengan enkripsi berstandar perbankan untuk mengamankan hak reward poin serta kerahasiaan arsip transaksi jam tangan mewah Anda.
+                    Security PIN Anda dilindungi dengan enkripsi berstandar perbankan untuk mengamankan hak reward poin serta kerahasiaan arsip aktivitas loyalty Anda.
                   </p>
                 </div>
               </>
@@ -754,7 +754,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   ? 'Verifikasi identitas berhasil. Tentukan 6-digit Security PIN baru Anda.'
                   : step === 'MANDATORY_PIN_CHANGE_CREATE'
                   ? 'PIN sementara dari kasir aktif. Buat 6-digit PIN permanen baru demi keamanan.'
-                  : 'Tentukan 6-digit Security PIN untuk melindungi poin reward dan data koleksi Anda.'}
+                  : 'Tentukan 6-digit Security PIN untuk melindungi poin reward dan aktivitas loyalty Anda.'}
               </p>
             </div>
 
@@ -920,7 +920,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                 <span>Privasi &amp; Keamanan Terjamin</span>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Data koleksi jam tangan, poin reward, dan privasi Anda dilindungi dengan sistem enkripsi setara perbankan. Kenyamanan dan keamanan Anda adalah prioritas kami.
+                Data poin reward, dan privasi Anda dilindungi dengan sistem enkripsi setara perbankan. Kenyamanan dan keamanan Anda adalah prioritas kami.
               </p>
             </div>
 

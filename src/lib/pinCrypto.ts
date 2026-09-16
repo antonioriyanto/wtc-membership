@@ -1,5 +1,5 @@
 /**
- * Watch Club Loyalty & POS System - Cryptographic Security Engine
+ * Watch Club Loyalty  System - Cryptographic Security Engine
  * Native Web Crypto API PBKDF2 (100,000 iterations, SHA-256, 16-byte random salt)
  */
 

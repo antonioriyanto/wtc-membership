@@ -330,7 +330,7 @@ export async function resetPinViaGoogleAuthClient(params: {
  * In-Store Retail Fallback:
  * cashierAssistedPinResetClient
  * 
- * Invoked by authorized Cashier at boutique POS.
+ * Invoked by authorized Cashier at boutique terminal.
  * Requires physical ID verification flag, records cashierUsername & storeId,
  * sets temporary PIN or direct new customer PIN, flags forcePinChangeOnNextLogin,
  * and commits immutable audit log.

@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, writeBatch, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, query, where, setDoc, deleteDoc, serverTimestamp, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, db } from './lib/firebase';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -33,10 +33,11 @@ import { NationalTransactionsTab } from './components/NationalTransactionsTab';
 import { QuickStoreSwitchModal } from './components/QuickStoreSwitchModal';
 import { CreateVoucherModal } from './components/CreateVoucherModal';
 import { CreateMemberModal } from './components/CreateMemberModal';
+import { MemberPreviewModal } from './components/MemberPreviewModal';
 import { ManualPointAdjustmentModal } from './components/ManualPointAdjustmentModal';
 
 // Roles Components
-import { CashierPOSView } from './components/CashierPOSView';
+import { CashierTerminalView } from './components/CashierTerminalView';
 import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
 import { PortalSwitcher } from './components/PortalSwitcher';
@@ -56,7 +57,7 @@ export default function App() {
     if (p.startsWith('/admin') || p.startsWith('/ho')) {
       document.title = "Watch Club - HO Management Portal (Restricted)";
     } else if (p.startsWith('/cashier') || p.startsWith('/pos') || p.startsWith('/kasir')) {
-      document.title = "Watch Club - Terminal Kasir POS";
+      document.title = "Watch Club - Terminal Kasir";
     } else {
       document.title = "Watch Club - Loyalty Member Portal";
     }
@@ -268,6 +269,7 @@ export default function App() {
   const [isQuickLauncherOpen, setIsQuickLauncherOpen] = useState(false);
   const [isCreateVoucherOpen, setIsCreateVoucherOpen] = useState(false);
   const [isCreateMemberOpen, setIsCreateMemberOpen] = useState(false);
+  const [globalPreviewMember, setGlobalPreviewMember] = useState<Member | null>(null);
   const [isPointAdjustOpen, setIsPointAdjustOpen] = useState(false);
   const [isAdjustingPoints, setIsAdjustingPoints] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
@@ -416,9 +418,43 @@ export default function App() {
 
   const handleDeleteMember = async (memberId: string) => {
     try {
+      // 1. Delete Member Document from Firestore
       await deleteDoc(doc(db, 'members', memberId));
+      
+      // 2. Delete All Associated Transactions
+      const q = query(collection(db, 'transactions'), where('memberId', '==', memberId));
+      const querySnapshot = await getDocs(q);
+      
+      const deletePromises = [];
+      querySnapshot.forEach((docSnap) => {
+        deletePromises.push(deleteDoc(docSnap.ref));
+      });
+      
+      await Promise.all(deletePromises);
+
+      // Audit Log 
+      const auditSaved = localStorage.getItem('wtc_audit_logs');
+      const auditList = auditSaved ? JSON.parse(auditSaved) : [];
+      const newLog = {
+        id: 'AL-' + Date.now().toString().slice(-4),
+        timestamp: new Date().toISOString(),
+        actorName: 'HO Admin',
+        actorRole: 'ADMIN',
+        action: 'MEMBER_DELETED',
+        details: `Menghapus member (${memberId}) beserta seluruh riwayat poin dan ${querySnapshot.size} transaksi terkait secara permanen.`,
+        module: 'MEMBERS'
+      };
+      localStorage.setItem('wtc_audit_logs', JSON.stringify([newLog, ...auditList]));
+
+      // Fallback local state update in case listener is slow
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+      setTransactions(prev => prev.filter(t => t.memberId !== memberId));
+
     } catch (err) {
-      console.warn("Could not sync member delete to Firestore:", err);
+      console.warn("Could not fully sync member delete to Firestore:", err);
+      // Fallback if completely offline
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+      setTransactions(prev => prev.filter(t => t.memberId !== memberId));
     }
   };
 
@@ -571,13 +607,20 @@ export default function App() {
       <Routes>
         <Route path="/cashier" element={
         cashierAuthenticated ? (
-          <CashierPOSView 
+          <CashierTerminalView 
             members={members} 
             setMembers={setMembers}
             transactions={transactions} 
             setTransactions={setTransactions}
             stores={stores}
-            currentStore={stores.find(s => s.name.toLowerCase() === cashierStoreName.toLowerCase() || s.code.toLowerCase() === cashierStoreName.toLowerCase()) || stores[0] || initialStores[0]}
+            currentStore={
+              stores.find(s => 
+                s.name.toLowerCase().includes(cashierStoreName.toLowerCase()) || 
+                cashierStoreName.toLowerCase().includes(s.name.toLowerCase()) ||
+                s.code?.toLowerCase() === cashierStoreName.toLowerCase() ||
+                s.id?.toLowerCase() === cashierStoreName.toLowerCase()
+              ) || stores[0] || initialStores[0]
+            }
             cashierName={cashierName}
             onSignOut={() => {
               setCashierAuthenticated(false);
@@ -684,7 +727,7 @@ export default function App() {
                 const existingMemberByPhone = await findMemberByPhoneInFirestore(normalizedTarget);
 
                 if (existingMemberByPhone) {
-                  // MERGE / LINK: Member already registered (e.g., at physical store POS by Cashier)
+                  // MERGE / LINK: Member already registered (e.g., at physical store by Cashier)
                   // Link Google UID to the existing member document, preserving the member ID, points, and history!
                   const updatedMemberData = cleanForFirestore({
                     ...existingMemberByPhone,
@@ -791,6 +834,20 @@ export default function App() {
                 isRefreshing={isRefreshingData}
                 onOpenNotifications={() => setIsNotificationsOpen(true)}
                 unreadNotificationsCount={unreadNotificationsCount}
+                members={members}
+                transactions={transactions}
+                stores={stores}
+                vouchers={vouchers}
+                campaigns={campaigns}
+                supportTickets={supportTickets}
+                auditLogs={auditLogs}
+                loyaltyConfig={loyaltyConfig}
+                onSelectMember={(m) => setGlobalPreviewMember(m)}
+                onSelectTransaction={(t) => {
+                  const m = members.find(mem => mem.id === t.memberId);
+                  if (m) setGlobalPreviewMember(m);
+                }}
+                onSelectTab={(tab) => setActiveTab(tab as any)}
               />
 
               <div id="main-scroll-area" className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -897,6 +954,20 @@ export default function App() {
               </div>
             </main>
 
+            <MemberPreviewModal
+              isOpen={!!globalPreviewMember}
+              onClose={() => setGlobalPreviewMember(null)}
+              member={globalPreviewMember}
+              transactions={transactions}
+              onOpenEdit={(m) => {
+                setGlobalPreviewMember(null);
+              }}
+              onToggleSuspend={handleToggleSuspendMember}
+              onDelete={(id) => {
+                handleDeleteMember(id);
+                setGlobalPreviewMember(null);
+              }}
+            />
             <QuickStoreSwitchModal 
               isOpen={isQuickLauncherOpen} 
               onClose={() => setIsQuickLauncherOpen(false)} 
@@ -1077,7 +1148,7 @@ export default function App() {
       {/* Redirect aliases for Head Office */}
       <Route path="/ho" element={<Navigate to="/admin" replace />} />
 
-      {/* Redirect aliases for Store Cashier POS */}
+      {/* Redirect aliases for Store Cashier */}
       <Route path="/pos" element={<Navigate to="/cashier" replace />} />
       <Route path="/kasir" element={<Navigate to="/cashier" replace />} />
 

@@ -7,46 +7,46 @@ import { db } from '../lib/firebase';
 import { findMemberByPhoneInFirestore, normalizePhoneNumber, isSamePhoneNumber } from '../lib/syncFirestore';
 
 export const STORE_ACCOUNTS = [
-  { name: "23 Paskal Bandung", username: "23PSC", password: "23PSC2026" },
-  { name: "23 Semarang", username: "23SMG", password: "23SMG2026" },
-  { name: "AEON Sentul", username: "AMSC", password: "AMSC2026" },
-  { name: "Alianyang Singkawang", username: "ALIAN", password: "ALIAN2026" },
-  { name: "Ambarukmo Plaza Jogja", username: "AMB", password: "AMB2026" },
-  { name: "Ayani Pontianak", username: "AYANI", password: "AYANI2026" },
-  { name: "BIG Mall Samarinda", username: "BIG", password: "BIG2026" },
-  { name: "Bogor Botani", username: "BOS", password: "BOS2026" },
-  { name: "Cibinong City Mall", username: "CCM", password: "CCM2026" },
-  { name: "Ciputra Semarang", username: "CL", password: "CL2026" },
-  { name: "DP Mall Semarang", username: "DPM", password: "DPM2026" },
-  { name: "Duta Mall 1 Banjarmasin", username: "DTM1", password: "DTM12026" },
-  { name: "Duta Mall 2 Banjarmasin", username: "DTM2", password: "DTM22026" },
-  { name: "E-Walk Balikpapan", username: "EWALK", password: "EWALK2026" },
-  { name: "Gaia Pontianak", username: "GAIA", password: "GAIA2026" },
-  { name: "Gorontalo", username: "GTLO", password: "GTLO2026" },
-  { name: "Jayapura", username: "JYP", password: "JYP2026" },
-  { name: "Jogja City Mall", username: "JCM", password: "JCM2026" },
-  { name: "Kendari", username: "KDI", password: "KDI2026" },
-  { name: "Kota Kasablanka Jakarta", username: "KOKAS", password: "KOKAS2026" },
-  { name: "Level 21 Bali", username: "LVL21", password: "LVL212026" },
-  { name: "Mall Olympic Garden 1 Malang", username: "MOG1", password: "MOG12026" },
-  { name: "Mall Olympic Garden 2 Malang", username: "MOG2", password: "MOG22026" },
-  { name: "Manado Town Square", username: "MANTS", password: "MANTS2026" },
-  { name: "Pakuwon Mall Yogya", username: "PMJ", password: "PMJ2026" },
-  { name: "Palu", username: "PALU", password: "PALU2026" },
-  { name: "Panakukang", username: "KUKA", password: "KUKA2026" },
-  { name: "Paragon Semarang", username: "PRG", password: "PRG2026" },
-  { name: "Penta City Balikpapan", username: "PENTA", password: "PENTA2026" },
-  { name: "Puri Jakarta", username: "PIM", password: "PIM2026" },
-  { name: "Singkawang Grand Mall", username: "SGM", password: "SGM2026" },
-  { name: "Solo Baru", username: "SOBAR", password: "SOBAR2026" },
-  { name: "Solo Square", username: "SQ", password: "SQ2026" },
-  { name: "Summarecon Mall Bandung", username: "SMB", password: "SMB2026" },
-  { name: "The Park Sawangan Depok", username: "SWG", password: "SWG2026" },
-  { name: "The Park Solo", username: "PARK", password: "PARK2026" },
-  { name: "TSM Bali", username: "BALI", password: "BALI2026" },
-  { name: "TSM Bandung", username: "TSM", password: "TSM2026" },
-  { name: "TSM Cibubur", username: "CBB", password: "CBB2026" },
-  { name: "TSM Makassar", username: "FINE", password: "FINE2026" }
+  { name: "23 Paskal Bandung", username: "23PSC", pin: "23PSC2026" },
+  { name: "23 Semarang", username: "23SMG", pin: "23SMG2026" },
+  { name: "AEON Sentul", username: "AMSC", pin: "AMSC2026" },
+  { name: "Alianyang Singkawang", username: "ALIAN", pin: "ALIAN2026" },
+  { name: "Ambarukmo Plaza Jogja", username: "AMB", pin: "AMB2026" },
+  { name: "Ayani Pontianak", username: "AYANI", pin: "AYANI2026" },
+  { name: "BIG Mall Samarinda", username: "BIG", pin: "BIG2026" },
+  { name: "Bogor Botani", username: "BOS", pin: "BOS2026" },
+  { name: "Cibinong City Mall", username: "CCM", pin: "CCM2026" },
+  { name: "Ciputra Semarang", username: "CL", pin: "CL2026" },
+  { name: "DP Mall Semarang", username: "DPM", pin: "DPM2026" },
+  { name: "Duta Mall 1 Banjarmasin", username: "DTM1", pin: "DTM12026" },
+  { name: "Duta Mall 2 Banjarmasin", username: "DTM2", pin: "DTM22026" },
+  { name: "E-Walk Balikpapan", username: "EWALK", pin: "EWALK2026" },
+  { name: "Gaia Pontianak", username: "GAIA", pin: "GAIA2026" },
+  { name: "Gorontalo", username: "GTLO", pin: "GTLO2026" },
+  { name: "Jayapura", username: "JYP", pin: "JYP2026" },
+  { name: "Jogja City Mall", username: "JCM", pin: "JCM2026" },
+  { name: "Kendari", username: "KDI", pin: "KDI2026" },
+  { name: "Kota Kasablanka Jakarta", username: "KOKAS", pin: "KOKAS2026" },
+  { name: "Level 21 Bali", username: "LVL21", pin: "LVL212026" },
+  { name: "Mall Olympic Garden 1 Malang", username: "MOG1", pin: "MOG12026" },
+  { name: "Mall Olympic Garden 2 Malang", username: "MOG2", pin: "MOG22026" },
+  { name: "Manado Town Square", username: "MANTS", pin: "MANTS2026" },
+  { name: "Pakuwon Mall Yogya", username: "PMJ", pin: "PMJ2026" },
+  { name: "Palu", username: "PALU", pin: "PALU2026" },
+  { name: "Panakukang", username: "KUKA", pin: "KUKA2026" },
+  { name: "Paragon Semarang", username: "PRG", pin: "PRG2026" },
+  { name: "Penta City Balikpapan", username: "PENTA", pin: "PENTA2026" },
+  { name: "Puri Jakarta", username: "PIM", pin: "PIM2026" },
+  { name: "Singkawang Grand Mall", username: "SGM", pin: "SGM2026" },
+  { name: "Solo Baru", username: "SOBAR", pin: "SOBAR2026" },
+  { name: "Solo Square", username: "SQ", pin: "SQ2026" },
+  { name: "Summarecon Mall Bandung", username: "SMB", pin: "SMB2026" },
+  { name: "The Park Sawangan Depok", username: "SWG", pin: "SWG2026" },
+  { name: "The Park Solo", username: "PARK", pin: "PARK2026" },
+  { name: "TSM Bali", username: "BALI", pin: "BALI2026" },
+  { name: "TSM Bandung", username: "TSM", pin: "TSM2026" },
+  { name: "TSM Cibubur", username: "CBB", pin: "CBB2026" },
+  { name: "TSM Makassar", username: "FINE", pin: "FINE2026" }
 ];
 
 interface AdminLoginProps {
@@ -63,8 +63,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   showStoreQuickSelect = true 
 }) => {
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [isStoreDropdownOpen, setIsStoreDropdownOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -79,10 +79,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     e.preventDefault();
     setError('');
     const u = username.trim();
-    const p = password.trim();
+    const p = pin.trim();
 
     if (!u || !p) {
-      setError('Silakan masukkan Username dan Password.');
+      setError('Silakan masukkan Username dan PIN.');
       return;
     }
 
@@ -107,13 +107,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
     // Check store accounts for Cashier portal (strict manual password check)
     const foundStore = STORE_ACCOUNTS.find(
-      s => s.username.toUpperCase() === u.toUpperCase() && (s.password === p || s.password.toUpperCase() === p.toUpperCase())
+      s => s.username.toUpperCase() === u.toUpperCase() && (s.pin === p || s.pin.toUpperCase() === p.toUpperCase())
     );
 
     if (foundStore) {
       onLogin(foundStore.username, foundStore.name);
     } else {
-      setError('Login ID (Username) atau Password toko salah. Silakan periksa dan ketik kembali.');
+      setError('Login ID (Username) atau PIN toko salah. Silakan periksa dan ketik kembali.');
     }
   };
 
@@ -183,7 +183,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
                           key={acc.username}
                           onClick={() => {
                             setUsername(acc.username);
-                            setPassword(''); // STRICTLY NO FAST LOGIN: Cashier must type password manually!
+                            setPin(''); // STRICTLY NO FAST LOGIN: Cashier must type password manually!
                             setIsStoreDropdownOpen(false);
                             setError('');
                           }}
@@ -225,38 +225,38 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-              {showStoreQuickSelect ? "Password Cabang (Input Manual)" : "Password Head Office"}
+              {showStoreQuickSelect ? "PIN Cabang (Input Manual)" : "PIN Head Office"}
             </label>
             <div className="relative">
               <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
-                type={showPassword ? "text" : "password"} 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                type={showPin ? "text" : "password"} maxLength={10} 
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
                 className="w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-slate-900"
-                placeholder={showStoreQuickSelect ? "Ketikkan password cabang Anda" : "••••••••"}
-                autoComplete="new-password"
+                placeholder={showStoreQuickSelect ? "Ketikkan PIN cabang Anda" : "••••••••"}
+                autoComplete="off"
                 data-lpignore="true"
                 name="wtc_pwd_field"
                 required
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPin(!showPin)}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 cursor-pointer"
-                title={showPassword ? "Sembunyikan password" : "Lihat password"}
+                title={showPin ? "Sembunyikan PIN" : "Lihat PIN"}
                 tabIndex={-1}
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
             {showStoreQuickSelect ? (
               <p className="text-[11px] text-slate-400 mt-1.5">
-                Password tidak disimpan otomatis. Format: <strong>[KODE]2026</strong> (Contoh: PIM2026)
+                PIN tidak disimpan otomatis. Format: <strong>[KODE]2026</strong> (Contoh: PIM2026)
               </p>
             ) : (
               <p className="text-[11px] text-slate-400 mt-1.5">
-                Ketikkan password admin Head Office secara manual.
+                Ketikkan PIN admin Head Office secara manual.
               </p>
             )}
           </div>

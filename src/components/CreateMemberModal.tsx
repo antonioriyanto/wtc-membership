@@ -170,8 +170,8 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
 
   return (
     <Portal>
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scaleUp border border-slate-200 dark:border-slate-700">
+      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-fadeIn">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 animate-modalIn">
         <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-700">
           <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />

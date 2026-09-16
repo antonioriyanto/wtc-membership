@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Member, Voucher, StoreBranch, Transaction, Campaign, SupportTicket } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
 import { useMemberLiveProfile } from '../hooks/useMemberLiveProfile';
@@ -32,6 +32,11 @@ import {
 } from 'lucide-react';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { WatchClubLogo } from './WatchClubLogo';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { QRCodeSVG } from 'qrcode.react';
+import confetti from 'canvas-confetti';
+
 
 interface CustomerMemberViewProps {
   member: Member;
@@ -65,6 +70,82 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedVoucherForQr, setSelectedVoucherForQr] = useState<Voucher | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('Failed to get canvas context'));
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate size? Even if large, we compress it immediately.
+    try {
+      showAlert('Processing', 'Compressing and uploading image...');
+      const compressedBase64 = await compressImage(file, 400, 400, 0.7);
+      
+      const memberRef = doc(db, 'members', member.id);
+      await updateDoc(memberRef, { avatarUrl: compressedBase64 });
+      
+      showAlert('Success', 'Profile picture updated successfully!');
+    } catch (err) {
+      showAlert('Error', 'Failed to update profile picture.');
+      console.error(err);
+    }
+  };
+
+  const tierBackgroundStyle = member.tier === 'BLUE' ? {
+    background: 'linear-gradient(135deg, #4375A6 0%, #30466E 25%, #222649 50%, #17182C 75%, #101010 100%)'
+  } : member.tier === 'SILVER' ? {
+    background: 'linear-gradient(135deg, #F8F4F3 0%, #A3A3A3 25%, #FCFCFC 50%, #909090 75%, #F4F0F1 100%)'
+  } : member.tier === 'GOLD' ? {
+    background: 'linear-gradient(135deg, #EEC944 0%, #FAE56F 25%, #DDAF1D 50%, #FFFA8A 75%, #B96F15 100%)'
+  } : member.tier === 'PLATINUM' ? {
+    background: 'linear-gradient(135deg, #ECF1F7 0%, #A7B8CA 25%, #E2E7ED 50%, #A7B8CA 75%, #F8F7FC 100%)'
+  } : member.tier === 'DIAMOND' ? {
+    background: 'linear-gradient(135deg, #F9FFFF 0%, #FFFFFF 12.5%, #CCD7E7 25%, #FDE2CA 30.61%, #B9C9DD 38.27%, #E7F7E0 50%, #FFFFFF 62.29%, #FEEBF0 70.02%, #DCE4EE 75%, #B9C9DD 85.2%, #FFFFFF 100%)'
+  } : {
+    background: 'linear-gradient(110deg, #1e293b 0%, #0f172a 100%)'
+  };
+
+  const tierTextColorClass = member.tier === 'BLUE' || member.tier === 'GOLD' ? 'text-white' : member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'text-slate-900' : 'text-white';
+
 
   // Support tickets & campaigns state
   const [activeCampaignModal, setActiveCampaignModal] = useState<Campaign | null>(null);
@@ -350,9 +431,16 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             <WatchClubLogo />
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full border border-slate-300 bg-slate-200 flex justify-center items-center font-bold text-slate-500 overflow-hidden shrink-0">
-              {member.name.charAt(0).toUpperCase()}
-            </div>
+            <button
+              onClick={() => setActiveTab('PROFILE')}
+              className="w-10 h-10 rounded-full border border-slate-300 bg-slate-200 flex justify-center items-center font-bold text-slate-500 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 shadow-sm"
+            >
+              {member.avatarUrl ? (
+                <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" />
+              ) : (
+                member.name.charAt(0).toUpperCase()
+              )}
+            </button>
           </div>
         </header>
 
@@ -404,19 +492,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 className={`rounded-[10px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] relative overflow-hidden grid grid-cols-[1.3fr_0.7fr] p-6 aspect-[2/1] cursor-pointer hover:scale-[1.02] transition-transform ${
                   member.tier === 'BLUE' || member.tier === 'GOLD' ? 'text-white' : member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'text-slate-900' : 'text-white bg-[radial-gradient(circle_at_top_left,#1e293b,#0f172a)]'
                 }`}
-                style={
-                  member.tier === 'BLUE' ? {
-                    background: 'linear-gradient(135deg, #4375A6 0%, #30466E 25%, #222649 50%, #17182C 75%, #101010 100%)'
-                  } : member.tier === 'SILVER' ? {
-                    background: 'linear-gradient(135deg, #F8F4F3 0%, #A3A3A3 25%, #FCFCFC 50%, #909090 75%, #F4F0F1 100%)'
-                  } : member.tier === 'GOLD' ? {
-                    background: 'linear-gradient(135deg, #EEC944 0%, #FAE56F 25%, #DDAF1D 50%, #FFFA8A 75%, #B96F15 100%)'
-                  } : member.tier === 'PLATINUM' ? {
-                    background: 'linear-gradient(135deg, #ECF1F7 0%, #A7B8CA 25%, #E2E7ED 50%, #A7B8CA 75%, #F8F7FC 100%)'
-                  } : member.tier === 'DIAMOND' ? {
-                    background: 'linear-gradient(135deg, #F9FFFF 0%, #FFFFFF 12.5%, #CCD7E7 25%, #FDE2CA 30.61%, #B9C9DD 38.27%, #E7F7E0 50%, #FFFFFF 62.29%, #FEEBF0 70.02%, #DCE4EE 75%, #B9C9DD 85.2%, #FFFFFF 100%)'
-                  } : null
-                }
+                style={tierBackgroundStyle}
                 onClick={() => {
                   setSelectedVoucherForQr(null);
                   setIsQrModalOpen(true);
@@ -711,8 +787,29 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               <div className="bg-white rounded-[20px] shadow-sm p-6 sm:p-8 flex flex-col items-center border border-slate-200/80">
                 
                 <div className="relative mb-6">
-                  <div className="w-[80px] h-[80px] rounded-full bg-slate-900 text-white flex justify-center items-center text-2xl font-bold shadow-sm">
-                    {member.name.charAt(0).toUpperCase()}
+                  <div 
+                    className="w-[80px] h-[80px] rounded-full bg-slate-900 text-white flex justify-center items-center text-2xl font-bold shadow-sm overflow-hidden group relative cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {member.avatarUrl ? (
+                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" />
+                    ) : (
+                      member.name.charAt(0).toUpperCase()
+                    )}
+                    
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Camera className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    ref={fileInputRef} 
+                    onChange={handleAvatarUpload}
+                  />
+                  <div className="text-center mt-3">
+                    <p className="text-xs text-slate-500 font-medium">Click to change picture</p>
                   </div>
                 </div>
 
@@ -985,7 +1082,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         onChange={(e) => setTicketCategory(e.target.value as any)}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none"
                       >
-                        <option value="MISSING_POINTS">Poin Belanja Belum Masuk</option>
+                        <option value="MISSING_POINTS">Poin Transaksi Belum Masuk</option>
                         <option value="VOUCHER_CLAIM">Kendala Klaim / Scan Voucher</option>
                         <option value="DATA_CORRECTION">Koreksi Data / No. HP Akun</option>
                         <option value="GENERAL_INQUIRY">Pertanyaan Umum Loyalty</option>
@@ -1019,7 +1116,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                           required
                           value={ticketSubject}
                           onChange={(e) => setTicketSubject(e.target.value)}
-                          placeholder="Contoh: Belanja kemarin poin belum bertambah"
+                          placeholder="Contoh: Transaksi kemarin poin belum bertambah"
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                         />
                       </div>
@@ -1047,7 +1144,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         rows={3}
                         value={ticketMessage}
                         onChange={(e) => setTicketMessage(e.target.value)}
-                        placeholder="Jelaskan detail belanja Anda, jam berapa, atau kendala voucher..."
+                        placeholder="Jelaskan detail transaksi Anda, jam berapa, atau kendala voucher..."
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                       />
                     </div>

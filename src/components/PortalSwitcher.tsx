@@ -31,7 +31,7 @@ export const PortalSwitcher: React.FC<PortalSwitcherProps> = ({ onSwitch }) => {
       label: 'Kasir',
       fullLabel: 'Kasir Toko',
       icon: Store,
-      description: 'POS Kasir & Transaksi'
+      description: 'Terminal Kasir & Transaksi'
     },
     {
       id: 'MEMBER' as const,

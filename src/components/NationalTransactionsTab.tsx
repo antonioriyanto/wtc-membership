@@ -166,7 +166,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
   }, [filteredTransactions]);
 
   const handleExportCSV = () => {
-    const headers = ['No Struk', 'Toko Cabang', 'Waktu', 'Nama Member', 'No Telepon', 'Tipe', 'Nominal Belanja', 'Poin Delta', 'Kasir', 'Catatan'];
+    const headers = ['No Struk', 'Toko Cabang', 'Waktu', 'Nama Member', 'No Telepon', 'Tipe', 'Nominal Transaksi', 'Poin Delta', 'Kasir', 'Catatan'];
     const rows = filteredTransactions.map(t => [
       t.receiptNo,
       t.storeName,
@@ -202,7 +202,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
             </span>
           </div>
           <p className="text-sm text-slate-500">
-            Pusat pemantauan seluruh mutasi transaksi belanja, penukaran voucher, & poin di seluruh cabang Watch Club Indonesia.
+            Pusat pemantauan seluruh mutasi aktivitas loyalty, penukaran voucher, & poin di seluruh cabang Watch Club Indonesia.
           </p>
         </div>
 
@@ -385,7 +385,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Tipe:</span>
             {[
               { id: 'ALL', label: 'Semua Tipe' },
-              { id: 'EARN', label: 'Belanja & Earn Poin' },
+              { id: 'EARN', label: 'Earn Poin' },
               { id: 'REDEEM', label: 'Tukar Voucher' },
               { id: 'MANUAL', label: 'Manual Adjustment' }
             ].map(tf => (
@@ -414,7 +414,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                 <th className="py-3.5 px-5">No. Struk & Waktu</th>
                 <th className="py-3.5 px-5">Toko Cabang</th>
                 <th className="py-3.5 px-5">Member / Pelanggan</th>
-                <th className="py-3.5 px-5">Nilai Belanja</th>
+                <th className="py-3.5 px-5">Nilai Transaksi</th>
                 <th className="py-3.5 px-5">Poin Delta</th>
                 <th className="py-3.5 px-5">Tipe & Kasir</th>
                 <th className="py-3.5 px-5 text-center">Aksi</th>
@@ -513,7 +513,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                       {/* Type & Cashier */}
                       <td className="py-3.5 px-5">
                         <div className="font-semibold text-slate-700">
-                          {isEarn && 'Belanja Kasir'}
+                          {isEarn && 'Penerbitan Poin'}
                           {isRedeem && 'Penukaran Voucher'}
                           {isManual && 'Manual Adjustment'}
                         </div>
@@ -555,12 +555,12 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                                 showConfirm(
                                   `Apakah Anda yakin ingin menghapus transaksi ${trx.receiptNo}? Tindakan ini akan menghapusnya dari laporan HO, namun saldo poin member TIDAK akan dikurangi secara otomatis (harap kurangi secara manual jika perlu).`,
                                   'Hapus Transaksi',
-                                  'Hapus (Audit Log)',
                                   () => {
                                     onDeleteTransaction(trx.id);
                                     showAlert(`Transaksi ${trx.receiptNo} berhasil dihapus (Audit Log dicatat).`, 'Berhasil', 'success');
                                   },
-                                  'danger'
+                                  'Hapus (Audit Log)',
+                                  'Batal'
                                 );
                               }}
                               className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors cursor-pointer"
@@ -638,7 +638,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
 
               <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
                 <div className="flex justify-between items-center text-slate-600">
-                  <span>Nilai Transaksi Belanja</span>
+                  <span>Nilai Transaksi</span>
                   <span className="font-bold text-slate-900 text-sm">
                     Rp {(selectedReceiptDetail.amount || 0).toLocaleString('id-ID')}
                   </span>
@@ -705,16 +705,16 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                 <label className="block text-xs font-semibold text-slate-700 mb-1">No. Struk</label>
                 <input 
                   type="text" 
-                  value={editingTransaction.receiptNo}
+                  value={editingTransaction.receiptNo || ""}
                   onChange={(e) => setEditingTransaction({...editingTransaction, receiptNo: e.target.value})}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:bg-white"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Nominal Belanja (Rp)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nominal Transaksi (Rp)</label>
                 <input 
                   type="number" 
-                  value={editingTransaction.amount}
+                  value={editingTransaction.amount || ""}
                   onChange={(e) => setEditingTransaction({...editingTransaction, amount: parseInt(e.target.value) || 0})}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:bg-white"
                 />

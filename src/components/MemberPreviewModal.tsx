@@ -83,7 +83,7 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
       <div 
-        className="bg-white rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden"
+        className="bg-white rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-modalIn"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
@@ -314,9 +314,9 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
             <div className="space-y-4 animate-fadeIn">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-medium">Password Login Member:</span>
+                  <span className="text-slate-500 font-medium">PIN Login Member:</span>
                   <span className="font-mono font-bold bg-white px-3 py-1 rounded-lg border border-slate-200 text-slate-800">
-                    {member.password || 'watchclub123'}
+                    {member.pin || '123456'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between pt-1">
@@ -364,7 +364,7 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
                 ) : (
                   <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
                     <p className="text-xs text-rose-800 font-medium">
-                      Yakin ingin menghapus akun <strong>{member.name}</strong> ({member.membershipId})? Tindakan ini tidak dapat dibatalkan.
+                      Yakin ingin menghapus akun <strong>{member.name}</strong> ({member.membershipId}) beserta seluruh Poin dan Riwayat Transaksinya secara permanen? Tindakan ini tidak dapat dibatalkan.
                     </p>
                     <div className="flex items-center gap-2">
                       <button

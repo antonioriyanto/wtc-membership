@@ -20,8 +20,8 @@ export const QuickStoreSwitchModal: React.FC<QuickStoreSwitchModalProps> = ({
   ] as const;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scaleUp">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-modalIn">
         <div className="flex justify-between items-center p-5 border-b border-slate-100">
           <h3 className="font-bold text-lg text-slate-900">Switch System Role</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">

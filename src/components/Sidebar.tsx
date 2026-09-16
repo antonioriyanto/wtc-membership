@@ -79,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 group text-left ${
                 isActive
                   ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold shadow-sm dark:shadow-inner border border-slate-200 dark:border-slate-700/60'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-800/50'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-800/50 hover:translate-x-1'
               }`}
             >
               <div className="flex items-center gap-3">

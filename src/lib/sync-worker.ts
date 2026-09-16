@@ -63,18 +63,18 @@ export async function runMemberSyncPass(
       }
     }
 
-    // Resolve duplicate phone entries by merging into the most complete (POS or high-points) record
+    // Resolve duplicate phone entries by merging into the most complete (cashier or high-points) record
     for (const [normPhone, duplicates] of Object.entries(phoneGroups)) {
       if (duplicates.length > 1) {
         discrepanciesCount++;
-        // Choose primary member (prefer member with highest points, non-empty membershipId, or POS id)
+        // Choose primary member (prefer member with highest points, non-empty membershipId, or cashier terminal id)
         const primary = [...duplicates].sort((a, b) => {
           const pointsA = Number(a.points || 0);
           const pointsB = Number(b.points || 0);
           if (pointsB !== pointsA) return pointsB - pointsA;
-          const isPosA = a.id.startsWith('mem_') ? 1 : 0;
-          const isPosB = b.id.startsWith('mem_') ? 1 : 0;
-          return isPosB - isPosA;
+          const isCashierA = a.id.startsWith('mem_') ? 1 : 0;
+          const isCashierB = b.id.startsWith('mem_') ? 1 : 0;
+          return isCashierB - isCashierA;
         })[0];
 
         const secondaries = duplicates.filter((m) => m.id !== primary.id);
@@ -215,7 +215,7 @@ export async function runMemberSyncPass(
 
           reconciledLocalMap.set(localMatch.id, updatedLocal);
 
-          // If local was higher than Firestore (e.g. offline POS transaction), push back to Firestore
+          // If local was higher than Firestore (e.g. offline Cashier transaction), push back to Firestore
           if (localPoints > fsPoints || localSpend > fsSpend) {
             await safeSetDoc("members", updatedLocal.id, updatedLocal);
             actions.push(`Pushed higher offline points/spend for ${updatedLocal.name} (${updatedLocal.id}) to Firestore`);
@@ -298,7 +298,7 @@ export async function runMemberSyncPass(
 /**
  * Starts the background sync worker.
  * Runs every 30 seconds (default) to continuously audit and align
- * member state between Cashier POS and Customer Portal.
+ * member state between Cashier Portal and Customer Portal.
  */
 export function startSyncWorker(options: SyncWorkerOptions = {}): () => void {
   const {

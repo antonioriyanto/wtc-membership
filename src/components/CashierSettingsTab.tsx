@@ -12,7 +12,7 @@ export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, st
   const { showAlert } = useCustomDialog();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [passwordUpdated, setPasswordUpdated] = useState(false);
+  const [pinUpdated, setPinUpdated] = useState(false);
 
   useEffect(() => {
     setIsDarkMode(document.documentElement.classList.contains('dark'));
@@ -29,10 +29,10 @@ export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, st
     }
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordUpdated(true);
-    setTimeout(() => setPasswordUpdated(false), 3000);
+    setPinUpdated(true);
+    setTimeout(() => setPinUpdated(false), 3000);
   };
 
   return (
@@ -64,27 +64,27 @@ export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, st
               <p className="text-sm text-slate-500 dark:text-slate-400">Perbarui kata sandi untuk keamanan akses kasir.</p>
             </div>
 
-            {passwordUpdated && (
+            {pinUpdated && (
               <div className="mb-3 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
                 <Check className="w-4 h-4" /> Kata sandi berhasil diperbarui!
               </div>
             )}
 
-            <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-3">
+            <form onSubmit={handlePinSubmit} className="flex flex-col gap-3">
               <input 
-                type="password" 
+                type="pin" maxLength={6} pattern="[0-9]*" inputMode="numeric" 
                 placeholder="Kata Sandi Saat Ini" 
                 required 
                 className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors" 
               />
               <input 
-                type="password" 
+                type="pin" maxLength={6} pattern="[0-9]*" inputMode="numeric" 
                 placeholder="Kata Sandi Baru" 
                 required 
                 className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors" 
               />
               <input 
-                type="password" 
+                type="pin" maxLength={6} pattern="[0-9]*" inputMode="numeric" 
                 placeholder="Konfirmasi Kata Sandi Baru" 
                 required 
                 className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors" 

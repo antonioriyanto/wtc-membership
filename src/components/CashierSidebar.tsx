@@ -43,7 +43,7 @@ export const CashierSidebar: React.FC<SidebarProps> = ({
                 className={`w-full flex items-center px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
                   isActive 
                     ? 'bg-white dark:bg-white/10 text-emerald-600 dark:text-white shadow-sm dark:shadow-none border border-slate-200 dark:border-transparent' 
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white hover:translate-x-1'
                 }`}
               >
                 <div className="w-5 text-center mr-3 flex justify-center">

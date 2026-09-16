@@ -42,7 +42,7 @@ export interface SupportTicket {
   storeName?: string;
   cashierName?: string;
   subject: string;
-  category: 'MISSING_POINTS' | 'VOUCHER_CLAIM' | 'DATA_CORRECTION' | 'POS_HARDWARE' | 'DISPUTE' | 'OTHER';
+  category: 'MISSING_POINTS' | 'VOUCHER_CLAIM' | 'DATA_CORRECTION' | 'CASHIER_HARDWARE' | 'DISPUTE' | 'OTHER';
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   createdAt: string;
@@ -87,7 +87,7 @@ export interface Member {
   phone: string;
   phoneE164?: string;
   email: string;
-  password?: string;
+  pin?: string;
   tier: MemberTier;
   points: number;
   lifetimePoints: number;
@@ -99,6 +99,7 @@ export interface Member {
   gender: 'Pria' | 'Wanita';
   birthDate?: string;
   address?: string;
+  avatarUrl?: string;
   status: 'ACTIVE' | 'SUSPENDED';
 
   // Cryptographic Credential & Recovery Attributes

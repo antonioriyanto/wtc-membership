@@ -144,7 +144,7 @@ export const StoreTransactionsModal: React.FC<StoreTransactionsModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
       <div 
-        className="bg-white rounded-3xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden"
+        className="bg-white rounded-3xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-modalIn"
         onClick={(e) => e.stopPropagation()}
       >
         {/* MODAL HEADER */}
@@ -261,7 +261,7 @@ export const StoreTransactionsModal: React.FC<StoreTransactionsModalProps> = ({
           </div>
 
           <div>
-            <div className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Rata-Rata Belanja</div>
+            <div className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Rata-Rata Transaksi</div>
             <div className="text-xl sm:text-2xl font-black text-slate-200 mt-0.5 truncate">
               Rp {stats.avgBasket.toLocaleString('id-ID')}
             </div>
@@ -327,7 +327,7 @@ export const StoreTransactionsModal: React.FC<StoreTransactionsModalProps> = ({
                 onClick={() => setSelectedType('EARN')}
                 className={`px-3 py-1 rounded-lg transition-all ${selectedType === 'EARN' ? 'bg-white text-emerald-700 shadow-sm' : 'hover:text-slate-900'}`}
               >
-                Belanja (Earn)
+                Mendapatkan Poin (Earn)
               </button>
               <button
                 onClick={() => setSelectedType('REDEEM')}
@@ -381,7 +381,7 @@ export const StoreTransactionsModal: React.FC<StoreTransactionsModalProps> = ({
                     <th className="py-3 px-4">Member Pelanggan</th>
                     <th className="py-3 px-4">Kasir</th>
                     <th className="py-3 px-4">Keterangan Item / Promo</th>
-                    <th className="py-3 px-4 text-right">Nilai Belanja</th>
+                    <th className="py-3 px-4 text-right">Nilai Transaksi</th>
                     <th className="py-3 px-4 text-center">Poin Delta</th>
                   </tr>
                 </thead>
@@ -415,7 +415,7 @@ export const StoreTransactionsModal: React.FC<StoreTransactionsModalProps> = ({
                           <div className="mt-0.5">
                             {isEarn && (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                BELANJA (EARN)
+                                EARN POIN
                               </span>
                             )}
                             {isRedeem && (
@@ -470,7 +470,7 @@ export const StoreTransactionsModal: React.FC<StoreTransactionsModalProps> = ({
                               {trx.notes}
                             </span>
                           ) : (
-                            <span className="text-slate-400 italic">Transaksi Resmi POS Watch Club</span>
+                            <span className="text-slate-400 italic">Transaksi Resmi Watch Club</span>
                           )}
                         </td>
 

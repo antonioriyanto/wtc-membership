@@ -16,7 +16,7 @@ import { CreateMemberModal } from './CreateMemberModal';
 import { CustomerPinPromptModal } from './CustomerPinPromptModal';
 import { useCustomDialog } from './CustomDialogProvider';
 
-interface CashierPOSViewProps {
+interface CashierTerminalViewProps {
   members: Member[];
   setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
   transactions: Transaction[];
@@ -31,7 +31,7 @@ interface CashierPOSViewProps {
   onSwitchPerspective: (view: 'HO' | 'CASHIER' | 'MEMBER') => void;
 }
 
-export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
+export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
   members, 
   setMembers, 
   transactions, 
@@ -52,7 +52,7 @@ export const CashierPOSView: React.FC<CashierPOSViewProps> = ({
   const [isCreateMemberOpen, setIsCreateMemberOpen] = useState(false);
   const [autoSelectMemberId, setAutoSelectMemberId] = useState<string | undefined>(undefined);
 
-  // Customer PIN Prompt State for POS Redemptions
+  // Customer PIN Prompt State for Cashier Redemptions
   const [pinPromptState, setPinPromptState] = useState<{
     isOpen: boolean;
     member: Member | null;

@@ -162,7 +162,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
       'Jenis Kelamin': m.gender || '-',
       'Level Tier': m.tier || 'SILVER',
       'Total Poin': m.points || 0,
-      'Total Belanja (Rp)': m.totalSpend || 0,
+      'Total Transaksi (Rp)': m.totalSpend || 0,
       'Store Terdaftar': m.registeredStore || 'Puri Jakarta',
       'Tanggal Bergabung': m.joinDate ? new Date(m.joinDate).toLocaleDateString('id-ID') : '-',
       'Status': m.status || 'ACTIVE'
@@ -186,7 +186,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
       { wch: 14 }, // Jenis Kelamin
       { wch: 14 }, // Level Tier
       { wch: 14 }, // Total Poin
-      { wch: 18 }, // Total Belanja
+      { wch: 18 }, // Total Transaksi
       { wch: 18 }, // Store Terdaftar
       { wch: 18 }, // Tanggal Bergabung
       { wch: 12 }  // Status
@@ -203,7 +203,7 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
       return;
     }
 
-    const headers = ['ID Member', 'Nama Lengkap', 'Nomor HP', 'Email', 'Tanggal Lahir', 'Jenis Kelamin', 'Level Tier', 'Total Poin', 'Total Belanja (Rp)', 'Store Terdaftar', 'Tanggal Bergabung', 'Status'];
+    const headers = ['ID Member', 'Nama Lengkap', 'Nomor HP', 'Email', 'Tanggal Lahir', 'Jenis Kelamin', 'Level Tier', 'Total Poin', 'Total Transaksi (Rp)', 'Store Terdaftar', 'Tanggal Bergabung', 'Status'];
     const rows = filteredMembers.map(m => [
       `"${m.membershipId || m.id}"`,
       `"${(m.name || '').replace(/"/g, '""')}"`,

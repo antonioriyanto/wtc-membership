@@ -183,7 +183,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
       'Tanggal Lahir': m.birthDate ? new Date(m.birthDate).toLocaleDateString('id-ID') : '-',
       'Level Tier': m.tier || 'SILVER',
       'Total Poin': m.points || 0,
-      'Total Belanja': m.totalSpend || 0,
+      'Total Transaksi': m.totalSpend || 0,
       'Store Terdaftar': m.registeredStore || 'Puri Jakarta',
       'Status': m.status || 'ACTIVE'
     }));
@@ -220,7 +220,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
       showAlert('Belum ada data member untuk diekspor.', 'Perhatian', 'warning');
       return;
     }
-    const headers = ['ID Member', 'Nama Lengkap', 'Nomor HP', 'Email', 'Tanggal Lahir', 'Level Tier', 'Total Poin', 'Total Belanja', 'Store Terdaftar', 'Status'];
+    const headers = ['ID Member', 'Nama Lengkap', 'Nomor HP', 'Email', 'Tanggal Lahir', 'Level Tier', 'Total Poin', 'Total Transaksi', 'Store Terdaftar', 'Status'];
     const rows = sortedMembers.map(m => [
       `"${m.membershipId || m.id}"`,
       `"${(m.name || '').replace(/"/g, '""')}"`,
@@ -284,7 +284,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Members Ledger & CRM</h2>
-          <p className="text-sm text-slate-500">Database master member 41 cabang, status akun, password, dan riwayat loyalitas.</p>
+          <p className="text-sm text-slate-500">Database master member 41 cabang, status akun, PIN, dan riwayat loyalitas.</p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* EXPORT DROPDOWN */}
