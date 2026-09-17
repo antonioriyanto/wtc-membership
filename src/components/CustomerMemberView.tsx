@@ -8,7 +8,9 @@ import {
   MapPin, 
   User, 
   ArrowLeft, 
-  ChevronRight, 
+  ChevronRight,
+  Sun,
+  Moon, 
   X, 
   Percent,
   Wrench,
@@ -65,6 +67,30 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const member = liveProfile || initialMember;
 
   const [activeTab, setActiveTab] = useState<'MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE'>('MEMBERSHIP');
+
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  useEffect(() => {
+    const stored = localStorage.getItem('theme');
+    const isDark = stored === 'dark' || document.documentElement.classList.contains('dark');
+    setIsDarkMode(isDark);
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+  
+  const toggleTheme = () => {
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
   const [tabHistory, setTabHistory] = useState<('MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE')[]>([]);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -422,7 +448,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   ] as const;
 
   return (
-    <div className="w-full h-full bg-black dark:bg-white dark:text-black overflow-y-auto">
+    <div className="w-full h-full bg-slate-100 dark:bg-black overflow-y-auto">
       <div className="w-full max-w-[480px] min-h-screen mx-auto bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-900 dark:text-white pb-[100px] relative shadow-2xl">
         
         <header className="flex justify-between items-center p-5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950/90 backdrop-blur-md sticky top-0 z-50">
@@ -442,10 +468,18 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
           <div className="w-[110px] text-neutral-900 dark:text-white flex justify-center">
             <WatchClubLogo />
           </div>
+
           <div className="flex items-center gap-2">
             <button
+              onClick={toggleTheme}
+              className="w-10 h-10 rounded-full border border-black/10 dark:border-white/20 bg-slate-200 dark:bg-neutral-800 flex justify-center items-center font-bold text-neutral-500 dark:text-neutral-400 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 dark:hover:bg-neutral-700 shadow-sm"
+              title="Ganti Tema"
+            >
+              {isDarkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <button
               onClick={() => setActiveTab('PROFILE')}
-              className="w-10 h-10 rounded-full border border-black/10 dark:border-white/20 bg-slate-200 flex justify-center items-center font-bold text-neutral-500 dark:text-neutral-400 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 shadow-sm"
+              className="w-10 h-10 rounded-full border border-black/10 dark:border-white/20 bg-slate-200 dark:bg-neutral-800 flex justify-center items-center font-bold text-neutral-500 dark:text-neutral-400 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 dark:hover:bg-neutral-700 shadow-sm"
             >
               {member.avatarUrl ? (
                 <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover object-center" />
@@ -548,7 +582,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 </div>
               </div>
               <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-black dark:bg-white dark:text-black rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
+                <div className="h-full bg-slate-100 dark:bg-black rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
               </div>
             </section>
 
@@ -618,7 +652,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               <h2 className="text-base font-bold mb-4 pl-1 text-neutral-900 dark:text-white">Your Active Vouchers</h2>
               <div className="flex overflow-x-auto snap-x snap-mandatory gap-5 pb-2.5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {activeCustomerVouchers.map((v, i) => (
-                  <div key={v.id} className="flex-[0_0_calc(100%-40px)] max-w-[400px] bg-black dark:bg-white dark:text-black text-white rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] snap-start flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
+                  <div key={v.id} className="flex-[0_0_calc(100%-40px)] max-w-[400px] bg-slate-100 dark:bg-black text-white rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] snap-start flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
                     backgroundImage: v.imagePath ? `url('${v.imagePath}')` : 'linear-gradient(to bottom right, #fef08a, #c7d2fe)',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
@@ -661,7 +695,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             <section className="m-5">
               <div className="flex flex-col gap-6">
                 {activeCustomerVouchers.map(v => (
-                  <div key={v.id} className="w-full bg-black dark:bg-white dark:text-black rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
+                  <div key={v.id} className="w-full bg-slate-100 dark:bg-black rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
                     backgroundImage: v.imagePath ? `url('${v.imagePath}')` : 'linear-gradient(to bottom right, #0f172a, #1e293b)',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
@@ -800,7 +834,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 
                 <div className="relative mb-6 flex flex-col items-center">
                   <div 
-                    className="w-[80px] h-[80px] rounded-full bg-black dark:bg-white dark:text-black text-white flex justify-center items-center text-2xl font-bold shadow-sm overflow-hidden group relative cursor-pointer"
+                    className="w-[80px] h-[80px] rounded-full bg-slate-100 dark:bg-black text-white flex justify-center items-center text-2xl font-bold shadow-sm overflow-hidden group relative cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     {member.avatarUrl ? (
@@ -907,7 +941,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 onClick={() => handleTabChange(item.id)}
                 className={`flex flex-col items-center gap-1 w-[60px] transition-colors bg-transparent border-none cursor-pointer ${isActive ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:text-neutral-400'}`}
               >
-                <div className={`w-10 h-10 rounded-full flex justify-center items-center text-[1.2rem] transition-colors ${isActive ? 'bg-black dark:bg-white dark:text-black text-white shadow-sm' : ''}`}>
+                <div className={`w-10 h-10 rounded-full flex justify-center items-center text-[1.2rem] transition-colors ${isActive ? 'bg-slate-100 dark:bg-black text-white shadow-sm' : ''}`}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <span className="text-[0.65rem] font-semibold text-center leading-[1.1]">{item.label}</span>
@@ -917,7 +951,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         </nav>
 
         {isHistoryModalOpen && (
-          <div className="fixed inset-0 bg-black dark:bg-white dark:text-black/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
+          <div className="fixed inset-0 bg-slate-100 dark:bg-black/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
             <div className="bg-white dark:bg-white/5 rounded-[24px] text-center shadow-sm dark:shadow-none [0_20px_40px_-10px_rgba(0,0,0,0.1)] w-full max-w-[420px] p-[25px_20px] relative animate-scaleUp">
               <button 
                 onClick={() => setIsHistoryModalOpen(false)}
@@ -952,7 +986,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
         <PwaInstallPrompt />
         {isQrModalOpen && (
-          <div className="fixed inset-0 bg-black dark:bg-white dark:text-black/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
+          <div className="fixed inset-0 bg-slate-100 dark:bg-black/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
             <div className="bg-white dark:bg-white/5 rounded-[24px] text-center shadow-sm dark:shadow-none [0_20px_40px_-10px_rgba(0,0,0,0.1)] w-[90%] max-w-[340px] p-7 relative animate-scaleUp">
               <button 
                 onClick={() => {
@@ -987,7 +1021,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         {/* 1. PUSH-POP CAMPAIGN BANNER MODAL */}
         {activeCampaignModal && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center z-[10000] p-4 animate-fadeIn">
-            <div className="bg-black dark:bg-white dark:text-black rounded-3xl text-center shadow-2xl w-full max-w-sm overflow-hidden relative animate-scaleUp border border-slate-700">
+            <div className="bg-slate-100 dark:bg-black rounded-3xl text-center shadow-2xl w-full max-w-sm overflow-hidden relative animate-scaleUp border border-slate-700">
               <button 
                 onClick={() => setActiveCampaignModal(null)}
                 className="absolute top-3.5 right-3.5 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 transition-colors cursor-pointer z-20 backdrop-blur-sm shadow-md"
