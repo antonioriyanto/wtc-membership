@@ -137,8 +137,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       }
 
       // Sign in with Firebase Auth Custom Token
-      const auth = getAuth();
-      await signInWithCustomToken(auth, result.token);
+      if (result.token) {
+        const auth = getAuth();
+        await signInWithCustomToken(auth, result.token);
+      }
       
       if (!isHO) {
         try { localStorage.setItem('wtc_cashier_store', storeName); } catch (e) {}
