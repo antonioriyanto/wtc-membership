@@ -73,6 +73,23 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const { profile: liveProfile } = useMemberLiveProfile(initialMember?.id || null);
   const member = liveProfile || initialMember;
 
+  if (!member) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
+        <h2 className="text-xl font-bold mb-2">Data Member Tidak Ditemukan</h2>
+        <p className="text-slate-400 text-sm mb-6">Silakan masuk kembali atau pilih member yang aktif.</p>
+        <button 
+          onClick={onBackToHO}
+          className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl transition-all cursor-pointer"
+        >
+          Kembali ke Beranda
+        </button>
+      </div>
+    );
+  }
+
+  const memberTier = (member.tier || 'SILVER').toUpperCase();
+
   const [activeTab, setActiveTab] = useState<'MEMBERSHIP' | 'REWARDS' | 'STORES' | 'PROFILE'>('MEMBERSHIP');
 
   const [isDarkMode, setIsDarkMode] = useState(false);

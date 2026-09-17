@@ -802,7 +802,7 @@ export default function App() {
       <Route path="/member" element={
         loggedInMemberId ? (
           <CustomerMemberView 
-            member={members.find(m => m.id === loggedInMemberId) || members[0]}
+            member={members.find(m => m.id === loggedInMemberId) || members[0] || { id: loggedInMemberId || 'guest', name: 'Member', phone: '', membershipId: 'WTC-000000', points: 0, tier: 'SILVER', registeredAt: new Date().toISOString() }}
             vouchers={vouchers}
             stores={stores}
             transactions={transactions}
