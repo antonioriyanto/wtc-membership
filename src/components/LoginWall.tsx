@@ -131,7 +131,14 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
         body: JSON.stringify({ username: u, pin: p, type, storeId })
       });
       
-      const result = await response.json();
+      const rawText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Server returned invalid response: ${rawText || 'Empty Response'}`);
+      }
+      
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Autentikasi ke server gagal');
       }
