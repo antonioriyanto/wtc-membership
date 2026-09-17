@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Member, Transaction, StoreBranch, Voucher, LoyaltyConfig } from '../types';
 import { calculateTier } from '../lib/loyalty';
 import { CashierSidebar } from './CashierSidebar';
+import { CashierSupportTicketsTab } from './CashierSupportTicketsTab';
 import { CashierHeader } from './CashierHeader';
 import { CashierTab } from './CashierTab';
 import { CashierMembersTab } from './CashierMembersTab';
@@ -412,6 +413,21 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
             />
           )}
 
+          {activeTab === 'tickets' && (
+            <CashierSupportTicketsTab
+              currentStore={currentStore}
+              cashierName={cashierName}
+              supportTickets={supportTickets}
+              onSubmitTicket={async (ticket) => {
+                if (onSubmitTicket) {
+                  await onSubmitTicket(ticket);
+                } else {
+                  console.warn('onSubmitTicket not provided from App.tsx');
+                }
+              }}
+            />
+          )}
+          
           {activeTab === 'settings' && (
             <CashierSettingsTab
               cashierName={cashierName}

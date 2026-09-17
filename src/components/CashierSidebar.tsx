@@ -21,6 +21,7 @@ export const CashierSidebar: React.FC<SidebarProps> = ({
     { id: 'cashier', label: 'Kasir Toko', icon: Monitor },
     { id: 'members', label: 'Members', icon: Users },
     { id: 'transactions', label: 'Transactions', icon: History },
+    { id: 'tickets', label: 'Tiket Bantuan', icon: MessageSquare },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
 

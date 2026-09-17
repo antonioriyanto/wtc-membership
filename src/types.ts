@@ -9,7 +9,7 @@ export type TabType =
   | 'support'
   | 'audit';
 
-export type CashierTabType = 'cashier' | 'members' | 'transactions' | 'settings';
+export type CashierTabType = 'cashier' | 'members' | 'transactions' | 'tickets' | 'settings';
 
 export type MemberTier = 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK';
 

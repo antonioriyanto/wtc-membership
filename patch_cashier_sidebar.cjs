@@ -1,8 +1,14 @@
 const fs = require('fs');
+let content = fs.readFileSync('src/components/CashierSidebar.tsx', 'utf8');
 
-let sidebar = fs.readFileSync('src/components/CashierSidebar.tsx', 'utf8');
-sidebar = sidebar.replace(
-  "hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white",
-  "hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white hover:translate-x-1"
+content = content.replace(
+  "Settings\\n} from 'lucide-react';",
+  "Settings,\n  MessageSquare\n} from 'lucide-react';"
 );
-fs.writeFileSync('src/components/CashierSidebar.tsx', sidebar);
+
+content = content.replace(
+  "{ id: 'settings', label: 'Settings', icon: Settings }",
+  "{ id: 'tickets', label: 'Tiket Bantuan', icon: MessageSquare },\n    { id: 'settings', label: 'Settings', icon: Settings }"
+);
+
+fs.writeFileSync('src/components/CashierSidebar.tsx', content);
