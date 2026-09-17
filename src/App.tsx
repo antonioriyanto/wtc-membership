@@ -15,7 +15,7 @@ import {
   initialCampaigns,
   initialAuditLogs
 } from './data/mockData';
-import { setupFirestoreListeners, seedFirestoreIfEmpty, safeSetDoc, cleanForFirestore, findMemberByPhoneInFirestore, findMemberByGoogleUidInFirestore, normalizePhoneNumber, isSamePhoneNumber } from './lib/syncFirestore';
+import { setupFirestoreListeners, seedFirestoreIfEmpty, safeSetDoc, cleanForFirestore, findMemberByPhoneInFirestore, findMemberByGoogleUidInFirestore, normalizePhoneNumber, isSamePhoneNumber, cleanAndEnrichStore } from './lib/syncFirestore';
 import { startSyncWorker, runMemberSyncPass } from './lib/sync-worker';
 
 // HO Components
@@ -124,10 +124,18 @@ export default function App() {
       const saved = localStorage.getItem('wtc_stores');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 40) return parsed; // Force reload if old small array
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const storeMap = new Map<string, StoreBranch>();
+          initialStores.forEach(s => storeMap.set(s.id, cleanAndEnrichStore(s)));
+          parsed.forEach((s: any) => {
+            const enriched = cleanAndEnrichStore(s);
+            storeMap.set(enriched.id, enriched);
+          });
+          return Array.from(storeMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        }
       }
     } catch {}
-    return initialStores;
+    return initialStores.map(cleanAndEnrichStore);
   });
 
   const [members, setMembers] = useState<Member[]>(() => {
@@ -510,8 +518,14 @@ export default function App() {
   };
 
   const handleUpdateTransaction = async (updatedTrx: Transaction) => {
+    setTransactions(prev => {
+      const next = prev.map(t => t.id === updatedTrx.id ? updatedTrx : t);
+      try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
     try {
-      await setDoc(doc(db, 'transactions', updatedTrx.id), updatedTrx);
+      await safeSetDoc('transactions', updatedTrx.id, updatedTrx);
 
       const auditSaved = localStorage.getItem('wtc_audit_logs');
       const auditList = auditSaved ? JSON.parse(auditSaved) : [];
@@ -534,8 +548,14 @@ export default function App() {
   };
 
   const handleDeleteTransaction = async (trxId: string) => {
+    const trx = transactions.find(t => t.id === trxId);
+    setTransactions(prev => {
+      const next = prev.filter(t => t.id !== trxId);
+      try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
     try {
-      const trx = transactions.find(t => t.id === trxId);
       await deleteDoc(doc(db, 'transactions', trxId));
       
       const auditSaved = localStorage.getItem('wtc_audit_logs');

@@ -126,9 +126,16 @@ export interface StoreBranch {
   mallName: string;
   city: string;
   region: 'Jabodetabek' | 'Jawa Barat' | 'Jawa Tengah & DIY' | 'Jawa Timur' | 'Bali & Nusa Tenggara' | 'Sumatera' | 'Kalimantan' | 'Sulawesi' | 'Papua';
+  floorUnit?: string;
   address: string;
+  fullAddress?: string;
+  phone?: string;
   email: string;
   whatsapp: string;
+  waNumber?: string;
+  location?: string;
+  type?: string;
+  isActive?: boolean;
   managerName: string;
   cashierCount: number;
   status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';

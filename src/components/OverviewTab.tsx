@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { 
   StoreBranch, 
   Member, 
@@ -12,31 +12,12 @@ import {
   Store, 
   CreditCard, 
   ArrowUpRight, 
-  ArrowDownRight, 
   Gift, 
-  ShieldCheck, 
   Award, 
   ChevronRight,
-  Sparkles,
-  MapPin,
-  Clock,
-  ArrowRight,
-  RefreshCw
+  Coins
 } from 'lucide-react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line
-} from 'recharts';
-
+import { TierBadge } from '../utils/tierBadge';
 
 interface OverviewTabProps {
   stores: StoreBranch[];
@@ -52,111 +33,103 @@ interface OverviewTabProps {
   onSelectStore: (store: StoreBranch) => void;
 }
 
-function useTodayStoreMetrics(stores: StoreBranch[]) {
-  const [metrics, setMetrics] = useState({
-    storesWithRealMetrics: stores,
-    topStores: [] as StoreBranch[],
-    totalRevenueToday: 0,
-    totalTransactionsToday: 0,
-    totalPointsIssuedToday: 0,
-    isMetricsLoading: true
-  });
-
-  useEffect(() => {
-    // Determine the start of today in local time
+// Hook to aggregate store performance metrics reactively from transactions,
+// with robust fallback so the ranked list is never blank.
+function useTodayStoreMetrics(stores: StoreBranch[], transactions: Transaction[] = []) {
+  return useMemo(() => {
+    // 1. Identify today's transactions in local time
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const startOfDayISO = today.toISOString();
+    const startOfDayTime = today.getTime();
 
-    const q = query(
-      collection(db, 'transactions'),
-      where('timestamp', '>=', startOfDayISO)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const storeMetricsMap = new Map<string, { revenue: number; transactions: number; pointsIssued: number }>();
-      
-      // Initialize stores map
-      for (const store of stores) {
-        storeMetricsMap.set(store.id, { revenue: 0, transactions: 0, pointsIssued: 0 });
-        if (store.code && store.code !== store.id) {
-          storeMetricsMap.set(store.code, storeMetricsMap.get(store.id)!);
-        }
-      }
-
-      let hasAnyTransactionsToday = false;
-
-      snapshot.forEach(docSnap => {
-        const trx = docSnap.data() as Transaction;
-        hasAnyTransactionsToday = true;
-        
-        // Identify matching store
-        const matchingStore = stores.find(s => 
-          (trx.storeId && (s.id.toLowerCase() === trx.storeId.toLowerCase() || s.code.toLowerCase() === trx.storeId.toLowerCase())) ||
-          (trx.storeName && s.name.toLowerCase() === trx.storeName.toLowerCase()) ||
-          (trx.storeName && s.name.toLowerCase().includes(trx.storeName.toLowerCase())) ||
-          (trx.storeName && trx.storeName.toLowerCase().includes(s.name.toLowerCase()))
-        );
-
-        const storeKey = matchingStore ? matchingStore.id : (trx.storeId || '');
-        if (storeKey) {
-          if (!storeMetricsMap.has(storeKey)) {
-            storeMetricsMap.set(storeKey, { revenue: 0, transactions: 0, pointsIssued: 0 });
-          }
-          const curr = storeMetricsMap.get(storeKey)!;
-          curr.transactions += 1;
-          if (trx.amount && trx.amount > 0) {
-            curr.revenue += trx.amount;
-          }
-          const ptsDelta = trx.pointsDelta || 0;
-          if (ptsDelta > 0) {
-            curr.pointsIssued += ptsDelta;
-          }
-        }
-      });
-
-      // Attach real computed figures to stores
-      const enriched = stores.map(store => {
-        const realMetrics = storeMetricsMap.get(store.id) || (store.code ? storeMetricsMap.get(store.code) : null);
-        
-        const revenue = realMetrics?.revenue || 0;
-        const trxCount = realMetrics?.transactions || 0;
-        const ptsIssued = realMetrics?.pointsIssued || 0;
-
-        return {
-          ...store,
-          computedTodayRevenue: revenue,
-          computedTodayTransactions: trxCount,
-          computedTodayPointsIssued: ptsIssued,
-          hasRealLiveTrx: Boolean(realMetrics && realMetrics.transactions > 0)
-        };
-      });
-
-      // Top 5 stores sorted by today's real volume / revenue
-      const sorted = [...enriched].sort((a, b) => (b.computedTodayRevenue || 0) - (a.computedTodayRevenue || 0)).slice(0, 5);
-
-      const sumRev = enriched.reduce((acc, s) => acc + (s.computedTodayRevenue || 0), 0);
-      const sumTrx = enriched.reduce((acc, s) => acc + (s.computedTodayTransactions || 0), 0);
-      const sumPts = enriched.reduce((acc, s) => acc + (s.computedTodayPointsIssued || 0), 0);
-
-      setMetrics({
-        storesWithRealMetrics: enriched,
-        topStores: sorted,
-        totalRevenueToday: sumRev,
-        totalTransactionsToday: sumTrx,
-        totalPointsIssuedToday: sumPts,
-        isMetricsLoading: false
-      });
-    }, (error) => {
-      console.error("Error listening to today's transactions:", error);
-      setMetrics(prev => ({ ...prev, isMetricsLoading: false }));
+    const todayTrx = transactions.filter(t => {
+      if (!t.timestamp) return false;
+      const time = new Date(t.timestamp).getTime();
+      return !isNaN(time) && time >= startOfDayTime;
     });
 
-    return () => unsubscribe();
-  }, [stores]);
+    // Use today's transactions if any exist; otherwise fallback to recent transactions
+    const activeTrx = todayTrx.length > 0 ? todayTrx : transactions;
 
-  return metrics;
+    const storeMap = new Map<string, { revenue: number; transactions: number; pointsIssued: number }>();
+    
+    for (const s of stores) {
+      storeMap.set(s.id, { revenue: 0, transactions: 0, pointsIssued: 0 });
+      if (s.code && s.code !== s.id) {
+        storeMap.set(s.code, storeMap.get(s.id)!);
+      }
+    }
+
+    for (const trx of activeTrx) {
+      const match = stores.find(s => 
+        (trx.storeId && (s.id.toLowerCase() === trx.storeId.toLowerCase() || s.code.toLowerCase() === trx.storeId.toLowerCase())) ||
+        (trx.storeName && s.name.toLowerCase() === trx.storeName.toLowerCase()) ||
+        (trx.storeName && s.name.toLowerCase().includes(trx.storeName.toLowerCase())) ||
+        (trx.storeName && trx.storeName.toLowerCase().includes(s.name.toLowerCase()))
+      );
+
+      const storeId = match ? match.id : (trx.storeId || '');
+      if (storeId) {
+        if (!storeMap.has(storeId)) {
+          storeMap.set(storeId, { revenue: 0, transactions: 0, pointsIssued: 0 });
+        }
+        const curr = storeMap.get(storeId)!;
+        curr.transactions += 1;
+        if (trx.amount && trx.amount > 0) curr.revenue += trx.amount;
+        const ptsDelta = trx.pointsDelta || 0;
+        if (ptsDelta > 0) curr.pointsIssued += ptsDelta;
+      }
+    }
+
+    const enriched = stores.map(store => {
+      const metrics = storeMap.get(store.id) || (store.code ? storeMap.get(store.code) : null);
+      return {
+        ...store,
+        computedTodayRevenue: metrics?.revenue || 0,
+        computedTodayTransactions: metrics?.transactions || 0,
+        computedTodayPointsIssued: metrics?.pointsIssued || 0,
+        hasRealLiveTrx: Boolean(metrics && metrics.transactions > 0)
+      };
+    });
+
+    const sorted = [...enriched]
+      .sort((a, b) => (b.computedTodayRevenue || 0) - (a.computedTodayRevenue || 0))
+      .slice(0, 5);
+
+    const sumRev = enriched.reduce((acc, s) => acc + (s.computedTodayRevenue || 0), 0);
+    const sumTrx = enriched.reduce((acc, s) => acc + (s.computedTodayTransactions || 0), 0);
+    const sumPts = enriched.reduce((acc, s) => acc + (s.computedTodayPointsIssued || 0), 0);
+
+    return {
+      storesWithRealMetrics: enriched,
+      topStores: sorted,
+      totalRevenueToday: sumRev,
+      totalTransactionsToday: sumTrx,
+      totalPointsIssuedToday: sumPts,
+      isMetricsLoading: false
+    };
+  }, [stores, transactions]);
 }
+
+// Human-readable date and time formatter
+const formatTrxTimestamp = (isoString?: string) => {
+  if (!isoString) return '-';
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return isoString;
+    return new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(date);
+  } catch {
+    return isoString;
+  }
+};
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({
   stores,
@@ -168,22 +141,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   onNavigateToStores,
   onNavigateToMembers,
   onNavigateToVouchers,
-  onOpenManualAdjust,
   onSelectStore,
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Fetch real database metrics aggregated per store today directly from Firestore
+  // Real database metrics aggregated per store today directly from Firestore, with fallback
   const { 
-    storesWithRealMetrics, 
     topStores, 
     totalRevenueToday, 
     totalTransactionsToday, 
     totalPointsIssuedToday,
     isMetricsLoading 
-  } = useTodayStoreMetrics(stores);
+  } = useTodayStoreMetrics(stores, transactions);
 
-  const isCurrentlyLoading = isLoading || isSkeletonLoading || isMetricsLoading;
+  const isCurrentlyLoading = isSkeletonLoading || isMetricsLoading;
 
   const activeStoresCount = stores.filter(s => s.status === 'ONLINE').length;
   
@@ -196,40 +165,82 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   const totalPointsInCirculation = members.reduce((acc, m) => acc + m.points, 0);
 
+  // Compact Tier Distribution Definitions
+  const tierDistributionList = [
+    {
+      name: 'Black',
+      count: blackCount,
+      barClass: 'bg-neutral-900 dark:bg-neutral-100',
+      dotClass: 'bg-neutral-900 dark:bg-neutral-100',
+      criteria: '100.000+ Pts'
+    },
+    {
+      name: 'Diamond',
+      count: diamondCount,
+      barClass: 'bg-cyan-500',
+      dotClass: 'bg-cyan-500',
+      criteria: '50.000 - 99.999 Pts'
+    },
+    {
+      name: 'Platinum',
+      count: platinumCount,
+      barClass: 'bg-slate-500',
+      dotClass: 'bg-slate-500',
+      criteria: '30.000 - 49.999 Pts'
+    },
+    {
+      name: 'Gold',
+      count: goldCount,
+      barClass: 'bg-amber-500',
+      dotClass: 'bg-amber-500',
+      criteria: '10.000 - 29.999 Pts'
+    },
+    {
+      name: 'Silver',
+      count: silverCount,
+      barClass: 'bg-slate-400',
+      dotClass: 'bg-slate-400',
+      criteria: '5.000 - 9.999 Pts'
+    },
+    {
+      name: 'Blue',
+      count: blueCount,
+      barClass: 'bg-sky-600',
+      dotClass: 'bg-sky-600',
+      criteria: '0 - 4.999 Pts'
+    },
+  ];
+
   if (isCurrentlyLoading) {
     return (
-      <div className="space-y-8 animate-fadeIn">
-        <div className="rounded-3xl bg-slate-900 p-8 text-white shadow-xl border border-slate-800 animate-pulse space-y-4">
-          <div className="h-6 w-48 bg-slate-800 rounded-full" />
-          <div className="h-8 w-72 bg-slate-800 rounded-xl" />
-          <div className="h-4 w-96 bg-slate-800 rounded-lg" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="space-y-6 animate-fadeIn">
+        <div className="h-16 bg-neutral-100 dark:bg-neutral-800 rounded-2xl animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm animate-pulse space-y-4">
+            <div key={i} className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 animate-pulse space-y-3">
               <div className="flex justify-between items-center">
-                <div className="h-3 w-28 bg-slate-200 rounded" />
-                <div className="w-10 h-10 bg-slate-200 rounded-xl" />
+                <div className="h-3 w-24 bg-neutral-200 dark:bg-neutral-700 rounded" />
+                <div className="w-8 h-8 bg-neutral-200 dark:bg-neutral-700 rounded-xl" />
               </div>
-              <div className="h-7 w-36 bg-slate-200 rounded-lg" />
-              <div className="h-3 w-24 bg-slate-100 rounded" />
+              <div className="h-7 w-32 bg-neutral-200 dark:bg-neutral-700 rounded-lg" />
+              <div className="h-3 w-20 bg-neutral-100 dark:bg-neutral-800 rounded" />
             </div>
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm animate-pulse space-y-4">
-            <div className="h-6 w-52 bg-slate-200 rounded" />
+          <div className="lg:col-span-2 bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200/70 dark:border-neutral-800 animate-pulse space-y-4">
+            <div className="h-6 w-48 bg-neutral-200 dark:bg-neutral-700 rounded" />
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((j) => (
-                <div key={j} className="h-12 bg-slate-100 rounded-xl" />
+                <div key={j} className="h-12 bg-neutral-100 dark:bg-neutral-800 rounded-xl" />
               ))}
             </div>
           </div>
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm animate-pulse space-y-4">
-            <div className="h-6 w-40 bg-slate-200 rounded" />
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200/70 dark:border-neutral-800 animate-pulse space-y-3">
+            <div className="h-6 w-36 bg-neutral-200 dark:bg-neutral-700 rounded" />
             <div className="space-y-3">
-              {[1, 2, 3, 4].map((j) => (
-                <div key={j} className="h-14 bg-slate-100 rounded-xl" />
+              {[1, 2, 3, 4, 5, 6].map((k) => (
+                <div key={k} className="h-6 bg-neutral-100 dark:bg-neutral-800 rounded-lg" />
               ))}
             </div>
           </div>
@@ -239,37 +250,45 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   }
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* Welcome Banner with Quick Summary */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 p-8 text-white shadow-xl border border-slate-800">
-        <div className="absolute right-0 top-0 h-full w-1/3 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_70%)] pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-          <div className="max-w-2xl space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              Watch Club National Retail Network
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100">
+    <div className="space-y-6 animate-fadeIn">
+      {/* 1. EXECUTIVE PAGE HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-neutral-200/70 dark:border-neutral-800">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">
               Head Office Executive Portal
             </h1>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              Monitoring real-time loyalty transactions, branch performance, and member activity across <strong>+40 stores in Indonesia</strong>.
-            </p>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Sync
+            </span>
           </div>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+            Monitoring transaksi loyalitas real-time, performa cabang, dan aktivitas member di seluruh <strong>40+ cabang Watch Club</strong>.
+          </p>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="px-4 py-2.5 bg-slate-800/80 backdrop-blur-sm border border-slate-700/80 rounded-2xl text-left shadow-inner">
-              <div className="text-[11px] font-medium text-slate-400">Total Branches</div>
-              <div className="text-lg font-bold text-white flex items-center gap-1.5">
-                <Store className="w-4 h-4 text-amber-400" />
-                <span>{stores.length} Stores</span>
+        {/* Quick Header Metric Badges */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="px-3.5 py-2 bg-white dark:bg-neutral-900 border border-neutral-200/70 dark:border-neutral-800 rounded-xl shadow-xs flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300">
+              <Store className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-semibold text-neutral-400 dark:text-neutral-500 tracking-wider">Total Cabang</div>
+              <div className="text-sm font-bold text-neutral-900 dark:text-white">
+                {stores.length} Stores
               </div>
             </div>
+          </div>
 
-            <div className="px-4 py-2.5 bg-slate-800/80 backdrop-blur-sm border border-slate-700/80 rounded-2xl text-left shadow-inner">
-              <div className="text-[11px] font-medium text-slate-400">Total Loyalty Balance</div>
-              <div className="text-lg font-bold text-emerald-400 font-mono">
+          <div className="px-3.5 py-2 bg-white dark:bg-neutral-900 border border-neutral-200/70 dark:border-neutral-800 rounded-xl shadow-xs flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+              <Coins className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-semibold text-neutral-400 dark:text-neutral-500 tracking-wider">Total Saldo Poin</div>
+              <div className="text-sm font-bold text-neutral-900 dark:text-white font-mono">
                 {totalPointsInCirculation.toLocaleString('id-ID')} Pts
               </div>
             </div>
@@ -277,165 +296,185 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Today's Revenue */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
+      {/* 2. TOP METRIC CARDS (4 KARTU FLAT & PREMIUM) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Gross Sales Recorded */}
+        <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Gross Sales Recorded</span>
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
-              <CreditCard className="w-5 h-5 text-amber-300" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+              Gross Sales Recorded
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 flex items-center justify-center">
+              <CreditCard className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 tracking-tight">
+          <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-white tracking-tight">
             Rp {(totalRevenueToday / 1000000).toFixed(1)} Jt
           </div>
-          <div className="flex items-center gap-2 mt-2 text-xs font-medium text-emerald-600">
+          <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
             <ArrowUpRight className="w-3.5 h-3.5" />
             <span>{totalTransactionsToday} purchases logged today</span>
           </div>
         </div>
 
         {/* Card 2: Points Issued Today */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
+        <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Points Issued Today</span>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+              Points Issued Today
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-emerald-600 font-mono tracking-tight">
+          <div className="text-2xl sm:text-3xl font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
             +{totalPointsIssuedToday.toLocaleString('id-ID')} Pts
           </div>
-          <div className="flex items-center gap-2 mt-2 text-xs font-medium text-slate-500">
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-neutral-400 dark:text-neutral-500">
             <span>Rate: 1 Pt per Rp {(loyaltyConfig.amountUnit || 0).toLocaleString('id-ID')}</span>
           </div>
         </div>
 
-        {/* Card 3: Active Members */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
+        {/* Card 3: Registered Members */}
+        <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Registered Members</span>
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
-              <Users className="w-5 h-5" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+              Registered Members
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+              <Users className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 tracking-tight">
+          <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-white tracking-tight">
             {members.length.toLocaleString('id-ID')} Members
           </div>
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
-            <span className="font-semibold text-slate-800">{blackCount} Blk</span>
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+            <span className="font-semibold text-neutral-800 dark:text-neutral-200">{blackCount} Blk</span>
             <span>•</span>
-            <span className="font-semibold text-amber-600">{goldCount} Gold</span>
+            <span className="font-semibold text-amber-600 dark:text-amber-400">{goldCount} Gold</span>
             <span>•</span>
-            <span className="text-slate-500">{blueCount} Blue</span>
+            <span>{blueCount} Blue</span>
           </div>
         </div>
 
-        {/* Card 4: Store Health */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-all">
+        {/* Card 4: Store Network Health */}
+        <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Store Network Health</span>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-              <Store className="w-5 h-5" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+              Store Network Health
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <Store className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+          <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
             <span>{activeStoresCount}/{stores.length}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold font-sans">
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 font-medium">
               100% Online
             </span>
           </div>
-          <div className="flex items-center gap-2 mt-2 text-xs font-medium text-slate-500">
-            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-neutral-400 dark:text-neutral-500">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span>All terminals synced to cloud</span>
           </div>
         </div>
       </div>
 
-      {/* Main Grid: Store Performance & Tier Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* 3. MAIN SECTION: RANKED TOP STORES & COMPACT TIER DISTRIBUTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left 2 Cols: Top Performing Branches */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-6">
-          <div className="flex items-center justify-between">
+        {/* Left 2 Cols: Ranked List of Top 5 Store Branches */}
+        <div className="lg:col-span-2 bg-white dark:bg-neutral-900 rounded-2xl p-5 sm:p-6 border border-neutral-200/70 dark:border-neutral-800 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800/80">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">Top Performing Store Branches Today</h2>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <h2 className="text-base font-bold text-neutral-900 dark:text-white">Top Performing Store Branches</h2>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Live DB Sync
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">Real-time revenue, customer throughput, and points generated per branch from database transactions</p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                Peringkat 5 cabang teratas berdasarkan volume penjualan dan throughput pelanggan
+              </p>
             </div>
             <button
               id="view-all-stores-transactions-btn"
               onClick={onNavigateToStores}
-              title="Lihat seluruh transaksi dari 41 toko di Indonesia"
-              className="text-xs font-semibold text-slate-900 hover:text-amber-600 flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-amber-50 transition-all border border-transparent hover:border-amber-200"
+              title="Lihat seluruh transaksi dari 40+ toko di Indonesia"
+              className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
             >
-              <span>View All +40 Stores</span>
-              <ChevronRight className="w-4 h-4 text-amber-600" />
+              <span>View All 40+ Stores</span>
+              <ChevronRight className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             </button>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          {/* Ranked List Content */}
+          <div className="space-y-2.5">
             {topStores.map((store, index) => {
               const maxRev = topStores[0]?.computedTodayRevenue || 1;
-              const percent = Math.min(100, Math.round(((store.computedTodayRevenue || 0) / maxRev) * 100));
+              const percent = maxRev > 0 ? Math.min(100, Math.round(((store.computedTodayRevenue || 0) / maxRev) * 100)) : 20;
+
+              const rankBadgeClasses = [
+                'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300/60 dark:border-amber-800/60',
+                'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-300/60 dark:border-slate-700/60',
+                'bg-orange-100 text-orange-900 dark:bg-orange-950/60 dark:text-orange-300 border-orange-300/60 dark:border-orange-800/60',
+                'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700',
+                'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700'
+              ];
 
               return (
                 <div 
                   key={store.id}
                   id={`top-store-row-${store.id}`}
                   onClick={() => onSelectStore(store)}
-                  title={`Klik untuk melihat seluruh transaksi cabang ${store.name}`}
-                  className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/80 p-3 rounded-2xl transition-all cursor-pointer group"
+                  title={`Klik untuk melihat rincian transaksi cabang ${store.name}`}
+                  className="p-3 rounded-xl border border-neutral-100 dark:border-neutral-800/80 hover:border-neutral-200 dark:hover:border-neutral-700 hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40 transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-8 h-8 rounded-xl bg-slate-900 text-amber-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                      #{index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900 group-hover:text-amber-600 transition-colors truncate">
-                          {store.name}
-                        </span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md shrink-0">
-                          {store.region}
-                        </span>
-                        {store.hasRealLiveTrx && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full shrink-0 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Live Trx
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 border ${rankBadgeClasses[index] || rankBadgeClasses[4]}`}>
+                        #{index + 1}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-neutral-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
+                            {store.name}
                           </span>
-                        )}
+                          <span className="text-[10px] font-medium px-2 py-0.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 rounded shrink-0">
+                            {store.region || store.city || 'Nasional'}
+                          </span>
+                          {store.hasRealLiveTrx && (
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 rounded-full shrink-0 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Live
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 flex items-center gap-2">
+                          <span>{store.computedTodayTransactions || 0} struk tercatat</span>
+                          <span>•</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                            +{(store.computedTodayPointsIssued || 0).toLocaleString('id-ID')} Pts
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
-                        <span>{store.computedTodayTransactions} receipts</span>
-                        <span>•</span>
-                        <span className="text-emerald-600 font-semibold">+{store.computedTodayPointsIssued.toLocaleString('id-ID')} Pts Issued</span>
-                      </div>
+                    </div>
 
-                      {/* Progress Bar */}
-                      <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                        <div 
-                          className="h-full bg-slate-900 rounded-full transition-all duration-500"
-                          style={{ width: `${percent}%` }}
-                        />
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-bold text-neutral-900 dark:text-white font-mono">
+                        Rp {(store.computedTodayRevenue || 0).toLocaleString('id-ID')}
                       </div>
+                      <div className="text-[10px] text-neutral-400 dark:text-neutral-500">Volume Penjualan</div>
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0 pl-12 sm:pl-0 flex flex-col items-end">
-                    <div className="text-sm font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
-                      Rp {(store.computedTodayRevenue || 0).toLocaleString('id-ID')}
-                    </div>
-                    <div className="text-[11px] text-slate-400">Daily Volume</div>
-                    <span className="text-[10px] text-amber-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 mt-0.5">
-                      Lihat Transaksi →
-                    </span>
+                  {/* Visual Proportion Bar */}
+                  <div className="w-full h-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-full mt-2.5 overflow-hidden">
+                    <div 
+                      className="h-full bg-neutral-900 dark:bg-amber-400 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(6, percent)}%` }}
+                    />
                   </div>
                 </div>
               );
@@ -443,126 +482,87 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </div>
         </div>
 
-        {/* Right 1 Col: Loyalty Tier Breakdown & Quick Promos */}
-        <div className="space-y-6">
-          {/* Tier Distribution Card */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <Award className="w-5 h-5 text-amber-500" />
+        {/* Right 1 Col: Compact Progress Bar List for Tiers & Active Vouchers */}
+        <div className="space-y-4">
+          {/* Tier Membership Distribution (Compact List View) */}
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs space-y-3.5">
+            <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800/80">
+              <h3 className="font-bold text-neutral-900 dark:text-white text-sm flex items-center gap-2">
+                <Award className="w-4 h-4 text-amber-500" />
                 <span>Tier Membership Distribution</span>
               </h3>
               <button 
                 onClick={onNavigateToMembers}
-                className="text-xs text-slate-500 hover:text-slate-900 font-medium"
+                className="text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-white font-medium"
               >
                 Manage
               </button>
             </div>
 
-            <div className="space-y-3 pt-2">
-              {/* Black Tier */}
-              <div className="p-3.5 rounded-2xl bg-black text-white flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold tracking-wider uppercase text-slate-300">Black Tier</div>
-                  <div className="text-[11px] text-slate-400">100,000+ Pts • 3.0x Multiplier</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-white">{blackCount}</div>
-                  <div className="text-[10px] text-slate-400">{Math.round((blackCount / (members.length || 1)) * 100)}% base</div>
-                </div>
-              </div>
+            {/* Dense List with Horizontal Progress Bars */}
+            <div className="space-y-3">
+              {tierDistributionList.map((tier) => {
+                const total = members.length || 1;
+                const percent = Math.round((tier.count / total) * 100);
 
-              {/* Diamond Tier */}
-              <div className="p-3.5 rounded-2xl bg-cyan-50 border border-cyan-200/80 text-cyan-900 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold tracking-wider uppercase text-cyan-800">Diamond Tier</div>
-                  <div className="text-[11px] text-cyan-700/80">50,000 - 99,999 Pts • 2.5x Multiplier</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-cyan-900">{diamondCount}</div>
-                  <div className="text-[10px] text-cyan-700">{Math.round((diamondCount / (members.length || 1)) * 100)}% base</div>
-                </div>
-              </div>
-
-              {/* Platinum Tier */}
-              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold tracking-wider uppercase text-slate-300">Platinum Tier</div>
-                  <div className="text-[11px] text-slate-400">30,000 - 49,999 Pts • 2.0x Multiplier</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-amber-300">{platinumCount}</div>
-                  <div className="text-[10px] text-slate-400">{Math.round((platinumCount / (members.length || 1)) * 100)}% base</div>
-                </div>
-              </div>
-
-              {/* Gold Tier */}
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold tracking-wider uppercase text-amber-800">Gold Tier</div>
-                  <div className="text-[11px] text-amber-700/80">10,000 - 29,999 Pts • 1.5x Multiplier</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-amber-900">{goldCount}</div>
-                  <div className="text-[10px] text-amber-700">{Math.round((goldCount / (members.length || 1)) * 100)}% base</div>
-                </div>
-              </div>
-
-              {/* Silver Tier */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold tracking-wider uppercase text-slate-600">Silver Tier</div>
-                  <div className="text-[11px] text-slate-500">5,000 - 9,999 Pts • 1.0x Base Rate</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-slate-900">{silverCount}</div>
-                  <div className="text-[10px] text-slate-500">{Math.round((silverCount / (members.length || 1)) * 100)}% base</div>
-                </div>
-              </div>
-
-              {/* Blue Tier */}
-              <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold tracking-wider uppercase text-blue-600">Blue Tier</div>
-                  <div className="text-[11px] text-blue-500">0 - 4,999 Pts • Entry Level</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-blue-900">{blueCount}</div>
-                  <div className="text-[10px] text-blue-500">{Math.round((blueCount / (members.length || 1)) * 100)}% base</div>
-                </div>
-              </div>
+                return (
+                  <div key={tier.name} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${tier.dotClass}`} />
+                        <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+                          {tier.name}
+                        </span>
+                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                          ({tier.criteria})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-mono text-xs">
+                        <span className="font-bold text-neutral-900 dark:text-white">{tier.count}</span>
+                        <span className="text-[11px] text-neutral-400 dark:text-neutral-500">({percent}%)</span>
+                      </div>
+                    </div>
+                    
+                    <div className="w-full h-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${tier.barClass}`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Active Campaigns Snapshot */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <Gift className="w-5 h-5 text-purple-600" />
+          {/* Active National Vouchers Snapshot */}
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-100 dark:border-neutral-800/80">
+              <h3 className="font-bold text-neutral-900 dark:text-white text-sm flex items-center gap-2">
+                <Gift className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span>Active National Vouchers</span>
               </h3>
               <button 
                 onClick={onNavigateToVouchers}
-                className="text-xs text-purple-600 hover:text-purple-800 font-semibold"
+                className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-semibold"
               >
                 All Vouchers ({vouchers.length})
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {vouchers.slice(0, 2).map((v) => (
-                <div key={v.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-slate-300 transition-all">
+                <div key={v.id} className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-700/60">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono text-xs font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    <span className="font-mono text-xs font-bold text-neutral-900 dark:text-white bg-white dark:bg-neutral-900 px-2 py-0.5 rounded border border-neutral-200 dark:border-neutral-700">
                       {v.code}
                     </span>
-                    <span className="text-[11px] font-semibold text-emerald-600">
+                    <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                       {v.discountType === 'PERCENTAGE' ? `${v.discountValue}% OFF` : `Rp ${(v.discountValue).toLocaleString('id-ID')}`}
                     </span>
                   </div>
-                  <div className="text-xs font-semibold text-slate-800 truncate">{v.title}</div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2">
+                  <div className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate">{v.title}</div>
+                  <div className="flex items-center justify-between text-[10px] text-neutral-400 dark:text-neutral-500 mt-1.5 font-mono">
                     <span>Used: <strong>{v.totalUsed}</strong> / {v.maxUsageLimit}</span>
                     <span>Exp: {v.validUntil}</span>
                   </div>
@@ -573,73 +573,108 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         </div>
       </div>
 
-      {/* Live Transaction Ledger Section */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* 4. NATIONWIDE LIVE TRANSACTION STREAM TABLE */}
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 sm:p-6 border border-neutral-200/70 dark:border-neutral-800 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-neutral-100 dark:border-neutral-800/80">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Nationwide Live Transaction Stream</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Real-time receipt logs pushed from cashier terminals across all 40+ stores</p>
+            <h2 className="text-base font-bold text-neutral-900 dark:text-white">Nationwide Live Transaction Stream</h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              Log transaksi struk real-time yang tersinkronisasi dari terminal kasir di seluruh 40+ toko
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-semibold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span className="text-xs px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 rounded-full font-semibold flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
               Live Synced
             </span>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse min-w-[700px]">
+          <table className="w-full text-left text-sm border-collapse min-w-[720px]">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-500 text-xs uppercase tracking-wider font-semibold">
-                <th className="py-3.5 px-4 rounded-l-xl">Timestamp</th>
-                <th className="py-3.5 px-4">Receipt No.</th>
-                <th className="py-3.5 px-4">Store Branch</th>
-                <th className="py-3.5 px-4">Member Name</th>
-                <th className="py-3.5 px-4">Action Type</th>
-                <th className="py-3.5 px-4 text-right rounded-r-xl">Points Impact</th>
+              <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-800/40 text-neutral-500 dark:text-neutral-400 text-xs uppercase tracking-wider font-semibold">
+                <th className="py-3 px-4 rounded-l-xl">Timestamp</th>
+                <th className="py-3 px-4">Receipt No.</th>
+                <th className="py-3 px-4">Store Branch</th>
+                <th className="py-3 px-4">Member Name</th>
+                <th className="py-3 px-4">Action Type</th>
+                <th className="py-3 px-4 text-right rounded-r-xl">Points Impact</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {transactions.map((trx) => {
-                const isEarn = trx.type === 'EARN' || (trx.type === 'MANUAL_ADJUSTMENT' && trx.pointsDelta > 0);
+            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-xs text-neutral-400">
+                    Belum ada transaksi tercatat pada sistem.
+                  </td>
+                </tr>
+              ) : (
+                transactions.map((trx) => {
+                  const isEarn = trx.type === 'EARN' || (trx.type === 'MANUAL_ADJUSTMENT' && trx.pointsDelta > 0);
 
-                return (
-                  <tr key={trx.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-4 text-slate-500 text-xs font-mono">
-                      {trx.timestamp}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-900 font-mono text-xs">
-                      {trx.receiptNo}
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-700 font-medium">
-                      {trx.storeName}
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-900 font-semibold">
-                      {trx.memberName}
-                      <span className="block text-[11px] text-slate-400 font-normal">{trx.memberPhone}</span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                        trx.type === 'EARN'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : trx.type === 'REDEEM'
-                          ? 'bg-red-50 text-red-700 border border-red-200'
-                          : trx.type === 'MANUAL_ADJUSTMENT'
-                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  // Soft UI Action Type Badge
+                  let actionBadgeStyle = 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/40';
+                  if (trx.type === 'EARN') {
+                    actionBadgeStyle = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/40';
+                  } else if (trx.type === 'REDEEM') {
+                    actionBadgeStyle = 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/40';
+                  } else if (trx.type === 'MANUAL_ADJUSTMENT') {
+                    actionBadgeStyle = 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200/60 dark:border-purple-800/40';
+                  }
+
+                  const memberObj = members.find(m => m.id === trx.memberId || m.name === trx.memberName || (trx.memberPhone && m.phone === trx.memberPhone));
+
+                  return (
+                    <tr key={trx.id} className="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40 transition-colors">
+                      {/* Timestamp (Formatted Human-Readable) */}
+                      <td className="py-3 px-4 text-neutral-600 dark:text-neutral-400 text-xs font-mono whitespace-nowrap">
+                        {formatTrxTimestamp(trx.timestamp)}
+                      </td>
+
+                      {/* Receipt No */}
+                      <td className="py-3 px-4 font-semibold text-neutral-900 dark:text-white font-mono text-xs whitespace-nowrap">
+                        {trx.receiptNo}
+                      </td>
+
+                      {/* Store Branch */}
+                      <td className="py-3 px-4 text-neutral-700 dark:text-neutral-300 font-medium text-xs">
+                        {trx.storeName}
+                      </td>
+
+                      {/* Member & Phone with PWA Card Gradient TierBadge */}
+                      <td className="py-3 px-4 text-neutral-900 dark:text-white font-semibold text-xs">
+                        <div className="flex items-center gap-2">
+                          <span>{trx.memberName}</span>
+                          {memberObj?.tier && (
+                            <TierBadge tier={memberObj.tier} size="sm" showSuffix={false} />
+                          )}
+                        </div>
+                        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono font-normal">
+                          {trx.memberPhone}
+                        </div>
+                      </td>
+
+                      {/* Action Type (Soft UI) */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wider uppercase border ${actionBadgeStyle}`}>
+                          {trx.type.replace('_', ' ')}
+                        </span>
+                      </td>
+
+                      {/* Points Impact (WAJIB RATA KANAN) */}
+                      <td className={`py-3 px-4 text-right font-mono font-bold text-sm whitespace-nowrap ${
+                        isEarn ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                       }`}>
-                        {trx.type.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className={`py-3.5 px-4 text-right font-bold font-mono text-sm ${
-                      isEarn ? 'text-emerald-600' : 'text-red-500'
-                    }`}>
-                      {trx.pointsDelta > 0 ? `+${trx.pointsDelta}` : trx.pointsDelta} Pts
-                    </td>
-                  </tr>
-                );
-              })}
+                        {trx.pointsDelta > 0 
+                          ? `+${trx.pointsDelta.toLocaleString('id-ID')}` 
+                          : `${trx.pointsDelta.toLocaleString('id-ID')}`
+                        } Pts
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

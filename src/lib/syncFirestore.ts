@@ -1,6 +1,7 @@
 import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, writeBatch, query, where } from "firebase/firestore";
 import { db } from "./firebase";
 import { initialStores, initialMembers, initialVouchers, initialTransactions, initialSupportTickets, initialCampaigns, initialAuditLogs, initialLoyaltyConfig } from "../data/mockData";
+import { StoreBranch } from "../types";
 
 export function cleanForFirestore<T>(obj: T): T {
   if (obj === undefined) return '' as any;
@@ -16,6 +17,166 @@ export function cleanForFirestore<T>(obj: T): T {
     }
   }
   return cleaned as any;
+}
+
+/**
+ * Ensures any store record (from Firestore, localStorage, or state)
+ * is fully populated with official phone numbers, addresses, images, and coordinates.
+ */
+export function cleanAndEnrichStore(rawStore: any): StoreBranch {
+  if (!rawStore) return initialStores[0];
+
+  const rawCode = (rawStore.code || rawStore.id || '').toString().trim().toUpperCase();
+  const rawName = (rawStore.name || '').toString().trim().toLowerCase();
+  const rawMall = (rawStore.mallName || '').toString().trim().toLowerCase();
+
+  // Match against official initialStores (all 42 Watch Club branches)
+  const fallback = initialStores.find(is => {
+    const isCode = (is.code || is.id || '').toUpperCase();
+    const isName = (is.name || '').toLowerCase();
+    const isMall = (is.mallName || '').toLowerCase();
+    
+    if (rawCode && isCode === rawCode) return true;
+    if (rawName && isName === rawName) return true;
+    if (rawMall && isMall === rawMall) return true;
+    if (rawName && (isName.includes(rawName) || rawName.includes(isName))) return true;
+    if (rawMall && (isMall.includes(rawMall) || rawMall.includes(isMall))) return true;
+    return false;
+  }) || initialStores.find(is => is.city?.toLowerCase() === rawStore.city?.toLowerCase()) || initialStores[0];
+
+  const isValidPhone = (p: any): boolean => {
+    if (!p || typeof p !== 'string') return false;
+    const digits = p.replace(/[^0-9]/g, '');
+    return digits.length >= 7 && p.trim() !== '-';
+  };
+
+  const isValidAddress = (a: any, storeTitle: string): boolean => {
+    if (!a || typeof a !== 'string') return false;
+    const t = a.trim();
+    if (t === '-' || t.length <= 15) return false;
+    if (t.toLowerCase() === storeTitle.toLowerCase()) return false;
+    return true;
+  };
+
+  const isValidImage = (img: any): boolean => {
+    return typeof img === 'string' && img.startsWith('http') && img.length > 15;
+  };
+
+  // If this store belongs to the official 42 Watch Club branches, strictly enforce the master Nama Cabang and metadata!
+  const isOfficialBranch = fallback && fallback.id !== 'CUSTOM';
+
+  const name = isOfficialBranch ? fallback.name : (rawStore.name || fallback.name);
+  const mallName = isOfficialBranch ? (fallback.mallName || fallback.name) : (rawStore.mallName || name);
+  const city = isOfficialBranch ? fallback.city : (rawStore.city || fallback.city);
+  const region = isOfficialBranch ? fallback.region : (rawStore.region || fallback.region);
+
+  const phone = isOfficialBranch ? fallback.phone : (isValidPhone(rawStore.phone) 
+    ? rawStore.phone 
+    : (isValidPhone(rawStore.whatsapp) ? rawStore.whatsapp : fallback.phone));
+
+  const whatsapp = isOfficialBranch ? fallback.whatsapp : (isValidPhone(rawStore.whatsapp) 
+    ? rawStore.whatsapp 
+    : (isValidPhone(rawStore.phone) ? rawStore.phone : fallback.whatsapp || fallback.phone));
+
+  const rawDigits = (whatsapp || phone || fallback.phone || '').replace(/[^0-9]/g, '');
+  const waNumber = isOfficialBranch && fallback.waNumber ? fallback.waNumber : (rawDigits.startsWith('0') ? '62' + rawDigits.slice(1) : (rawDigits.startsWith('62') ? rawDigits : '62' + rawDigits));
+
+  const floorUnit = (rawStore.floorUnit && rawStore.floorUnit.trim() !== '-' && rawStore.floorUnit.trim().length > 1) 
+    ? rawStore.floorUnit 
+    : fallback.floorUnit;
+
+  const address = isOfficialBranch ? fallback.address : (isValidAddress(rawStore.address, name) 
+    ? rawStore.address 
+    : fallback.address);
+
+  const fullAddress = isOfficialBranch ? fallback.fullAddress : (isValidAddress(rawStore.fullAddress, name) 
+    ? rawStore.fullAddress 
+    : (fallback.fullAddress || `${mallName} ${floorUnit} ${address}`));
+
+  const imageUrl = isValidImage(rawStore.imageUrl) 
+    ? rawStore.imageUrl 
+    : fallback.imageUrl;
+
+  const email = isOfficialBranch && fallback.email ? fallback.email : (rawStore.email || fallback.email);
+
+  const latitude = (isOfficialBranch && fallback.latitude !== undefined)
+    ? fallback.latitude
+    : ((rawStore.latitude !== undefined && rawStore.latitude !== null && !isNaN(Number(rawStore.latitude)))
+      ? Number(rawStore.latitude)
+      : fallback.latitude);
+
+  const longitude = (isOfficialBranch && fallback.longitude !== undefined)
+    ? fallback.longitude
+    : ((rawStore.longitude !== undefined && rawStore.longitude !== null && !isNaN(Number(rawStore.longitude)))
+      ? Number(rawStore.longitude)
+      : fallback.longitude);
+
+  return {
+    ...fallback,
+    ...rawStore,
+    id: rawStore.id || fallback.id,
+    code: fallback.code || rawStore.code,
+    name,
+    mallName,
+    city,
+    region,
+    floorUnit,
+    address,
+    fullAddress,
+    phone,
+    whatsapp,
+    waNumber,
+    email,
+    imageUrl,
+    latitude,
+    longitude,
+    location: `${name}, ${city}`,
+    type: fallback.type || rawStore.type || 'STORE',
+    isActive: rawStore.isActive !== false,
+  };
+}
+
+/**
+ * Synchronizes and updates all 42 official Watch Club store branches to Firestore
+ * so that any legacy documents with outdated branch name, missing phone, broken image, or incomplete address
+ * are updated to the official database.
+ */
+export async function syncOfficialStoresToFirestore(force = false) {
+  try {
+    const snap = await getDocs(collection(db, 'stores'));
+    let needUpdate = force || snap.empty;
+
+    if (!needUpdate) {
+      for (const d of snap.docs) {
+        const dat = d.data();
+        const p = dat.phone || '';
+        const digits = p.replace(/[^0-9]/g, '');
+        const official = initialStores.find(s => s.id === d.id || s.code === dat.code);
+        if (
+          digits.length < 7 || 
+          p.trim() === '-' || 
+          !dat.imageUrl || 
+          !dat.fullAddress ||
+          (official && (dat.name !== official.name || dat.mallName !== official.mallName))
+        ) {
+          needUpdate = true;
+          break;
+        }
+      }
+    }
+
+    if (needUpdate) {
+      console.log('[Firestore] Syncing official 42 Watch Club branches to Firestore with canonical Nama Cabang...');
+      const batch = writeBatch(db);
+      initialStores.forEach(s => {
+        batch.set(doc(db, 'stores', s.id), cleanForFirestore(s), { merge: true });
+      });
+      await batch.commit();
+      console.log('[Firestore] Successfully updated official 42 stores.');
+    }
+  } catch (err: any) {
+    console.warn('[Firestore] Store sync check:', err?.message || err);
+  }
 }
 
 export function normalizePhoneNumber(rawPhone: string): string {
@@ -122,17 +283,14 @@ export function setupFirestoreListeners(callbacks: any) {
       let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       if (name === 'stores') {
-        if (data.length >= 20) {
-          // If Firestore is already populated with the real store directory,
-          // trust Firestore as the single source of truth to avoid duplicates.
-          data = data.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
-        } else {
-          // Fallback to initialStores if Firestore is somehow empty or unseeded
-          const storeMap = new Map();
-          initialStores.forEach(s => storeMap.set(s.id, s));
-          data.forEach(s => storeMap.set(s.id, s));
-          data = Array.from(storeMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        }
+        // Guarantee all official 42 stores are present and enriched with full metadata
+        const storeMap = new Map();
+        initialStores.forEach(s => storeMap.set(s.id, cleanAndEnrichStore(s)));
+        data.forEach(s => {
+          const enriched = cleanAndEnrichStore(s);
+          storeMap.set(enriched.id, enriched);
+        });
+        data = Array.from(storeMap.values()).sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
       }
 
       if (data.length > 0) {
@@ -188,8 +346,11 @@ export function setupFirestoreListeners(callbacks: any) {
   unsubscribes.push(unsubConfig);
 
   // Sync any offline/locally stored members to Firestore so they are never lost
+  // and guarantee 42 official stores in Firestore have valid phone and address
   setTimeout(async () => {
     try {
+      await syncOfficialStoresToFirestore();
+
       const localMembersRaw = localStorage.getItem('wtc_members');
       if (localMembersRaw) {
         const localMembers = JSON.parse(localMembersRaw);
@@ -209,7 +370,7 @@ export function setupFirestoreListeners(callbacks: any) {
     } catch (e) {
       console.warn('Local-to-cloud sync check completed with note:', e);
     }
-  }, 2000);
+  }, 1500);
 
   return () => {
     unsubscribes.forEach(unsub => unsub());
@@ -231,6 +392,9 @@ export async function seedFirestoreIfEmpty() {
       batch.set(doc(db, 'config', 'loyalty'), cleanForFirestore(initialLoyaltyConfig));
       await batch.commit();
       console.log('Seeded Firestore with initial data');
+    } else {
+      // Ensure official stores have full phones & addresses
+      await syncOfficialStoresToFirestore();
     }
   } catch (err: any) {
     console.warn('[Firestore] Seed check skipped or restricted by security rules:', err?.message || err);

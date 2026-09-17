@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Monitor, Sliders, LogOut, Moon, Check, Key, HelpCircle, Smartphone } from 'lucide-react';
+import { ShieldCheck, Monitor, Sliders, LogOut, Moon, Check, Key, HelpCircle, Smartphone, Store, MapPin, Phone, Building, Compass } from 'lucide-react';
 import { useCustomDialog } from './CustomDialogProvider';
+import { StoreBranch } from '../types';
 
 interface SettingsTabProps {
   cashierName: string | null;
   storeName: string;
+  currentStore?: StoreBranch | null;
   onSignOut: () => void;
 }
 
-export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, storeName, onSignOut }) => {
+export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, storeName, currentStore, onSignOut }) => {
   const { showAlert } = useCustomDialog();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -54,6 +56,63 @@ export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, st
             <h4 className="text-[0.95rem] text-slate-900 dark:text-white font-semibold mb-1">Detail Kasir Aktif</h4>
             <p className="text-sm text-slate-600 dark:text-slate-300 mb-1 font-medium">{cashierName || 'Kasir Default'}</p>
             <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Store: {storeName}</p>
+          </div>
+
+          {/* INFORMASI CABANG TOKO / STORE PROFILE */}
+          <div className="py-4 border-b border-slate-200 dark:border-slate-700 space-y-3">
+            <h4 className="text-[0.95rem] text-slate-900 dark:text-white font-semibold flex items-center gap-1.5">
+              <Store className="w-4 h-4 text-emerald-500" /> Profil Cabang Kasir
+            </h4>
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/70 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900 dark:text-white text-sm">{currentStore?.mallName || storeName}</span>
+                <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-mono text-[10px] font-bold rounded">
+                  {currentStore?.code || 'WTC'}
+                </span>
+              </div>
+              <div className="flex items-start gap-1.5 text-slate-600 dark:text-slate-400">
+                <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <span>{currentStore?.city || 'Jakarta'} • {currentStore?.region || 'Jabodetabek'}</span>
+              </div>
+              {currentStore?.floorUnit && (
+                <div className="flex items-start gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
+                  <Building className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                  <span>{currentStore.floorUnit}</span>
+                </div>
+              )}
+              <div className="text-slate-500 dark:text-slate-400 leading-relaxed">
+                {currentStore?.fullAddress || currentStore?.address || 'Alamat Cabang Watch Club'}
+              </div>
+              {(currentStore?.phone || currentStore?.whatsapp) && (
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-800">
+                  <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+                    <Phone className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="font-semibold">{currentStore.phone || currentStore.whatsapp}</span>
+                  </div>
+                  <a
+                    href={`https://wa.me/${(currentStore.whatsapp || currentStore.phone || '').replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                  >
+                    Buka WA ↗
+                  </a>
+                </div>
+              )}
+              {currentStore?.latitude !== undefined && currentStore?.longitude !== undefined && (
+                <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
+                  <span className="font-mono">GPS: {currentStore.latitude.toFixed(4)}, {currentStore.longitude.toFixed(4)}</span>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${currentStore.latitude},${currentStore.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <Compass className="w-3 h-3" /> Buka Maps ↗
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="py-4">

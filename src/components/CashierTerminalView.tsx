@@ -432,6 +432,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
             <CashierSettingsTab
               cashierName={cashierName}
               storeName={currentStore?.name || 'Puri Jakarta'}
+              currentStore={currentStore}
               onSignOut={() => {
                 if (onSignOut) {
                   onSignOut();

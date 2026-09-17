@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { StoreBranch, Transaction, Member } from '../types';
 import { 
   Store, 
@@ -10,23 +10,20 @@ import {
   MapPin, 
   Calendar, 
   ChevronDown, 
-  Layers, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  ShieldCheck, 
-  ShoppingBag,
-  Clock,
-  Printer,
-  X,
-  Building2,
-  Users,
-  Coins,
-  CreditCard,
-  Trash2,
-  Edit2
+  Clock, 
+  Printer, 
+  X, 
+  Coins, 
+  ShoppingBag, 
+  Trash2, 
+  Edit2,
+  MoreVertical,
+  RotateCcw,
+  ShieldCheck,
+  Building
 } from 'lucide-react';
-import { TierBadge } from '../utils/tierBadge';
 import { useCustomDialog } from './CustomDialogProvider';
+import { TierBadge } from '../utils/tierBadge';
 
 interface NationalTransactionsTabProps {
   stores: StoreBranch[];
@@ -51,16 +48,23 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
 }) => {
   if (isSkeletonLoading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-8 w-64 bg-slate-200 rounded-xl" />
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="h-16 bg-slate-200 rounded-xl" />
+      <div className="space-y-5 animate-pulse">
+        <div className="h-20 bg-neutral-200 dark:bg-neutral-800 rounded-2xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-24 bg-neutral-200 dark:bg-neutral-800 rounded-2xl" />
+          ))}
+        </div>
+        <div className="h-14 bg-neutral-200 dark:bg-neutral-800 rounded-xl" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-14 bg-neutral-200 dark:bg-neutral-800 rounded-xl" />
           ))}
         </div>
       </div>
     );
   }
+
   const [selectedStore, setSelectedStore] = useState<StoreBranch | null>(initialSelectedStore);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('ALL');
@@ -68,11 +72,26 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
   const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
   const [selectedReceiptDetail, setSelectedReceiptDetail] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  
+
+  // Kebab Menu state
+  const [activeMenuTrxId, setActiveMenuTrxId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
   const { showConfirm, showAlert } = useCustomDialog();
 
+  // Close dropdown menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenuTrxId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // When parent updates selectedStore
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialSelectedStore !== undefined) {
       setSelectedStore(initialSelectedStore);
     }
@@ -83,6 +102,22 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
     if (onSelectStore) {
       onSelectStore(store);
     }
+  };
+
+  const isAnyFilterActive = Boolean(
+    searchTerm.trim() || 
+    dateFilter !== 'ALL' || 
+    selectedRegion !== 'ALL' || 
+    selectedType !== 'ALL' ||
+    selectedStore !== null
+  );
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setDateFilter('ALL');
+    setSelectedRegion('ALL');
+    setSelectedType('ALL');
+    handleStoreChange(null);
   };
 
   // Filter transactions
@@ -191,22 +226,24 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
   };
 
   return (
-    <div className="animate-fadeIn space-y-6">
+    <div className="animate-fadeIn space-y-5">
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-neutral-900 p-5 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-2xl font-bold text-slate-900">Transaksi Toko Nasional</h2>
-            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+            <h1 className="text-xl font-bold text-neutral-900 dark:text-white tracking-tight">
+              Transaksi Toko Nasional
+            </h1>
+            <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
               Live Ledger 40+ Toko
             </span>
           </div>
-          <p className="text-sm text-slate-500">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
             Pusat pemantauan seluruh mutasi aktivitas loyalty, penukaran voucher, & poin di seluruh cabang Watch Club Indonesia.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
           {/* Store Selector Dropdown */}
           <div className="relative">
             <select
@@ -219,7 +256,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                   handleStoreChange(found || null);
                 }
               }}
-              className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer appearance-none pr-9 min-w-[220px]"
+              className="pl-3 pr-8 py-2 bg-neutral-50 dark:bg-neutral-800/60 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-800 dark:text-neutral-200 focus:outline-hidden focus:border-neutral-900 cursor-pointer appearance-none min-w-[200px]"
             >
               <option value="ALL">🏢 Seluruh Toko di Indonesia ({stores.length} Cabang)</option>
               <optgroup label="Pilih Cabang Spesifik">
@@ -230,12 +267,12 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                 ))}
               </optgroup>
             </select>
-            <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+            className="px-3.5 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors shadow-xs cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Ekspor CSV</span>
@@ -243,190 +280,195 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
         </div>
       </div>
 
-      {/* SUMMARY METRICS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold mb-2">
+      {/* SUMMARY METRICS CARDS (Flat Premium Style) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Omzet Transaksi */}
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400 text-[11px] font-semibold uppercase tracking-wider mb-2">
             <span>TOTAL OMZET TRANSAKSI</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
+            <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <TrendingUp className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-xl lg:text-2xl font-black text-slate-900">
+          <div className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">
             Rp {metrics.revenue.toLocaleString('id-ID')}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
+          <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-1">
             {selectedStore ? `Cabang ${selectedStore.name}` : 'Akumulasi 40+ Cabang Nasional'}
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold mb-2">
+        {/* Struk Transaksi */}
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400 text-[11px] font-semibold uppercase tracking-wider mb-2">
             <span>TOTAL STRUK TRANSAKSI</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Receipt className="w-4 h-4" />
+            <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <Receipt className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-xl lg:text-2xl font-black text-slate-900">
+          <div className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">
             {metrics.count.toLocaleString('id-ID')} Struk
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
+          <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-1">
             Rata-rata: Rp {metrics.averageBasket.toLocaleString('id-ID')} / transaksi
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold mb-2">
+        {/* Poin Diterbitkan */}
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400 text-[11px] font-semibold uppercase tracking-wider mb-2">
             <span>POIN DITERBITKAN (EARNED)</span>
-            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Coins className="w-4 h-4" />
+            <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <Coins className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-xl lg:text-2xl font-black text-emerald-600">
+          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
             +{metrics.pointsEarned.toLocaleString('id-ID')} Pts
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
+          <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-1">
             Reward loyalty yang diberikan kasir
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold mb-2">
+        {/* Poin Ditukarkan */}
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400 text-[11px] font-semibold uppercase tracking-wider mb-2">
             <span>POIN DITUKARKAN (REDEEMED)</span>
-            <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <ShoppingBag className="w-4 h-4" />
+            <div className="w-6 h-6 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+              <ShoppingBag className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-xl lg:text-2xl font-black text-purple-600">
+          <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 tracking-tight">
             -{metrics.pointsRedeemed.toLocaleString('id-ID')} Pts
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
+          <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-1">
             Penukaran kupon diskon member
           </div>
         </div>
       </div>
 
-      {/* FILTER & SEARCH BAR */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-          {/* Search box */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm || ''}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari no struk (INV-...), nama member, nomor HP, kasir, atau nama toko..."
-              className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition-colors"
-            />
-            {searchTerm && (
-              <button 
-                onClick={() => setSearchTerm('')} 
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Date range filter */}
-          <div className="flex items-center gap-1.5 overflow-x-auto text-xs shrink-0">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Waktu:</span>
-            {[
-              { id: 'ALL', label: 'Semua Waktu' },
-              { id: 'TODAY', label: 'Hari Ini' },
-              { id: 'WEEK', label: '7 Hari' },
-              { id: 'MONTH', label: '30 Hari' }
-            ].map(df => (
-              <button
-                key={df.id}
-                onClick={() => setDateFilter(df.id as any)}
-                className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
-                  dateFilter === df.id
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {df.label}
-              </button>
-            ))}
-          </div>
+      {/* UNIFIED COMPACT TOOLBAR (Space Saver: 1 Single Clean Row) */}
+      <div className="bg-white dark:bg-neutral-900 p-3 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 shadow-xs flex flex-col lg:flex-row items-center justify-between gap-3">
+        {/* Left: Search Bar */}
+        <div className="relative w-full lg:w-96">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Cari no struk, member, HP, kasir, toko..."
+            className="w-full pl-9 pr-8 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-neutral-900 font-medium"
+          />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')} 
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-0.5"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Region & Transaction Type Filter Pills */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
-          {/* Region filter */}
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Wilayah:</span>
-            {[
-              { id: 'ALL', label: 'Seluruh Indonesia' },
-              { id: 'JABODETABEK', label: 'Jabodetabek' },
-              { id: 'JAWA_BALI', label: 'Jawa & Bali' },
-              { id: 'SUMATERA', label: 'Sumatera' },
-              { id: 'KALIMANTAN', label: 'Kalimantan' },
-              { id: 'SULAWESI', label: 'Sulawesi' }
-            ].map(reg => (
-              <button
-                key={reg.id}
-                onClick={() => setSelectedRegion(reg.id)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  selectedRegion === reg.id
-                    ? 'bg-emerald-700 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {reg.label}
-              </button>
-            ))}
+        {/* Right: Compact Dropdown Filters (Waktu, Wilayah, Tipe) */}
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
+          {/* Waktu Filter */}
+          <div className="relative flex items-center">
+            <Calendar className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as any)}
+              className="pl-8 pr-7 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-700 dark:text-neutral-200 focus:outline-hidden focus:border-neutral-900 cursor-pointer appearance-none"
+            >
+              <option value="ALL">Semua Waktu</option>
+              <option value="TODAY">Hari Ini</option>
+              <option value="WEEK">7 Hari Terakhir</option>
+              <option value="MONTH">30 Hari Terakhir</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-neutral-400 absolute right-2 pointer-events-none" />
           </div>
 
-          {/* Type filter */}
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Tipe:</span>
-            {[
-              { id: 'ALL', label: 'Semua Tipe' },
-              { id: 'EARN', label: 'Earn Poin' },
-              { id: 'REDEEM', label: 'Tukar Voucher' },
-              { id: 'MANUAL', label: 'Manual Adjustment' }
-            ].map(tf => (
+          {/* Wilayah Filter */}
+          <div className="relative flex items-center">
+            <MapPin className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
+            <select
+              value={selectedRegion}
+              onChange={(e) => setSelectedRegion(e.target.value)}
+              className="pl-8 pr-7 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-700 dark:text-neutral-200 focus:outline-hidden focus:border-neutral-900 cursor-pointer appearance-none"
+            >
+              <option value="ALL">Seluruh Indonesia</option>
+              <option value="JABODETABEK">Jabodetabek</option>
+              <option value="JAWA_BALI">Jawa & Bali</option>
+              <option value="SUMATERA">Sumatera</option>
+              <option value="KALIMANTAN">Kalimantan</option>
+              <option value="SULAWESI">Sulawesi</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-neutral-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          {/* Tipe Filter */}
+          <div className="relative flex items-center">
+            <Filter className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="pl-8 pr-7 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-700 dark:text-neutral-200 focus:outline-hidden focus:border-neutral-900 cursor-pointer appearance-none"
+            >
+              <option value="ALL">Semua Tipe Transaksi</option>
+              <option value="EARN">Penerbitan Poin (Earn)</option>
+              <option value="REDEEM">Penukaran Voucher (Redeem)</option>
+              <option value="MANUAL">Manual Adjustment</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-neutral-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          {/* Counter badge & Reset button */}
+          <div className="flex items-center gap-1.5 ml-1">
+            <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 px-2 py-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-lg whitespace-nowrap">
+              {filteredTransactions.length} dari {transactions.length}
+            </span>
+            {isAnyFilterActive && (
               <button
-                key={tf.id}
-                onClick={() => setSelectedType(tf.id)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  selectedType === tf.id
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+                onClick={handleResetFilters}
+                className="p-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
+                title="Reset Semua Filter"
               >
-                {tf.label}
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
-            ))}
+            )}
           </div>
         </div>
       </div>
 
       {/* TRANSACTIONS TABLE */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                <th className="py-3.5 px-5">No. Struk & Waktu</th>
-                <th className="py-3.5 px-5">Toko Cabang</th>
-                <th className="py-3.5 px-5">Member / Pelanggan</th>
-                <th className="py-3.5 px-5">Nilai Transaksi</th>
-                <th className="py-3.5 px-5">Poin Delta</th>
-                <th className="py-3.5 px-5">Tipe & Kasir</th>
-                <th className="py-3.5 px-5 text-center">Aksi</th>
+              <tr className="bg-neutral-50/60 dark:bg-neutral-850/40 border-b border-neutral-100 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+                <th className="py-3 px-4">NO. STRUK & WAKTU</th>
+                <th className="py-3 px-4">TOKO CABANG</th>
+                <th className="py-3 px-4">MEMBER / PELANGGAN</th>
+                <th className="py-3 px-4 text-right">NILAI TRANSAKSI</th>
+                <th className="py-3 px-4 text-right">POIN DELTA</th>
+                <th className="py-3 px-4">TIPE & KASIR</th>
+                <th className="py-3 px-4 text-right w-16">AKSI</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400">
-                    <Receipt className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                    <p className="font-bold text-slate-700 text-sm">Tidak ada transaksi ditemukan</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Coba sesuaikan kata kunci pencarian atau filter cabang/waktu.</p>
+                  <td colSpan={7} className="py-14 text-center text-neutral-400">
+                    <Receipt className="w-9 h-9 mx-auto mb-2 text-neutral-300 dark:text-neutral-600" />
+                    <p className="font-semibold text-neutral-800 dark:text-neutral-200 text-sm">Tidak ada transaksi ditemukan</p>
+                    <p className="text-xs text-neutral-400 mt-0.5">Coba sesuaikan kata kunci pencarian atau filter cabang/waktu.</p>
+                    {isAnyFilterActive && (
+                      <button
+                        onClick={handleResetFilters}
+                        className="mt-3 px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                      >
+                        Reset Filter
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -435,140 +477,175 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                   const isRedeem = trx.type === 'REDEEM' || trx.type === 'VOUCHER_DISCOUNT';
                   const isManual = trx.type === 'MANUAL_ADJUSTMENT';
 
-                  // find member object for tier badge
+                  // Find member for tier
                   const memberObj = members.find(m => m.id === trx.memberId || m.name === trx.memberName);
+                  const isMenuOpen = activeMenuTrxId === trx.id;
 
                   return (
                     <tr 
                       key={trx.id} 
-                      className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                      className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 transition-colors group cursor-pointer"
                       onClick={() => setSelectedReceiptDetail(trx)}
                     >
                       {/* No Struk & Timestamp */}
-                      <td className="py-3.5 px-5">
-                        <div className="font-mono font-bold text-slate-900 group-hover:text-emerald-700 transition-colors flex items-center gap-1.5">
-                          <Receipt className="w-3.5 h-3.5 text-slate-400" />
-                          {trx.receiptNo}
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono font-bold text-neutral-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-1.5">
+                          <Receipt className="w-3.5 h-3.5 text-neutral-400" />
+                          <span>{trx.receiptNo}</span>
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 flex items-center gap-1 font-normal">
                           <Clock className="w-3 h-3" />
-                          {new Date(trx.timestamp).toLocaleString('id-ID', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          <span>
+                            {new Date(trx.timestamp).toLocaleString('id-ID', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
                         </div>
                       </td>
 
-                      {/* Store */}
-                      <td className="py-3.5 px-5">
-                        <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                          <Store className="w-3.5 h-3.5 text-emerald-600" />
-                          {trx.storeName}
+                      {/* Store Branch */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                          <Building className="w-3.5 h-3.5 text-neutral-400" />
+                          <span>{trx.storeName}</span>
                         </div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1 mt-0.5 font-normal">
                           <MapPin className="w-3 h-3" />
-                          {stores.find(s => s.name === trx.storeName)?.city || 'Nasional'}
+                          <span>{stores.find(s => s.name === trx.storeName)?.city || 'Nasional'}</span>
                         </div>
                       </td>
 
-                      {/* Member */}
-                      <td className="py-3.5 px-5">
-                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                          {trx.memberName}
-                          {memberObj && <TierBadge tier={memberObj.tier} size="sm" />}
+                      {/* Member & Phone */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-neutral-900 dark:text-white">
+                            {trx.memberName}
+                          </span>
+                          <TierBadge tier={memberObj?.tier || 'BLUE'} size="sm" />
                         </div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono mt-0.5 font-normal">
                           {trx.memberPhone}
                         </div>
                       </td>
 
-                      {/* Amount */}
-                      <td className="py-3.5 px-5">
-                        <div className="font-bold text-slate-900">
+                      {/* Amount (RATA KANAN) */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="font-semibold text-neutral-900 dark:text-white text-sm">
                           Rp {(trx.amount || 0).toLocaleString('id-ID')}
                         </div>
                         {trx.voucherCode && (
-                          <div className="text-[10px] text-purple-700 font-mono bg-purple-50 px-1.5 py-0.5 rounded mt-0.5 w-fit">
+                          <div className="text-[10px] text-purple-700 dark:text-purple-300 font-mono bg-purple-50 dark:bg-purple-950/50 px-1.5 py-0.5 rounded mt-0.5 inline-block">
                             Kupon: {trx.voucherCode}
                           </div>
                         )}
                       </td>
 
-                      {/* Points Delta */}
-                      <td className="py-3.5 px-5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs ${
-                          trx.pointsDelta > 0 
-                            ? 'bg-emerald-100 text-emerald-800' 
-                            : trx.pointsDelta < 0 
-                              ? 'bg-purple-100 text-purple-800' 
-                              : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          {trx.pointsDelta > 0 ? `+${trx.pointsDelta}` : trx.pointsDelta} Pts
-                        </span>
+                      {/* Points Delta (RATA KANAN with Soft UI) */}
+                      <td className="py-3.5 px-4 text-right">
+                        {trx.pointsDelta > 0 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+                            +{trx.pointsDelta.toLocaleString('id-ID')} Pts
+                          </span>
+                        ) : trx.pointsDelta < 0 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40">
+                            {trx.pointsDelta.toLocaleString('id-ID')} Pts
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+                            0 Pts
+                          </span>
+                        )}
                       </td>
 
                       {/* Type & Cashier */}
-                      <td className="py-3.5 px-5">
-                        <div className="font-semibold text-slate-700">
+                      <td className="py-3.5 px-4">
+                        <div className="font-medium text-neutral-700 dark:text-neutral-300">
                           {isEarn && 'Penerbitan Poin'}
                           {isRedeem && 'Penukaran Voucher'}
                           {isManual && 'Manual Adjustment'}
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
+                        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 font-normal">
                           Kasir: {trx.cashierName || 'Sistem'}
                         </div>
                       </td>
 
-                      {/* Action */}
-                      <td className="py-3.5 px-5">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            title="Lihat Struk"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedReceiptDetail(trx);
-                            }}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                      {/* Clean Kebab Menu (Row Action) */}
+                      <td 
+                        className="py-3.5 px-4 text-right relative"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setActiveMenuTrxId(isMenuOpen ? null : trx.id)}
+                          className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                          title="Menu Aksi"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {isMenuOpen && (
+                          <div
+                            ref={menuRef}
+                            className="absolute right-4 top-10 w-48 bg-white dark:bg-neutral-800 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-700 py-1.5 z-30 text-left animate-fadeIn"
                           >
-                            <Receipt className="w-4 h-4" />
-                          </button>
-                          {onUpdateTransaction && (
                             <button
-                              title="Edit Transaksi"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingTransaction(trx);
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuTrxId(null);
+                                setSelectedReceiptDetail(trx);
                               }}
-                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
+                              className="w-full px-3.5 py-2 text-xs text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60 flex items-center gap-2 font-medium cursor-pointer"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <Receipt className="w-3.5 h-3.5 text-neutral-500" />
+                              Lihat Detail Struk
                             </button>
-                          )}
-                          {onDeleteTransaction && (
-                            <button
-                              title="Hapus Transaksi"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                showConfirm(
-                                  `Apakah Anda yakin ingin menghapus transaksi ${trx.receiptNo}? Tindakan ini akan menghapusnya dari laporan HO, namun saldo poin member TIDAK akan dikurangi secara otomatis (harap kurangi secara manual jika perlu).`,
-                                  'Hapus Transaksi',
-                                  () => {
-                                    onDeleteTransaction(trx.id);
-                                    showAlert(`Transaksi ${trx.receiptNo} berhasil dihapus (Audit Log dicatat).`, 'Berhasil', 'success');
-                                  },
-                                  'Hapus (Audit Log)',
-                                  'Batal'
-                                );
-                              }}
-                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+
+                            {onUpdateTransaction && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuTrxId(null);
+                                  setEditingTransaction(trx);
+                                }}
+                                className="w-full px-3.5 py-2 text-xs text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60 flex items-center gap-2 font-medium cursor-pointer"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-neutral-500" />
+                                Edit Transaksi
+                              </button>
+                            )}
+
+                            {onDeleteTransaction && (
+                              <>
+                                <div className="my-1 border-t border-neutral-100 dark:border-neutral-700" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveMenuTrxId(null);
+                                    showConfirm(
+                                      `Apakah Anda yakin ingin membatalkan/menghapus transaksi ${trx.receiptNo}? Tindakan ini akan dicatat dalam Audit Log HO.`,
+                                      'Void / Delete Transaction',
+                                      () => {
+                                        onDeleteTransaction(trx.id);
+                                        showAlert(`Transaksi ${trx.receiptNo} berhasil dihapus (Audit Log tercatat).`, 'Berhasil', 'success');
+                                      },
+                                      'Hapus Transaksi',
+                                      'Batal'
+                                    );
+                                  }}
+                                  className="w-full px-3.5 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2 font-semibold cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                  Void / Delete Transaction
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -579,9 +656,9 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
         </div>
 
         {/* TABLE FOOTER SUMMARY */}
-        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+        <div className="px-5 py-3.5 bg-neutral-50/50 dark:bg-neutral-850/40 border-t border-neutral-100 dark:border-neutral-800 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 gap-2">
           <span>Menampilkan <strong>{filteredTransactions.length}</strong> transaksi dari total {transactions.length} rekor</span>
-          <div className="flex items-center gap-2 font-medium">
+          <div className="flex items-center gap-1.5 font-medium text-neutral-600 dark:text-neutral-300">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>Watch Club National Ledger • Terverifikasi Enkripsi HO</span>
           </div>
@@ -590,67 +667,76 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
 
       {/* RECEIPT DETAIL MODAL */}
       {selectedReceiptDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-scaleUp">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs">
+        <div 
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
+          onClick={() => setSelectedReceiptDetail(null)}
+        >
+          <div 
+            className="bg-white dark:bg-neutral-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-neutral-100 dark:border-neutral-800 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-xs">
                   WTC
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">Salinan Struk Transaksi</h4>
-                  <p className="text-[11px] text-slate-500">{selectedReceiptDetail.storeName}</p>
+                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Salinan Struk Transaksi</h4>
+                  <p className="text-[11px] text-neutral-500">{selectedReceiptDetail.storeName}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedReceiptDetail(null)}
-                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-500 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-3.5 text-xs">
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">No. Struk Resmi</div>
-                <div className="font-mono text-base font-black text-slate-900 flex items-center gap-2">
+              <div className="p-3.5 bg-neutral-50 dark:bg-neutral-800/60 rounded-2xl border border-neutral-200/70 dark:border-neutral-700/60 space-y-1">
+                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">No. Struk Resmi</div>
+                <div className="font-mono text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                   <Receipt className="w-4 h-4 text-emerald-600" />
                   {selectedReceiptDetail.receiptNo}
                 </div>
-                <div className="text-[11px] text-slate-500">
+                <div className="text-[11px] text-neutral-500">
                   {new Date(selectedReceiptDetail.timestamp).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'medium' })}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Outlet Cabang</div>
-                  <div className="font-bold text-slate-800 text-xs mt-0.5">{selectedReceiptDetail.storeName}</div>
-                  <div className="text-[11px] text-slate-500">Kasir: {selectedReceiptDetail.cashierName}</div>
+                <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60">
+                  <div className="text-[10px] font-bold text-neutral-400 uppercase">Outlet Cabang</div>
+                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 text-xs mt-0.5">{selectedReceiptDetail.storeName}</div>
+                  <div className="text-[11px] text-neutral-500">Kasir: {selectedReceiptDetail.cashierName}</div>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Pelanggan</div>
-                  <div className="font-bold text-slate-800 text-xs mt-0.5">{selectedReceiptDetail.memberName}</div>
-                  <div className="text-[11px] text-slate-500 font-mono">{selectedReceiptDetail.memberPhone}</div>
+                <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60">
+                  <div className="text-[10px] font-bold text-neutral-400 uppercase">Pelanggan</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 text-xs">{selectedReceiptDetail.memberName}</span>
+                    <TierBadge tier={members.find(m => m.id === selectedReceiptDetail.memberId || m.name === selectedReceiptDetail.memberName)?.tier || 'BLUE'} size="sm" />
+                  </div>
+                  <div className="text-[11px] text-neutral-500 font-mono">{selectedReceiptDetail.memberPhone}</div>
                 </div>
               </div>
 
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                <div className="flex justify-between items-center text-slate-600">
+              <div className="p-3.5 bg-neutral-50 dark:bg-neutral-800/60 rounded-2xl border border-neutral-200/70 dark:border-neutral-700/60 space-y-2">
+                <div className="flex justify-between items-center text-neutral-600 dark:text-neutral-400">
                   <span>Nilai Transaksi</span>
-                  <span className="font-bold text-slate-900 text-sm">
+                  <span className="font-bold text-neutral-900 dark:text-white text-sm">
                     Rp {(selectedReceiptDetail.amount || 0).toLocaleString('id-ID')}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-slate-600">
+                <div className="flex justify-between items-center text-neutral-600 dark:text-neutral-400">
                   <span>Mutasi Poin Loyalty</span>
-                  <span className={`font-bold text-sm ${selectedReceiptDetail.pointsDelta >= 0 ? 'text-emerald-600' : 'text-purple-600'}`}>
+                  <span className={`font-bold text-sm ${selectedReceiptDetail.pointsDelta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                     {selectedReceiptDetail.pointsDelta >= 0 ? `+${selectedReceiptDetail.pointsDelta}` : selectedReceiptDetail.pointsDelta} Pts
                   </span>
                 </div>
                 {selectedReceiptDetail.voucherCode && (
-                  <div className="flex justify-between items-center text-purple-700 pt-1 border-t border-slate-200">
+                  <div className="flex justify-between items-center text-purple-700 dark:text-purple-300 pt-1.5 border-t border-neutral-200 dark:border-neutral-700">
                     <span>Voucher Digunakan</span>
                     <span className="font-mono font-bold">{selectedReceiptDetail.voucherCode}</span>
                   </div>
@@ -658,24 +744,24 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
               </div>
 
               {selectedReceiptDetail.notes && (
-                <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl text-amber-900 text-xs">
+                <div className="p-3 bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl text-amber-900 dark:text-amber-300 text-xs">
                   <span className="font-bold">Catatan: </span> {selectedReceiptDetail.notes}
                 </div>
               )}
             </div>
 
-            <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+            <div className="mt-6 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
               <button
                 onClick={() => {
                   window.print();
                 }}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 text-neutral-700 dark:text-neutral-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" /> Cetak Salinan
               </button>
               <button
                 onClick={() => setSelectedReceiptDetail(null)}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer ml-auto"
+                className="px-5 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer ml-auto"
               >
                 Tutup
               </button>
@@ -686,59 +772,65 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
 
       {/* EDIT TRANSACTION MODAL */}
       {editingTransaction && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-                <Edit2 className="w-4 h-4 text-blue-600" />
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn"
+          onClick={() => setEditingTransaction(null)}
+        >
+          <div 
+            className="bg-white dark:bg-neutral-900 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-neutral-200 dark:border-neutral-800 relative animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-850/40">
+              <h3 className="font-bold text-neutral-900 dark:text-white flex items-center gap-2 text-sm">
+                <Edit2 className="w-4 h-4 text-neutral-600 dark:text-neutral-300" />
                 Edit Transaksi (Admin HO)
               </h3>
               <button 
                 onClick={() => setEditingTransaction(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors text-slate-500 cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors text-neutral-500 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">No. Struk</label>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">No. Struk</label>
                 <input 
                   type="text" 
                   value={editingTransaction.receiptNo || ""}
                   onChange={(e) => setEditingTransaction({...editingTransaction, receiptNo: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:bg-white"
+                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-900 dark:text-white focus:outline-hidden focus:border-neutral-900"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Nominal Transaksi (Rp)</label>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Nominal Transaksi (Rp)</label>
                 <input 
                   type="number" 
                   value={editingTransaction.amount || ""}
                   onChange={(e) => setEditingTransaction({...editingTransaction, amount: parseInt(e.target.value) || 0})}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:bg-white"
+                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-900 dark:text-white focus:outline-hidden focus:border-neutral-900"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Tambahan</label>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Catatan Tambahan</label>
                 <input 
                   type="text" 
                   value={editingTransaction.notes || ''}
                   onChange={(e) => setEditingTransaction({...editingTransaction, notes: e.target.value})}
                   placeholder="Opsional"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:bg-white"
+                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-neutral-900"
                 />
               </div>
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl mt-4">
-                <p className="text-xs text-amber-800 leading-relaxed font-medium">
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl mt-4">
+                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
                   <strong>Peringatan Audit:</strong> Perubahan ini tidak akan secara otomatis menghitung ulang tier/poin milik member terkait. Perubahan hanya berlaku untuk pelaporan HO.
                 </p>
               </div>
             </div>
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+            <div className="px-6 py-4 bg-neutral-50 dark:bg-neutral-850/40 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2">
               <button
                 onClick={() => setEditingTransaction(null)}
-                className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                className="px-4 py-2 bg-white hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-750 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -750,7 +842,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                   }
                   setEditingTransaction(null);
                 }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Simpan (Audit Log)
               </button>

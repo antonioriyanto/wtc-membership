@@ -1,3 +1,6 @@
+import { initialStores } from "../data/mockData";
+import { cleanAndEnrichStore } from "../lib/syncFirestore";
+import { StoreCard } from "./StoreCard";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Member, Voucher, StoreBranch, Transaction, Campaign, SupportTicket } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
@@ -30,7 +33,11 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Send
+  Send,
+  Navigation,
+  Compass,
+  Phone,
+  ExternalLink
 } from 'lucide-react';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { WatchClubLogo } from './WatchClubLogo';
@@ -372,12 +379,22 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   };
 
   const filteredStores = useMemo(() => {
-    let result = stores.filter(s => 
-      s.name.toLowerCase().includes(storeSearch.toLowerCase()) ||
-      s.mallName.toLowerCase().includes(storeSearch.toLowerCase()) ||
-      s.city.toLowerCase().includes(storeSearch.toLowerCase()) ||
-      (s.code && s.code.toLowerCase().includes(storeSearch.toLowerCase()))
-    );
+    let result = stores.map(cleanAndEnrichStore);
+
+    const q = storeSearch.trim().toLowerCase();
+    if (q) {
+      result = result.filter(s => 
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.mallName && s.mallName.toLowerCase().includes(q)) ||
+        (s.city && s.city.toLowerCase().includes(q)) ||
+        (s.address && s.address.toLowerCase().includes(q)) ||
+        (s.floorUnit && s.floorUnit.toLowerCase().includes(q)) ||
+        (s.code && s.code.toLowerCase().includes(q))
+      );
+    } else {
+      // By default in Customer PWA, show retail boutiques (exclude HO)
+      result = result.filter(s => s.id !== 'HO' && s.type !== 'HO');
+    }
 
     if (userLocation) {
       result = result.map(s => {
@@ -389,7 +406,6 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         }
         return s;
       });
-
       result.sort((a, b) => {
         if (a.distance !== undefined && b.distance !== undefined) return a.distance - b.distance;
         if (a.distance !== undefined) return -1;
@@ -397,7 +413,6 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         return 0;
       });
     }
-
     return result;
   }, [stores, storeSearch, userLocation]);
 
@@ -451,41 +466,33 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     <div className="w-full h-full bg-slate-100 dark:bg-black overflow-y-auto">
       <div className="w-full max-w-[480px] min-h-screen mx-auto bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-900 dark:text-white pb-[100px] relative shadow-2xl">
         
-        <header className="flex justify-between items-center p-5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950/90 backdrop-blur-md sticky top-0 z-50">
+        <header className="relative flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 bg-neutral-50/90 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950/90 backdrop-blur-md sticky top-0 z-50 border-b border-black/5 dark:border-white/10 min-h-[58px]">
           <button 
             type="button"
             onClick={handleHeaderBack} 
-            className={`p-2 -ml-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
+            className={`w-8 h-8 rounded-full transition-all flex items-center justify-center cursor-pointer z-10 shrink-0 ${
               canGoBack 
-                ? 'text-neutral-700 dark:text-neutral-300 hover:text-slate-950 hover:bg-slate-200/70 active:scale-95' 
-                : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:text-neutral-400 hover:bg-slate-200/40'
+                ? 'text-neutral-700 dark:text-neutral-300 hover:text-slate-950 dark:hover:text-white bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/5 dark:hover:bg-white/15 active:scale-95' 
+                : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-400 hover:bg-black/[0.04] dark:hover:bg-white/5'
             }`}
             title={canGoBack ? "Kembali ke halaman sebelumnya" : "Beranda"}
             aria-label="Kembali"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className="w-4 h-4 stroke-[2]" />
           </button>
-          <div className="w-[110px] text-neutral-900 dark:text-white flex justify-center">
-            <WatchClubLogo />
+
+          <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none text-neutral-900 dark:text-white">
+            <WatchClubLogo className="h-[19px] sm:h-6 w-auto pointer-events-auto transition-transform hover:scale-105" />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center z-10 shrink-0">
             <button
               onClick={toggleTheme}
-              className="w-10 h-10 rounded-full border border-black/10 dark:border-white/20 bg-slate-200 dark:bg-neutral-800 flex justify-center items-center font-bold text-neutral-500 dark:text-neutral-400 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 dark:hover:bg-neutral-700 shadow-sm"
-              title="Ganti Tema"
+              className="w-8 h-8 rounded-full border border-black/5 dark:border-white/15 bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/5 dark:hover:bg-white/15 flex justify-center items-center text-neutral-700 dark:text-neutral-300 overflow-hidden shrink-0 transition-all cursor-pointer shadow-xs active:scale-95"
+              title={isDarkMode ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+              aria-label="Ganti Tema"
             >
-              {isDarkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={() => setActiveTab('PROFILE')}
-              className="w-10 h-10 rounded-full border border-black/10 dark:border-white/20 bg-slate-200 dark:bg-neutral-800 flex justify-center items-center font-bold text-neutral-500 dark:text-neutral-400 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 dark:hover:bg-neutral-700 shadow-sm"
-            >
-              {member.avatarUrl ? (
-                <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover object-center" />
-              ) : (
-                member.name.charAt(0).toUpperCase()
-              )}
+              {isDarkMode ? <Sun className="w-4 h-4 text-amber-400 stroke-[1.75]" /> : <Moon className="w-4 h-4 stroke-[1.75]" />}
             </button>
           </div>
         </header>
@@ -582,7 +589,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 </div>
               </div>
               <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-100 dark:bg-black rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
+                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%`, ...tierBackgroundStyle }}></div>
               </div>
             </section>
 
@@ -756,67 +763,11 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
             <div className="flex flex-col gap-4 px-5 py-2.5 pb-5">
               {filteredStores.map((store, idx) => (
-                <div key={store.id} className="bg-white dark:bg-white/5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col transition-transform hover:-translate-y-0.5 border border-black/5 dark:border-white/10">
-                  {/* Photo Placeholder */}
-                  <div className="w-full aspect-[20/9] bg-slate-100 overflow-hidden relative border-b border-black/5 dark:border-white/10">
-                    <img 
-                      src={store.imageUrl || (store as any).image || 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'} 
-                      alt={store.name}
-                      className="w-full h-full object-cover object-center"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-                    <div className="absolute bottom-3 left-4 right-4">
-                      <div className="text-[0.65rem] font-bold uppercase tracking-wider text-white/90 mb-0.5 shadow-sm">{store.region}</div>
-                      <h3 className="text-base sm:text-lg font-bold text-white leading-snug drop-shadow-md">
-                        {store.name}
-                      </h3>
-                      {store.distance !== undefined && (
-                        <div className="flex items-center gap-1 text-[0.7rem] font-bold text-emerald-300 drop-shadow-md mt-1 bg-black/40 w-fit px-2 py-0.5 rounded-full backdrop-blur-sm">
-                          <MapPin className="w-3 h-3" />
-                          <span>
-                            {store.distance < 1 
-                              ? `${Math.round(store.distance * 1000)}m` 
-                              : `${store.distance.toFixed(1)}km`}
-                          </span>
-                        </div>
-                      )}
-                      
-                      
-                      
-                    </div>
-                  </div>
-
-                  <div className="p-4 flex flex-col gap-3">
-                    <a 
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([store.mallName || store.name, store.city].filter(Boolean).join(' '))}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-neutral-600 dark:text-neutral-400 font-medium bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 p-2.5 rounded-xl border border-black/5 dark:border-white/10 block hover:bg-blue-50/50 hover:border-blue-100 transition-colors cursor-pointer group"
-                    >
-                      <div className="font-semibold text-neutral-800 dark:text-neutral-200 group-hover:text-blue-700 transition-colors">{store.mallName || store.name}</div>
-                      <div className="text-neutral-500 dark:text-neutral-400 mt-0.5 flex items-start gap-1 group-hover:text-blue-600/80 transition-colors">
-                        <MapPin className="text-neutral-400 dark:text-neutral-500 group-hover:text-blue-500 w-3.5 h-3.5 mt-0.5 shrink-0 transition-colors" />
-                        <span>{store.address || `${store.mallName || store.name}, Indonesia`}</span>
-                      </div>
-                    </a>
-                    {store.whatsapp && (
-                      <div className="flex items-center justify-between gap-2 mt-1">
-                        <div className="flex items-center gap-1.5">
-                          <MessageCircle className="text-[#25D366] w-4 h-4 shrink-0" />
-                          <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">WhatsApp:</span>
-                        </div>
-                        <a 
-                          href={`https://wa.me/${store.whatsapp.replace(/[^0-9]/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline bg-emerald-50 px-2 py-1 rounded-md transition-colors"
-                        >
-                          {store.whatsapp}
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <StoreCard 
+                  key={store.id || idx} 
+                  store={store} 
+                  index={idx} 
+                />
               ))}
             </div>
           </div>
@@ -891,7 +842,10 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     <textarea className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:border-slate-900 text-sm font-medium resize-y min-h-[70px]" placeholder="Enter your full address" defaultValue={member.address || ''}></textarea>
                   </div>
 
-                  <button type="submit" className="w-full bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm dark:shadow-none cursor-pointer mt-2">
+                  <button 
+                    type="submit" 
+                    className="w-full h-11 sm:h-12 bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-100 dark:text-neutral-950 rounded-xl text-xs sm:text-[13px] font-semibold tracking-wide transition-all duration-200 shadow-xs active:scale-[0.99] cursor-pointer mt-2"
+                  >
                     Save Changes
                   </button>
                 </form>
@@ -904,27 +858,39 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                       setTicketSuccessNotice(null);
                       setIsSupportModalOpen(true);
                     }}
-                    className="w-full p-3.5 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200 rounded-2xl flex items-center justify-between text-left transition-colors cursor-pointer"
+                    className="w-full p-3.5 sm:p-4 bg-neutral-100/70 hover:bg-neutral-200/60 dark:bg-white/[0.04] dark:hover:bg-white/[0.07] border border-black/5 dark:border-white/10 rounded-2xl flex items-center justify-between text-left transition-all duration-200 cursor-pointer group/help active:scale-[0.99]"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
-                        <HelpCircle className="w-5 h-5" />
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-black/5 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 flex items-center justify-center shrink-0 border border-black/5 dark:border-white/10 group-hover/help:scale-105 transition-transform">
+                        <HelpCircle className="w-4.5 h-4.5 stroke-[1.75]" />
                       </div>
-                      <div>
-                        <div className="font-bold text-xs text-neutral-900 dark:text-white">Pusat Bantuan & Komplain Poin</div>
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Ajukan keluhan atau cek status tiket Anda</div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 group-hover/help:text-black dark:group-hover/help:text-white truncate">
+                          Pusat Bantuan & Komplain Poin
+                        </div>
+                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                          Ajukan keluhan atau cek status tiket Anda
+                        </div>
                       </div>
                     </div>
-                    {myTickets.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
-                        {myTickets.length} Tiket
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      {myTickets.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-[10px] font-semibold tracking-tight">
+                          {myTickets.length} Tiket
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-neutral-400 dark:text-neutral-500 group-hover/help:translate-x-0.5 transition-transform" />
+                    </div>
                   </button>
                 </div>
 
-                <button type="button" onClick={onBackToHO} className="w-full max-w-[400px] bg-white dark:bg-white/5 hover:bg-red-50 text-red-600 border border-red-200 py-3 rounded-xl text-sm font-semibold transition-colors mt-3 flex justify-center items-center gap-2 cursor-pointer">
-                  <LogOut className="w-4 h-4" /> Sign Out
+                <button 
+                  type="button" 
+                  onClick={onBackToHO} 
+                  className="w-full max-w-[400px] h-11 rounded-xl border border-rose-500/20 hover:border-rose-500/30 bg-rose-500/[0.03] hover:bg-rose-500/[0.08] dark:border-rose-400/20 dark:hover:border-rose-400/30 dark:bg-rose-400/[0.06] dark:hover:bg-rose-400/10 text-rose-600 dark:text-rose-400 text-xs sm:text-[13px] font-medium transition-all duration-200 mt-3 flex justify-center items-center gap-2 cursor-pointer active:scale-[0.99]"
+                >
+                  <LogOut className="w-3.5 h-3.5 stroke-[1.75]" /> 
+                  <span>Sign Out</span>
                 </button>
               </div>
             </section>
