@@ -217,25 +217,45 @@ export async function findMemberByPhoneInFirestore(phone: string): Promise<any |
     ])).filter(Boolean);
 
     for (const cand of candidates) {
-      const q = query(collection(db, 'members'), where('phone', '==', cand));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        return { id: d.id, ...d.data() };
+      try {
+        const q = query(collection(db, 'members'), where('phone', '==', cand));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          return { id: d.id, ...d.data() };
+        }
+      } catch (innerErr) {
+        // Ignore individual query index/permission error
       }
     }
 
-    // 2. Comprehensive fallback scan over members collection to ensure no phone format escapes
-    const allSnap = await getDocs(collection(db, 'members'));
-    for (const d of allSnap.docs) {
-      const data = d.data();
-      if (data.phone && isSamePhoneNumber(data.phone, normalized)) {
-        return { id: d.id, ...data };
+    // 2. Comprehensive fallback scan over members collection
+    try {
+      const allSnap = await getDocs(collection(db, 'members'));
+      for (const d of allSnap.docs) {
+        const data = d.data();
+        if (data.phone && isSamePhoneNumber(data.phone, normalized)) {
+          return { id: d.id, ...data };
+        }
       }
+    } catch (scanErr) {
+      // Ignore scan error
     }
   } catch (err) {
-    console.error("Error querying member by phone in Firestore:", err);
+    // Gracefully handle any Firestore permission or network error
   }
+
+  // 3. Fallback to local storage members
+  try {
+    const saved = localStorage.getItem('wtc_members');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        const found = parsed.find((m: any) => m.phone && isSamePhoneNumber(m.phone, normalized));
+        if (found) return found;
+      }
+    }
+  } catch {}
 
   return null;
 }
