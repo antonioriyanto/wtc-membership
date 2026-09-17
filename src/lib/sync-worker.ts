@@ -1,7 +1,8 @@
 import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
-import { Member } from "../types";
+import { Member, MemberTier } from "../types";
 import { cleanForFirestore, safeSetDoc, normalizePhoneNumber, isSamePhoneNumber } from "./syncFirestore";
+import { calculateTier } from "./loyalty";
 
 export interface SyncReport {
   timestamp: string;
@@ -18,20 +19,177 @@ export interface SyncWorkerOptions {
   intervalMs?: number;
   immediate?: boolean;
   onSyncComplete?: (report: SyncReport) => void;
+  onInitialReconciled?: (report: SyncReport) => void;
+  maxInitialRetries?: number;
+  initialRetryDelayMs?: number;
 }
 
-let syncIntervalTimer: any = null;
-let isSyncInProgress = false;
-let lastSyncReport: SyncReport | null = null;
+const DELETED_MEMBERS_STORAGE_KEY = 'wtc_deleted_member_ids';
+
+function getStorage(): Storage | null {
+  if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+  if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) return (globalThis as any).localStorage;
+  return null;
+}
 
 /**
- * Compares the local members state with Firestore documents,
- * identifies inconsistencies (missing records, point discrepancies,
- * unlinked Google UIDs, or duplicate phone identities), and resolves them.
+ * Returns set of member IDs that were explicitly deleted.
+ * Used to avoid resurrecting deleted members from client-side caches.
  */
-export async function runMemberSyncPass(
+export function getDeletedMemberIds(): Set<string> {
+  const storage = getStorage();
+  if (!storage) return new Set();
+  try {
+    const raw = storage.getItem(DELETED_MEMBERS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Records a deleted member ID into tombstone storage.
+ */
+export function recordDeletedMemberId(memberId: string): void {
+  const storage = getStorage();
+  if (!storage || !memberId) return;
+  try {
+    const current = getDeletedMemberIds();
+    current.add(memberId);
+    // Keep max 500 records to prevent unbounded growth
+    const arr = Array.from(current).slice(-500);
+    storage.setItem(DELETED_MEMBERS_STORAGE_KEY, JSON.stringify(arr));
+  } catch (err) {
+    console.warn('[SyncWorker] Could not record deleted member ID:', err);
+  }
+}
+
+/**
+ * Clears a member ID from tombstone storage (e.g. if re-registered).
+ */
+export function unrecordDeletedMemberId(memberId: string): void {
+  const storage = getStorage();
+  if (!storage || !memberId) return;
+  try {
+    const current = getDeletedMemberIds();
+    current.delete(memberId);
+    storage.setItem(DELETED_MEMBERS_STORAGE_KEY, JSON.stringify(Array.from(current)));
+  } catch {}
+}
+
+/**
+ * Identifies whether an error from Firebase is transient and safe to retry.
+ */
+export function isTransientFirebaseError(error: any): boolean {
+  if (!error) return false;
+  const code = (error.code || '').toLowerCase();
+  const message = (error.message || '').toLowerCase();
+
+  // Permanent failure codes: do not retry
+  if (
+    code === 'permission-denied' ||
+    code === 'unauthenticated' ||
+    code === 'invalid-argument' ||
+    code === 'not-found' ||
+    code === 'already-exists'
+  ) {
+    return false;
+  }
+
+  // Known transient Firebase codes
+  if (
+    code === 'unavailable' ||
+    code === 'deadline-exceeded' ||
+    code === 'resource-exhausted' ||
+    code === 'internal' ||
+    code === 'cancelled' ||
+    code === 'aborted'
+  ) {
+    return true;
+  }
+
+  // Network and connectivity patterns
+  if (
+    message.includes('client is offline') ||
+    message.includes('network') ||
+    message.includes('failed to fetch') ||
+    message.includes('timeout') ||
+    message.includes('connection') ||
+    message.includes('backend') ||
+    message.includes('unavailable')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Retries an asynchronous operation using exponential backoff with jitter.
+ */
+export async function retryWithBackoff<T>(
+  operation: (attempt: number) => Promise<T>,
+  options: {
+    maxAttempts?: number;
+    initialDelayMs?: number;
+    maxDelayMs?: number;
+    backoffFactor?: number;
+    isRetryable?: (err: any) => boolean;
+  } = {}
+): Promise<T> {
+  const {
+    maxAttempts = 3,
+    initialDelayMs = 350,
+    maxDelayMs = 2500,
+    backoffFactor = 2,
+    isRetryable = isTransientFirebaseError,
+  } = options;
+
+  let attempt = 1;
+  let delay = initialDelayMs;
+
+  while (true) {
+    try {
+      return await operation(attempt);
+    } catch (err: any) {
+      if (attempt >= maxAttempts || !isRetryable(err)) {
+        throw err;
+      }
+      const jitter = delay * 0.25 * (Math.random() * 2 - 1);
+      const actualDelay = Math.min(maxDelayMs, Math.max(100, delay + jitter));
+      
+      console.warn(
+        `[SyncWorker] Transient Firebase failure on attempt ${attempt}/${maxAttempts}: ${err?.message || err}. Retrying in ${Math.round(actualDelay)}ms...`
+      );
+      
+      await new Promise((resolve) => setTimeout(resolve, actualDelay));
+      delay = Math.min(maxDelayMs, delay * backoffFactor);
+      attempt++;
+    }
+  }
+}
+
+// Module-level single-flight / mutex lock to prevent concurrent overlapping executions
+let activeSyncPromise: Promise<SyncReport> | null = null;
+let hasQueuedPass = false;
+
+let syncIntervalTimer: any = null;
+let fastRetryTimer: any = null;
+let isInitialReconciled = false;
+let lastSyncReport: SyncReport | null = null;
+let lastSyncTimestamp = 0;
+let lastSyncError: string | null = null;
+let consecutiveFailures = 0;
+
+/**
+ * Internal execution of member sync pass.
+ */
+async function executeMemberSyncPassInternal(
   localMembers: Member[],
-  setMembersCallback?: (members: Member[]) => void
+  setMembersCallback?: (members: Member[]) => void,
+  getMembersLatest?: () => Member[]
 ): Promise<SyncReport> {
   const timestamp = new Date().toISOString();
   const actions: string[] = [];
@@ -39,17 +197,55 @@ export async function runMemberSyncPass(
   let resolvedCount = 0;
 
   try {
-    // 1. Fetch latest snapshot of all members from Firestore
-    const firestoreSnap = await getDocs(collection(db, "members"));
-    const firestoreMembers: Member[] = [];
-    firestoreSnap.forEach((d) => {
-      firestoreMembers.push({ id: d.id, ...(d.data() as any) });
-    });
-
+    const deletedIds = getDeletedMemberIds();
     // Working copy of local members
     let workingLocal = [...localMembers];
-    const loggedInMemberId = typeof window !== 'undefined' ? localStorage.getItem('wtc_logged_in_member') : null;
+    const storage = getStorage();
+    const loggedInMemberId = storage ? storage.getItem('wtc_logged_in_member') : null;
     let updatedLoggedInId = loggedInMemberId;
+
+    // 1. Fetch latest snapshot of all members from Firestore with transient retry
+    let firestoreMembers: Member[] = [];
+    const firestoreSnap = await retryWithBackoff(
+      async () => {
+        return await getDocs(collection(db, "members"));
+      },
+      {
+        maxAttempts: 3,
+        initialDelayMs: 350,
+        maxDelayMs: 2500,
+        backoffFactor: 2,
+      }
+    );
+
+    firestoreSnap.forEach((d) => {
+      if (deletedIds.has(d.id)) return;
+      const data = d.data() as any;
+      let tier = data.tier;
+      if (tier === 'DIAMOND' || tier === 'BLACK') tier = 'PLATINUM';
+      firestoreMembers.push({ id: d.id, ...data, tier });
+    });
+
+    // Handle race condition with initial seeding:
+    // If Firestore returned 0 members but we have local members, wait briefly and re-check once
+    if (firestoreMembers.length === 0 && localMembers.length > 0) {
+      await new Promise((r) => setTimeout(r, 400));
+      try {
+        const secondSnap = await getDocs(collection(db, "members"));
+        if (!secondSnap.empty) {
+          secondSnap.forEach((d) => {
+            if (deletedIds.has(d.id)) return;
+            const data = d.data() as any;
+            let tier = data.tier;
+            if (tier === 'DIAMOND' || tier === 'BLACK') tier = 'PLATINUM';
+            firestoreMembers.push({ id: d.id, ...data, tier });
+          });
+          actions.push("Detected members populated during concurrent initialization");
+        }
+      } catch {}
+    }
+
+    firestoreMembers = firestoreMembers.filter(fm => !deletedIds.has(fm.id));
 
     // 2. CHECK: Detect dual-identity duplicates in Firestore (e.g. same phone registered twice)
     const phoneGroups: { [phoneKey: string]: Member[] } = {};
@@ -63,11 +259,10 @@ export async function runMemberSyncPass(
       }
     }
 
-    // Resolve duplicate phone entries by merging into the most complete (cashier or high-points) record
+    // Resolve duplicate phone entries by merging into primary (highest points or cashier terminal ID)
     for (const [normPhone, duplicates] of Object.entries(phoneGroups)) {
       if (duplicates.length > 1) {
         discrepanciesCount++;
-        // Choose primary member (prefer member with highest points, non-empty membershipId, or cashier terminal id)
         const primary = [...duplicates].sort((a, b) => {
           const pointsA = Number(a.points || 0);
           const pointsB = Number(b.points || 0);
@@ -95,42 +290,49 @@ export async function runMemberSyncPass(
             email = sec.email;
           }
 
-          // If the customer was currently logged in with this secondary duplicate ID, migrate them to primary
           if (loggedInMemberId === sec.id) {
             updatedLoggedInId = primary.id;
           }
 
-          // Clean up secondary duplicate document in Firestore
+          // Clean up secondary duplicate document in Firestore with transient retry
           try {
-            await deleteDoc(doc(db, "members", sec.id));
+            await retryWithBackoff(() => deleteDoc(doc(db, "members", sec.id)), { maxAttempts: 2, initialDelayMs: 250 });
             actions.push(`Removed duplicate Firestore doc ${sec.id} for phone ${normPhone}`);
           } catch (e) {
             console.warn(`Could not delete duplicate member ${sec.id}:`, e);
           }
         }
 
-        // Update primary document in Firestore with consolidated details
+        const calculatedTier = calculateTier(mergedPoints);
+        let consolidatedTier: MemberTier = primary.tier || calculatedTier;
+        if ((consolidatedTier as any) === 'DIAMOND' || (consolidatedTier as any) === 'BLACK') {
+          consolidatedTier = 'PLATINUM';
+        }
         const consolidatedData: any = cleanForFirestore({
           ...primary,
           phone: normPhone,
           points: mergedPoints,
           lifetimePoints: mergedLifetime,
           totalSpend: mergedSpend,
+          tier: consolidatedTier,
           googleUid: googleUid || undefined,
           email: email,
           updatedAt: timestamp,
         });
 
-        await safeSetDoc("members", primary.id, consolidatedData);
-        resolvedCount++;
-        actions.push(`Consolidated dual-identity for phone ${normPhone} into primary ${primary.id} (${mergedPoints} pts)`);
+        try {
+          await retryWithBackoff(() => safeSetDoc("members", primary.id, consolidatedData), { maxAttempts: 2, initialDelayMs: 250 });
+          resolvedCount++;
+          actions.push(`Consolidated dual-identity for phone ${normPhone} into primary ${primary.id} (${mergedPoints} pts)`);
+        } catch (e) {
+          console.warn(`Could not update consolidated primary ${primary.id}:`, e);
+        }
 
-        // Update primary in firestore array
+        // Update in-memory firestore array
         const primaryIdx = firestoreMembers.findIndex((m) => m.id === primary.id);
         if (primaryIdx !== -1) {
           firestoreMembers[primaryIdx] = { ...primary, ...consolidatedData };
         }
-        // Remove secondary from firestore array
         for (const sec of secondaries) {
           const sIdx = firestoreMembers.findIndex((m) => m.id === sec.id);
           if (sIdx !== -1) {
@@ -142,29 +344,42 @@ export async function runMemberSyncPass(
 
     // 3. CHECK: Member exists in local state but is missing in Firestore
     for (const localMem of workingLocal) {
+      if (!localMem || !localMem.id) continue;
+
+      // Skip members that were explicitly deleted by admin to avoid zombie resurrection
+      if (deletedIds.has(localMem.id)) {
+        actions.push(`Skipped resurrecting explicitly deleted member ${localMem.name || localMem.id}`);
+        continue;
+      }
+
       const existsInFirestore = firestoreMembers.some(
         (fm) => fm.id === localMem.id || isSamePhoneNumber(fm.phone || '', localMem.phone || '')
       );
       if (!existsInFirestore) {
         discrepanciesCount++;
-        // Upload missing local member to Firestore
-        await safeSetDoc("members", localMem.id, localMem);
-        firestoreMembers.push(localMem);
-        resolvedCount++;
-        actions.push(`Synced local member ${localMem.name} (${localMem.id}) to Firestore`);
+        try {
+          await retryWithBackoff(() => safeSetDoc("members", localMem.id, localMem), { maxAttempts: 2, initialDelayMs: 250 });
+          firestoreMembers.push(localMem);
+          resolvedCount++;
+          actions.push(`Synced local member ${localMem.name} (${localMem.id}) to Firestore`);
+        } catch (err: any) {
+          console.warn(`[SyncWorker] Could not sync local member ${localMem.id} to Firestore:`, err);
+        }
       }
     }
 
     // 4. CHECK: Member exists in Firestore but missing or outdated in local state
     const reconciledLocalMap = new Map<string, Member>();
     for (const localMem of workingLocal) {
-      reconciledLocalMap.set(localMem.id, localMem);
+      if (localMem && localMem.id && !deletedIds.has(localMem.id)) {
+        reconciledLocalMap.set(localMem.id, localMem);
+      }
     }
 
     for (const fsMem of firestoreMembers) {
       let localMatch = reconciledLocalMap.get(fsMem.id);
 
-      // Also try matching by phone number if ID differs
+      // Match by phone number if document ID differs
       if (!localMatch) {
         for (const [, lm] of reconciledLocalMap.entries()) {
           if (isSamePhoneNumber(lm.phone || '', fsMem.phone || '')) {
@@ -196,29 +411,48 @@ export async function runMemberSyncPass(
         const hasTierDiff = fsTier && localTier && fsTier !== localTier;
         const hasGoogleDiff = fsGoogleUid && !localGoogleUid;
 
+        const authoritativePoints = Math.max(fsPoints, localPoints);
+        const authoritativeSpend = Math.max(fsSpend, localSpend);
+        const calculatedTier = calculateTier(authoritativePoints);
+        let authoritativeTier: MemberTier = fsTier || calculatedTier || localTier;
+        if ((authoritativeTier as any) === 'DIAMOND' || (authoritativeTier as any) === 'BLACK') {
+          authoritativeTier = 'PLATINUM';
+        }
+
+        const updatedLocal: Member = {
+          ...localMatch,
+          ...fsMem,
+          id: fsMem.id, // Strictly canonicalize to Firestore doc ID
+          points: authoritativePoints,
+          lifetimePoints: Math.max(Number(fsMem.lifetimePoints || 0), Number(localMatch.lifetimePoints || 0), authoritativePoints),
+          totalSpend: authoritativeSpend,
+          tier: authoritativeTier,
+          googleUid: fsGoogleUid || localGoogleUid,
+        } as any;
+
+        // Clean up stale local ID from map if canonical Firestore doc ID differs
+        if (localMatch.id !== fsMem.id) {
+          reconciledLocalMap.delete(localMatch.id);
+          if (loggedInMemberId === localMatch.id) {
+            updatedLoggedInId = fsMem.id;
+          }
+          discrepanciesCount++;
+          resolvedCount++;
+          actions.push(`Canonicalized local ID ${localMatch.id} -> ${fsMem.id} for ${updatedLocal.name}`);
+        }
+
+        reconciledLocalMap.set(fsMem.id, updatedLocal);
+
         if (hasPointsDiff || hasSpendDiff || hasTierDiff || hasGoogleDiff) {
           discrepanciesCount++;
-          // Firestore is authoritative for cashier transactions and web app synchronization
-          const authoritativePoints = Math.max(fsPoints, localPoints);
-          const authoritativeSpend = Math.max(fsSpend, localSpend);
-          const authoritativeTier = fsTier || localTier;
-
-          const updatedLocal: Member = {
-            ...localMatch,
-            ...fsMem,
-            points: authoritativePoints,
-            lifetimePoints: Math.max(Number(fsMem.lifetimePoints || 0), Number(localMatch.lifetimePoints || 0), authoritativePoints),
-            totalSpend: authoritativeSpend,
-            tier: authoritativeTier,
-            googleUid: fsGoogleUid || localGoogleUid,
-          } as any;
-
-          reconciledLocalMap.set(localMatch.id, updatedLocal);
-
-          // If local was higher than Firestore (e.g. offline Cashier transaction), push back to Firestore
+          // If local has higher points/spend (e.g. offline Cashier transaction), push back to Firestore with retry
           if (localPoints > fsPoints || localSpend > fsSpend) {
-            await safeSetDoc("members", updatedLocal.id, updatedLocal);
-            actions.push(`Pushed higher offline points/spend for ${updatedLocal.name} (${updatedLocal.id}) to Firestore`);
+            try {
+              await retryWithBackoff(() => safeSetDoc("members", updatedLocal.id, updatedLocal), { maxAttempts: 2, initialDelayMs: 250 });
+              actions.push(`Pushed higher offline points/spend for ${updatedLocal.name} (${updatedLocal.id}) to Firestore`);
+            } catch (e) {
+              console.warn(`Could not sync updated points back to Firestore for ${updatedLocal.id}:`, e);
+            }
           }
 
           resolvedCount++;
@@ -229,15 +463,40 @@ export async function runMemberSyncPass(
       }
     }
 
-    // 5. Finalize reconciled list
-    const finalMembersList = Array.from(reconciledLocalMap.values());
+    // 5. Finalize reconciled list and protect against in-flight state mutations
+    let finalMembersList = Array.from(reconciledLocalMap.values());
 
-    // Update localStorage for instant offline durability
-    if (typeof window !== 'undefined') {
+    if (getMembersLatest) {
       try {
-        localStorage.setItem("wtc_members", JSON.stringify(finalMembersList));
+        const freshestLocal = getMembersLatest();
+        if (Array.isArray(freshestLocal) && freshestLocal.length > 0) {
+          const finalMap = new Map(finalMembersList.map((m) => [m.id, m]));
+          for (const freshMem of freshestLocal) {
+            if (!freshMem || !freshMem.id || deletedIds.has(freshMem.id)) continue;
+            const existing = finalMap.get(freshMem.id);
+            if (!existing) {
+              finalMap.set(freshMem.id, freshMem);
+            } else {
+              // Preserve any points/spend added concurrently during this async pass
+              if (Number(freshMem.points || 0) > Number(existing.points || 0)) {
+                existing.points = freshMem.points;
+              }
+              if (Number(freshMem.totalSpend || 0) > Number(existing.totalSpend || 0)) {
+                existing.totalSpend = freshMem.totalSpend;
+              }
+            }
+          }
+          finalMembersList = Array.from(finalMap.values());
+        }
+      } catch {}
+    }
+
+    // Persist to localStorage for instant offline durability
+    if (storage) {
+      try {
+        storage.setItem("wtc_members", JSON.stringify(finalMembersList));
         if (updatedLoggedInId && updatedLoggedInId !== loggedInMemberId) {
-          localStorage.setItem("wtc_logged_in_member", updatedLoggedInId);
+          storage.setItem("wtc_logged_in_member", updatedLoggedInId);
           actions.push(`Redirected customer session to canonical member ${updatedLoggedInId}`);
         }
       } catch (err) {
@@ -245,12 +504,12 @@ export async function runMemberSyncPass(
       }
     }
 
-    // Trigger state update callback if provided and changes occurred
-    if (setMembersCallback && (discrepanciesCount > 0 || finalMembersList.length !== localMembers.length)) {
+    // Trigger state update callback
+    if (setMembersCallback && (discrepanciesCount > 0 || finalMembersList.length !== localMembers.length || !isInitialReconciled)) {
       setMembersCallback(finalMembersList);
     }
 
-    // Dispatch global custom event for any listening UI components (Customer or Cashier)
+    // Dispatch global custom event for reactive UI components
     if (typeof window !== 'undefined' && discrepanciesCount > 0) {
       try {
         window.dispatchEvent(
@@ -284,28 +543,68 @@ export async function runMemberSyncPass(
     } else {
       console.error("[SyncWorker] Error during sync pass:", err);
     }
-    return {
+
+    const failureReport: SyncReport = {
       timestamp,
       localCount: localMembers.length,
       firestoreCount: 0,
       discrepanciesCount,
       resolvedCount,
-      actions: [`Sync notice: ${err?.message || 'Permission restricted'}`],
+      actions: [`Sync notice: ${err?.message || 'Permission restricted or connection error'}`],
     };
+    lastSyncReport = failureReport;
+    throw err;
   }
 }
 
 /**
- * Starts the background sync worker.
- * Runs every 30 seconds (default) to continuously audit and align
- * member state between Cashier Portal and Customer Portal.
+ * Compares the local members state with Firestore documents,
+ * identifies inconsistencies (missing records, point discrepancies,
+ * unlinked Google UIDs, or duplicate phone identities), and resolves them.
+ * Protected by a single-flight mutex to avoid concurrent race conditions.
+ */
+export async function runMemberSyncPass(
+  localMembers: Member[],
+  setMembersCallback?: (members: Member[]) => void,
+  getMembersLatest?: () => Member[]
+): Promise<SyncReport> {
+  // If an active pass is already running, await it rather than launching a conflicting parallel query
+  if (activeSyncPromise) {
+    hasQueuedPass = true;
+    console.info("[SyncWorker] A sync pass is already active. Awaiting current pass completion.");
+    return activeSyncPromise;
+  }
+
+  activeSyncPromise = (async () => {
+    try {
+      const report = await executeMemberSyncPassInternal(localMembers, setMembersCallback, getMembersLatest);
+      return report;
+    } finally {
+      activeSyncPromise = null;
+      if (hasQueuedPass) {
+        hasQueuedPass = false;
+        // Run coalesced pass with latest state
+        setTimeout(() => {
+          const fresh = getMembersLatest ? getMembersLatest() : localMembers;
+          runMemberSyncPass(fresh, setMembersCallback, getMembersLatest).catch(() => {});
+        }, 150);
+      }
+    }
+  })();
+
+  return activeSyncPromise;
+}
+
+/**
+ * Starts the background sync worker with transient error fast-retries on initial mount.
  */
 export function startSyncWorker(options: SyncWorkerOptions = {}): () => void {
   const {
     getMembers = () => {
-      if (typeof window !== 'undefined') {
+      const storage = getStorage();
+      if (storage) {
         try {
-          const saved = localStorage.getItem("wtc_members");
+          const saved = storage.getItem("wtc_members");
           return saved ? JSON.parse(saved) : [];
         } catch {
           return [];
@@ -317,42 +616,97 @@ export function startSyncWorker(options: SyncWorkerOptions = {}): () => void {
     intervalMs = 30000,
     immediate = true,
     onSyncComplete,
+    onInitialReconciled,
+    maxInitialRetries = 3,
+    initialRetryDelayMs = 2000,
   } = options;
 
-  const executePass = async () => {
-    if (isSyncInProgress) return;
-    isSyncInProgress = true;
+  let initialRetryCount = 0;
+  let onlineListener: (() => void) | null = null;
+  let visibilityListener: (() => void) | null = null;
+
+  const executePass = async (isInitial = false) => {
     try {
       const currentLocal = getMembers();
-      const report = await runMemberSyncPass(currentLocal, setMembers);
+      const report = await runMemberSyncPass(currentLocal, setMembers, getMembers);
+
+      lastSyncTimestamp = Date.now();
+      lastSyncError = null;
+      consecutiveFailures = 0;
+
+      if (!isInitialReconciled) {
+        isInitialReconciled = true;
+        if (onInitialReconciled) {
+          onInitialReconciled(report);
+        }
+      }
+
       if (onSyncComplete) {
         onSyncComplete(report);
       }
+
       if (report.discrepanciesCount > 0) {
-        console.info(`[SyncWorker] Automatically resolved ${report.resolvedCount} discrepancies:`, report.actions);
+        console.info(`[SyncWorker] Reconciled ${report.resolvedCount} discrepancies:`, report.actions);
       }
-    } catch (err) {
-      console.warn("[SyncWorker] Periodic pass failed:", err);
-    } finally {
-      isSyncInProgress = false;
+    } catch (err: any) {
+      lastSyncError = err?.message || String(err);
+      consecutiveFailures++;
+
+      // If initial mount pass failed with a transient error, schedule a fast retry
+      // rather than leaving the app unreconciled for 30 seconds
+      if (!isInitialReconciled && initialRetryCount < maxInitialRetries && isTransientFirebaseError(err)) {
+        initialRetryCount++;
+        const nextDelay = initialRetryDelayMs * initialRetryCount;
+        console.warn(`[SyncWorker] Initial mount sync encountered transient error. Scheduling fast retry ${initialRetryCount}/${maxInitialRetries} in ${nextDelay}ms...`);
+        if (fastRetryTimer) clearTimeout(fastRetryTimer);
+        fastRetryTimer = setTimeout(() => executePass(true), nextDelay);
+      } else {
+        console.warn("[SyncWorker] Periodic sync pass completed with notice:", err?.message || err);
+      }
     }
   };
 
-  // Stop any previous running timer
-  if (syncIntervalTimer) {
-    clearInterval(syncIntervalTimer);
-    syncIntervalTimer = null;
+  // Stop any previous running timer or listeners
+  stopSyncWorker();
+
+  // Setup online network recovery listener
+  if (typeof window !== 'undefined') {
+    onlineListener = () => {
+      console.info("[SyncWorker] Browser is online. Triggering synchronization pass.");
+      executePass(false);
+    };
+    window.addEventListener('online', onlineListener);
+
+    visibilityListener = () => {
+      if (document.visibilityState === 'visible') {
+        const elapsed = Date.now() - lastSyncTimestamp;
+        if (elapsed > 15000) {
+          executePass(false);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityListener);
   }
 
-  // Run immediately on start if requested
+  // Run immediate pass on mount
   if (immediate) {
-    setTimeout(executePass, 1000);
+    fastRetryTimer = setTimeout(() => executePass(true), 250);
   }
 
-  // Schedule background recurring job every 30 seconds
-  syncIntervalTimer = setInterval(executePass, intervalMs);
+  // Recurring background interval
+  syncIntervalTimer = setInterval(() => executePass(false), intervalMs);
 
   return () => {
+    if (fastRetryTimer) {
+      clearTimeout(fastRetryTimer);
+      fastRetryTimer = null;
+    }
+    if (onlineListener && typeof window !== 'undefined') {
+      window.removeEventListener('online', onlineListener);
+    }
+    if (visibilityListener && typeof window !== 'undefined') {
+      document.removeEventListener('visibilitychange', visibilityListener);
+    }
     stopSyncWorker();
   };
 }
@@ -365,16 +719,36 @@ export function stopSyncWorker() {
     clearInterval(syncIntervalTimer);
     syncIntervalTimer = null;
   }
-  isSyncInProgress = false;
+  if (fastRetryTimer) {
+    clearTimeout(fastRetryTimer);
+    fastRetryTimer = null;
+  }
 }
 
 /**
- * Returns the status of the sync worker.
+ * Manually triggers an immediate synchronization pass using the mutex.
+ */
+export async function triggerImmediateSync(
+  getMembers?: () => Member[],
+  setMembers?: (members: Member[]) => void
+): Promise<SyncReport> {
+  const storage = getStorage();
+  const members = getMembers ? getMembers() : (storage ? JSON.parse(storage.getItem('wtc_members') || '[]') : []);
+  return await runMemberSyncPass(members, setMembers, getMembers);
+}
+
+/**
+ * Returns the current health and status of the sync worker.
  */
 export function getSyncWorkerStatus() {
   return {
     isRunning: syncIntervalTimer !== null,
-    isSyncInProgress,
+    isSyncInProgress: activeSyncPromise !== null,
+    isInitialReconciled,
     lastSyncReport,
+    lastSyncTimestamp,
+    lastSyncError,
+    consecutiveFailures,
   };
 }
+

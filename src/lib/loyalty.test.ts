@@ -12,17 +12,17 @@ describe('Loyalty Engine Boundary Tests', () => {
       expect(calculateTier(29999)).toBe('GOLD');
       expect(calculateTier(30000)).toBe('PLATINUM');
       expect(calculateTier(49999)).toBe('PLATINUM');
-      expect(calculateTier(50000)).toBe('DIAMOND');
-      expect(calculateTier(99999)).toBe('DIAMOND');
-      expect(calculateTier(100000)).toBe('BLACK');
-      expect(calculateTier(999999999)).toBe('BLACK');
+      expect(calculateTier(50000)).toBe('PLATINUM');
+      expect(calculateTier(99999)).toBe('PLATINUM');
+      expect(calculateTier(100000)).toBe('PLATINUM');
+      expect(calculateTier(999999999)).toBe('PLATINUM');
     });
 
     it('handles negative, NaN, and Infinity safely', () => {
       expect(calculateTier(-500)).toBe('BLUE');
       expect(calculateTier(NaN)).toBe('BLUE');
       expect(calculateTier(-Infinity)).toBe('BLUE');
-      expect(calculateTier(Infinity)).toBe('BLACK'); // Technically > 100000
+      expect(calculateTier(Infinity)).toBe('PLATINUM');
     });
   });
 
@@ -33,8 +33,6 @@ describe('Loyalty Engine Boundary Tests', () => {
       expect(calculateEarnedPoints(5000, 'SILVER', config)).toBe(5);
       expect(calculateEarnedPoints(10000, 'GOLD', config)).toBe(15);
       expect(calculateEarnedPoints(10000, 'PLATINUM', config)).toBe(20);
-      expect(calculateEarnedPoints(10000, 'DIAMOND', config)).toBe(25);
-      expect(calculateEarnedPoints(10000, 'BLACK', config)).toBe(30);
     });
 
     it('handles malformed financial inputs safely', () => {

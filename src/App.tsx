@@ -3,7 +3,7 @@ import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, db } from './lib/firebase';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
-import { Member, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch, SupportTicket, Campaign, AuditLog } from './types';
+import { Member, MemberTier, Transaction, Voucher, LoyaltyConfig, TabType, StoreBranch, SupportTicket, Campaign, AuditLog } from './types';
 import { useCustomDialog } from './components/CustomDialogProvider';
 import { 
   initialStores, 
@@ -16,7 +16,7 @@ import {
   initialAuditLogs
 } from './data/mockData';
 import { setupFirestoreListeners, seedFirestoreIfEmpty, safeSetDoc, cleanForFirestore, findMemberByPhoneInFirestore, findMemberByGoogleUidInFirestore, normalizePhoneNumber, isSamePhoneNumber, cleanAndEnrichStore } from './lib/syncFirestore';
-import { startSyncWorker, runMemberSyncPass } from './lib/sync-worker';
+import { startSyncWorker, runMemberSyncPass, recordDeletedMemberId } from './lib/sync-worker';
 
 // HO Components
 import { Sidebar } from './components/Sidebar';
@@ -141,9 +141,16 @@ export default function App() {
   const [members, setMembers] = useState<Member[]>(() => {
     try {
       const saved = localStorage.getItem('wtc_members');
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map((m: any) => {
+            if (m.tier === 'DIAMOND' || m.tier === 'BLACK') {
+              return { ...m, tier: 'PLATINUM' as MemberTier };
+            }
+            return m as Member;
+          });
+        }
       }
     } catch {}
     return initialMembers;
@@ -152,9 +159,9 @@ export default function App() {
   const [vouchers, setVouchers] = useState<Voucher[]>(() => {
     try {
       const saved = localStorage.getItem('wtc_vouchers');
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
     return initialVouchers;
@@ -163,9 +170,9 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
       const saved = localStorage.getItem('wtc_transactions');
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           const seen = new Set<string>();
           const seenReceipts = new Set<string>();
           const deduped = parsed
@@ -231,7 +238,10 @@ export default function App() {
       const saved = localStorage.getItem('wtc_loyalty_config');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') return parsed;
+        if (parsed && typeof parsed === 'object') {
+          const { diamondThreshold, blackThreshold, diamondMultiplier, blackMultiplier, ...clean } = parsed;
+          return { ...initialLoyaltyConfig, ...clean };
+        }
       }
     } catch {}
     return initialLoyaltyConfig;
@@ -468,6 +478,9 @@ export default function App() {
 
   const handleDeleteMember = async (memberId: string) => {
     try {
+      // 0. Record deleted member in tombstone storage to prevent sync-worker resurrection
+      recordDeletedMemberId(memberId);
+
       // 1. Delete Member Document from Firestore
       await deleteDoc(doc(db, 'members', memberId));
       
@@ -498,14 +511,30 @@ export default function App() {
       localStorage.setItem('wtc_audit_logs', JSON.stringify([newLog, ...auditList]));
 
       // Fallback local state update in case listener is slow
-      setMembers(prev => prev.filter(m => m.id !== memberId));
-      setTransactions(prev => prev.filter(t => t.memberId !== memberId));
+      setMembers(prev => {
+        const next = prev.filter(m => m.id !== memberId);
+        try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+        return next;
+      });
+      setTransactions(prev => {
+        const next = prev.filter(t => t.memberId !== memberId);
+        try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
+        return next;
+      });
 
     } catch (err) {
       console.warn("Could not fully sync member delete to Firestore:", err);
       // Fallback if completely offline
-      setMembers(prev => prev.filter(m => m.id !== memberId));
-      setTransactions(prev => prev.filter(t => t.memberId !== memberId));
+      setMembers(prev => {
+        const next = prev.filter(m => m.id !== memberId);
+        try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+        return next;
+      });
+      setTransactions(prev => {
+        const next = prev.filter(t => t.memberId !== memberId);
+        try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
+        return next;
+      });
     }
   };
 
@@ -623,6 +652,9 @@ export default function App() {
       },
       intervalMs: 30000,
       immediate: true,
+      onInitialReconciled: (report) => {
+        console.info("[SyncWorker] Initial state reconciled with Firestore upon mount:", report);
+      },
       onSyncComplete: (report) => {
         if (report.discrepanciesCount > 0) {
           console.info("[SyncWorker] Discrepancies reconciled:", report);
@@ -638,7 +670,11 @@ export default function App() {
   const handleRefreshData = async () => {
     setIsRefreshingData(true);
     try {
-      await runMemberSyncPass(membersRef.current, (reconciled) => setMembers(reconciled));
+      await runMemberSyncPass(
+        membersRef.current,
+        (reconciled) => setMembers(reconciled),
+        () => membersRef.current
+      );
     } catch (err) {
       console.warn("Manual sync error:", err);
     } finally {

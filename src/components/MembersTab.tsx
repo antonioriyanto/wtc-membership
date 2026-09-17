@@ -129,8 +129,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
       BLUE: 1,
       SILVER: 2,
       GOLD: 3,
-      PLATINUM: 4,
-      BLACK: 5
+      PLATINUM: 4
     };
 
     return [...filteredMembers].sort((a, b) => {
@@ -367,7 +366,6 @@ export const MembersTab: React.FC<MembersTabProps> = ({
               <option value="SILVER">SILVER</option>
               <option value="GOLD">GOLD</option>
               <option value="PLATINUM">PLATINUM</option>
-              <option value="BLACK">BLACK</option>
             </select>
 
             {/* STATUS FILTER */}
@@ -592,8 +590,15 @@ export const MembersTab: React.FC<MembersTabProps> = ({
                         {/* DELETE BUTTON */}
                         <button
                           onClick={() => {
-                            setMemberToDelete(m);
-                            setIsDeleteModalOpen(true);
+                            showConfirm(
+                              `Hapus akun member ${m.name || m.membershipId || m.id} beserta seluruh riwayat poin dan transaksi secara permanen?`,
+                              'Konfirmasi Hapus Member',
+                              () => {
+                                handleDeleteMember(m.id);
+                              },
+                              'Ya, Hapus',
+                              'Batal'
+                            );
                           }}
                           className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                           title="Hapus Akun Member"

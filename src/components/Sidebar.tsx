@@ -38,15 +38,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout
 }) => {
   const navItems: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string | number }[] = [
-    { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
-    { id: 'transactions', label: 'Transaksi Toko Nasional', icon: Receipt, badge: transactionsCount },
-    { id: 'stores', label: 'Store & Branch Settings', icon: Store, badge: storesCount },
-    { id: 'members', label: 'Member CRM & Ledger', icon: Users, badge: membersCount },
-    { id: 'loyalty', label: 'Loyalty & Tier Engine', icon: Award },
-    { id: 'vouchers', label: 'Vouchers & Promos', icon: Ticket, badge: vouchersCount },
-    { id: 'campaigns', label: 'Comms & Campaigns', icon: Megaphone },
-    { id: 'support', label: 'Support Tickets', icon: MessageSquare },
-    { id: 'audit', label: 'System Audit Trail', icon: ClipboardList }
+    { id: 'overview', label: 'Ringkasan Dasbor', icon: LayoutDashboard },
+    { id: 'transactions', label: 'Transaksi Nasional', icon: Receipt, badge: transactionsCount },
+    { id: 'stores', label: 'Pengaturan Toko & Cabang', icon: Store, badge: storesCount },
+    { id: 'members', label: 'Data Pelanggan', icon: Users, badge: membersCount },
+    { id: 'loyalty', label: 'Pengaturan Level Tier', icon: Award },
+    { id: 'vouchers', label: 'Voucher & Promo', icon: Ticket, badge: vouchersCount },
+    { id: 'campaigns', label: 'Pesan & Promo', icon: Megaphone },
+    { id: 'support', label: 'Tiket Bantuan', icon: MessageSquare },
+    { id: 'audit', label: 'Riwayat Sistem (Audit)', icon: ClipboardList }
   ];
 
   return (
@@ -61,13 +61,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></div>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium tracking-wide">
-            Enterprise Cloud Sync • Online
+            Sinkronisasi Cloud • Online
           </span>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 custom-scrollbar">
         <div className="px-3 pb-2 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-          Management Modules
+          Modul Manajemen
         </div>
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -101,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
         <div className="pt-6 px-3 pb-2 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-          Quick Portals & Switcher
+          Pintasan & Pindah Portal
         </div>
         <button
           onClick={onOpenQuickLauncher}
@@ -112,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <ExternalLink className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-xs font-semibold text-amber-200">System Role Switcher</div>
+              <div className="text-xs font-semibold text-amber-200">Pengalih Peran Sistem</div>
               <div className="text-[10px] text-amber-400/80">Kasir Toko / Member Web</div>
             </div>
           </div>

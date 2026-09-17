@@ -80,9 +80,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
   
   let multiplier = 1.0;
   if (activeMember) {
-    if (activeMember.tier === 'BLACK') multiplier = 3.0;
-    else if (activeMember.tier === 'DIAMOND') multiplier = 2.5;
-    else if (activeMember.tier === 'PLATINUM') multiplier = 2.0;
+    if (activeMember.tier === 'PLATINUM') multiplier = 2.0;
     else if (activeMember.tier === 'GOLD') multiplier = 1.5;
   }
   const estimatedPoints = Math.floor(Math.floor(parsedAmount / 1000) * multiplier);

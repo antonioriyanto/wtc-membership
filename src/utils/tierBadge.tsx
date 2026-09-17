@@ -25,18 +25,6 @@ export const TIER_CARD_GRADIENTS = {
     borderColor: '#94A3B8',
     boxShadow: '0 1px 3px rgba(167, 184, 202, 0.3)',
   },
-  DIAMOND: {
-    background: 'linear-gradient(135deg, #F9FFFF 0%, #FFFFFF 12.5%, #CCD7E7 25%, #FDE2CA 30.61%, #B9C9DD 38.27%, #E7F7E0 50%, #FFFFFF 62.29%, #FEEBF0 70.02%, #DCE4EE 75%, #B9C9DD 85.2%, #FFFFFF 100%)',
-    textColor: '#0F172A',
-    borderColor: '#7DD3FC',
-    boxShadow: '0 1px 3px rgba(185, 201, 221, 0.35)',
-  },
-  BLACK: {
-    background: 'radial-gradient(circle at top left, #1e293b, #0f172a)',
-    textColor: '#FFFFFF',
-    borderColor: '#334155',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
-  },
 };
 
 export const getTierStyle = (tier?: string) => {

@@ -11,7 +11,7 @@ export type TabType =
 
 export type CashierTabType = 'cashier' | 'members' | 'transactions' | 'tickets' | 'settings';
 
-export type MemberTier = 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK';
+export type MemberTier = 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM';
 
 export interface AuditLog {
   id: string;
@@ -65,7 +65,7 @@ export interface Campaign {
   headline?: string;
   type: 'POPUP_BANNER' | 'PUSH' | 'SMS' | 'EMAIL';
   status: 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'COMPLETED';
-  targetAudience: 'ALL' | 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK' | 'INACTIVE';
+  targetAudience: 'ALL' | 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'INACTIVE';
   content: string;
   bannerImage?: string;
   popupImage?: string;
@@ -194,12 +194,8 @@ export interface LoyaltyConfig {
   silverThreshold: number;
   goldThreshold: number;
   platinumThreshold: number;
-  diamondThreshold: number;
-  blackThreshold: number;
   goldMultiplier: number;
   platinumMultiplier: number;
-  diamondMultiplier: number;
-  blackMultiplier: number;
   pointsExpiryDays: number;
   birthdayBonusMultiplier: number;
   enableWhatsAppNotifications: boolean;

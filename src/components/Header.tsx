@@ -130,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Global Omnisearch (Members, Vouchers, Stores, Logs...)"
+            placeholder="Cari nama pelanggan, toko, atau no. struk..."
             value={searchQuery || ''}
             onChange={handleSearchChange}
             onFocus={() => { if (searchQuery.length > 1) setShowDropdown(true); }}
@@ -402,10 +402,10 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
         <button onClick={onOpenManualAdjust} className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl shadow-sm transition-all cursor-pointer">
-          Point Adjustment
+          Penyesuaian Poin Manual
         </button>
         <button onClick={onOpenCreateVoucher} className="px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
-          <Plus className="w-3.5 h-3.5" /> Create Voucher
+          <Plus className="w-3.5 h-3.5" /> Buat Voucher Baru
         </button>
         <div className="h-8 w-px bg-slate-200 mx-1"></div>
         <button 

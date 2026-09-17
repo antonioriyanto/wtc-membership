@@ -1,12 +1,18 @@
 import { Member, Transaction, SupportTicket, StoreBranch, LoyaltyConfig, Voucher, Campaign, AuditLog } from '../types';
 
-export const initialLoyaltyConfig: any = {
-  
-  tiers: [
-    { name: 'BLUE', minPoints: 0, benefits: ['Additional 10% Discount', 'Watch Services Discount', 'Watch Club Sticker Pack'] },
-    { name: 'SILVER', minPoints: 5000, benefits: ['Additional 15% Discount', 'Free Battery Replacement', 'Birthday Gift'] },
-    { name: 'GOLD', minPoints: 15000, benefits: ['Additional 20% Discount', 'Priority Service', 'Exclusive Event Invites'] }
-  ]
+export const initialLoyaltyConfig: LoyaltyConfig = {
+  pointsPerAmount: 1,
+  amountUnit: 1000,
+  silverThreshold: 5000,
+  goldThreshold: 10000,
+  platinumThreshold: 30000,
+  goldMultiplier: 1.5,
+  platinumMultiplier: 2.0,
+  pointsExpiryDays: 365,
+  birthdayBonusMultiplier: 2.0,
+  enableWhatsAppNotifications: true,
+  enableStrictVoucherSingleUse: true,
+  enableCashierManualOverride: true,
 };
 
 // Start with empty arrays to prevent frontend from seeding dummy data

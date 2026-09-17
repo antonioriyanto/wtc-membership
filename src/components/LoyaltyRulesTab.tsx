@@ -42,7 +42,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
   }
   const [formData, setFormData] = useState<LoyaltyConfig>({ ...config });
   const [testSpend, setTestSpend] = useState<number>(3500000);
-  const [testTier, setTestTier] = useState<'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK'>('GOLD');
+  const [testTier, setTestTier] = useState<'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM'>('GOLD');
   const [isSaved, setIsSaved] = useState(false);
 
   const handleChange = (field: keyof LoyaltyConfig, value: any) => {
@@ -74,8 +74,6 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
   let multiplier = 1.0;
   if (testTier === 'GOLD') multiplier = formData.goldMultiplier;
   if (testTier === 'PLATINUM') multiplier = formData.platinumMultiplier;
-  if (testTier === 'DIAMOND') multiplier = formData.diamondMultiplier;
-  if (testTier === 'BLACK') multiplier = formData.blackMultiplier;
   const calculatedPoints = Math.floor(basePoints * multiplier);
 
   return (
@@ -168,7 +166,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Member Tiers & VIP Point Multipliers</h3>
-                <p className="text-xs text-slate-500">Configure point thresholds and earning multipliers across all 6 member tiers (Blue, Silver, Gold, Platinum, Diamond, Black)</p>
+                <p className="text-xs text-slate-500">Configure point thresholds and earning multipliers across all 4 member tiers (Blue, Silver, Gold, Platinum)</p>
               </div>
             </div>
 
@@ -238,7 +236,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
               <div className="p-4 rounded-2xl bg-slate-100 text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-300">
                 <div>
                   <TierBadge tier="PLATINUM" size="md" />
-                  <div className="text-xs text-slate-500 mt-1">Prestige club members</div>
+                  <div className="text-xs text-slate-500 mt-1">Prestige club members (Top Tier VIP)</div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-xs font-semibold text-slate-600">Min. Points:</div>
@@ -255,56 +253,6 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                     value={formData.platinumMultiplier || 0}
                     onChange={(e) => handleChange('platinumMultiplier', parseFloat(e.target.value) || 2.0)}
                     className="w-20 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* Diamond Rule */}
-              <div className="p-4 rounded-2xl bg-cyan-50/70 border border-cyan-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <TierBadge tier="DIAMOND" size="md" />
-                  <div className="text-xs text-cyan-900/80 mt-1">VIP Luxury watch clientele</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-xs font-semibold text-cyan-900">Min. Points:</div>
-                  <input
-                    type="number"
-                    value={formData.diamondThreshold || 0}
-                    onChange={(e) => handleChange('diamondThreshold', parseInt(e.target.value) || 50000)}
-                    className="w-24 px-3 py-1.5 bg-white border border-cyan-300 rounded-xl text-xs font-bold text-cyan-900"
-                  />
-                  <div className="text-xs font-semibold text-cyan-900">Multiplier:</div>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={formData.diamondMultiplier || 0}
-                    onChange={(e) => handleChange('diamondMultiplier', parseFloat(e.target.value) || 2.5)}
-                    className="w-20 px-3 py-1.5 bg-white border border-cyan-300 rounded-xl text-xs font-bold text-cyan-900"
-                  />
-                </div>
-              </div>
-
-              {/* Black Rule */}
-              <div className="p-4 rounded-2xl bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
-                <div>
-                  <TierBadge tier="BLACK" size="md" />
-                  <div className="text-xs text-slate-300 mt-1">Exclusive ultra luxury tier</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-xs font-semibold text-slate-300">Min. Points:</div>
-                  <input
-                    type="number"
-                    value={formData.blackThreshold || 0}
-                    onChange={(e) => handleChange('blackThreshold', parseInt(e.target.value) || 100000)}
-                    className="w-24 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white"
-                  />
-                  <div className="text-xs font-semibold text-slate-300">Multiplier:</div>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={formData.blackMultiplier || 0}
-                    onChange={(e) => handleChange('blackMultiplier', parseFloat(e.target.value) || 3.0)}
-                    className="w-20 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white"
                   />
                 </div>
               </div>
@@ -387,7 +335,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   Customer Tier
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['BLUE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'BLACK'] as const).map(tier => (
+                  {(['BLUE', 'SILVER', 'GOLD', 'PLATINUM'] as const).map(tier => (
                     <button
                       key={tier}
                       type="button"

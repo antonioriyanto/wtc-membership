@@ -333,8 +333,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     <option value="BLUE">BLUE (Tier Dasar)</option>
                     <option value="SILVER">SILVER (Tier Menengah)</option>
                     <option value="GOLD">GOLD (Tier Prioritas)</option>
-                    <option value="PLATINUM">PLATINUM (VIP Eksklusif)</option>
-                    <option value="BLACK">BLACK (VVIP Tertinggi / Sultan)</option>
+                    <option value="PLATINUM">PLATINUM (VIP Eksklusif / Top Tier)</option>
                   </select>
                 </div>
 

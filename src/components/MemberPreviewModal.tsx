@@ -69,8 +69,6 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
   // Card theme gradients based on tier
   const getCardGradient = () => {
     switch (member.tier) {
-      case 'BLACK':
-        return 'from-slate-950 via-slate-900 to-zinc-950 border-amber-500/30 text-white';
       case 'PLATINUM':
         return 'from-slate-800 via-slate-700 to-slate-900 border-slate-400/40 text-white';
       case 'GOLD':

@@ -160,33 +160,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const silverCount = members.filter(m => m.tier === 'SILVER').length;
   const goldCount = members.filter(m => m.tier === 'GOLD').length;
   const platinumCount = members.filter(m => m.tier === 'PLATINUM').length;
-  const diamondCount = members.filter(m => m.tier === 'DIAMOND').length;
-  const blackCount = members.filter(m => m.tier === 'BLACK').length;
 
   const totalPointsInCirculation = members.reduce((acc, m) => acc + m.points, 0);
 
-  // Compact Tier Distribution Definitions
+  // Compact Tier Distribution Definitions (4 Tiers)
   const tierDistributionList = [
-    {
-      name: 'Black',
-      count: blackCount,
-      barClass: 'bg-neutral-900 dark:bg-neutral-100',
-      dotClass: 'bg-neutral-900 dark:bg-neutral-100',
-      criteria: '100.000+ Pts'
-    },
-    {
-      name: 'Diamond',
-      count: diamondCount,
-      barClass: 'bg-cyan-500',
-      dotClass: 'bg-cyan-500',
-      criteria: '50.000 - 99.999 Pts'
-    },
     {
       name: 'Platinum',
       count: platinumCount,
       barClass: 'bg-slate-500',
       dotClass: 'bg-slate-500',
-      criteria: '30.000 - 49.999 Pts'
+      criteria: '30.000+ Pts'
     },
     {
       name: 'Gold',
@@ -239,7 +223,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200/70 dark:border-neutral-800 animate-pulse space-y-3">
             <div className="h-6 w-36 bg-neutral-200 dark:bg-neutral-700 rounded" />
             <div className="space-y-3">
-              {[1, 2, 3, 4, 5, 6].map((k) => (
+              {[1, 2, 3, 4].map((k) => (
                 <div key={k} className="h-6 bg-neutral-100 dark:bg-neutral-800 rounded-lg" />
               ))}
             </div>
@@ -298,11 +282,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
       {/* 2. TOP METRIC CARDS (4 KARTU FLAT & PREMIUM) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Gross Sales Recorded */}
+        {/* Card 1: Total Omzet */}
         <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-              Gross Sales Recorded
+              Total Omzet
             </span>
             <div className="w-8 h-8 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 flex items-center justify-center">
               <CreditCard className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -313,15 +297,15 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </div>
           <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>{totalTransactionsToday} purchases logged today</span>
+            <span>{totalTransactionsToday} transaksi tercatat hari ini</span>
           </div>
         </div>
 
-        {/* Card 2: Points Issued Today */}
+        {/* Card 2: Poin Diterbitkan Hari Ini */}
         <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-              Points Issued Today
+              Poin Diterbitkan Hari Ini
             </span>
             <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
@@ -331,37 +315,39 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             +{totalPointsIssuedToday.toLocaleString('id-ID')} Pts
           </div>
           <div className="flex items-center gap-1.5 mt-2 text-xs text-neutral-400 dark:text-neutral-500">
-            <span>Rate: 1 Pt per Rp {(loyaltyConfig.amountUnit || 0).toLocaleString('id-ID')}</span>
+            <span>Rate: 1 Pts per Rp {(loyaltyConfig.amountUnit || 0).toLocaleString('id-ID')}</span>
           </div>
         </div>
 
-        {/* Card 3: Registered Members */}
+        {/* Card 3: Total Pelanggan */}
         <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-              Registered Members
+              Total Pelanggan
             </span>
             <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-white tracking-tight">
-            {members.length.toLocaleString('id-ID')} Members
+            {members.length.toLocaleString('id-ID')} Pelanggan
           </div>
           <div className="flex items-center gap-1.5 mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-            <span className="font-semibold text-neutral-800 dark:text-neutral-200">{blackCount} Blk</span>
+            <span className="font-semibold text-neutral-800 dark:text-neutral-200">{platinumCount} Plat</span>
             <span>•</span>
             <span className="font-semibold text-amber-600 dark:text-amber-400">{goldCount} Gold</span>
+            <span>•</span>
+            <span>{silverCount} Silv</span>
             <span>•</span>
             <span>{blueCount} Blue</span>
           </div>
         </div>
 
-        {/* Card 4: Store Network Health */}
+        {/* Card 4: Status Jaringan Toko */}
         <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/70 dark:border-neutral-800 shadow-xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-              Store Network Health
+              Status Jaringan Toko
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
               <Store className="w-4 h-4" />

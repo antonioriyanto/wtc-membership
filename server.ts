@@ -61,11 +61,9 @@ try {
 }
 
 // Calculate Tier function
-const calculateTier = (points: number): 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK' => {
-  if (points >= 150000) return 'BLACK';
-  if (points >= 75000) return 'DIAMOND';
-  if (points >= 35000) return 'PLATINUM';
-  if (points >= 15000) return 'GOLD';
+const calculateTier = (points: number): 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' => {
+  if (points >= 30000) return 'PLATINUM';
+  if (points >= 10000) return 'GOLD';
   if (points >= 5000) return 'SILVER';
   return 'BLUE';
 };
@@ -186,9 +184,7 @@ async function startServer() {
 
             // 3. Calculate points
             let multiplier = 1.0;
-            if (memberData?.tier === 'BLACK') multiplier = 3.0;
-            else if (memberData?.tier === 'DIAMOND') multiplier = 2.5;
-            else if (memberData?.tier === 'PLATINUM') multiplier = 2.0;
+            if (memberData?.tier === 'PLATINUM') multiplier = 2.0;
             else if (memberData?.tier === 'GOLD') multiplier = 1.5;
 
             const calculatedPoints = Math.max(1, Math.floor(Math.floor(numericAmount / 1000) * multiplier));

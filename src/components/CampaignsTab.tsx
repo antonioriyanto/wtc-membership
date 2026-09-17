@@ -423,8 +423,6 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                   <option value="SILVER">Khusus Silver</option>
                   <option value="GOLD">Khusus Gold</option>
                   <option value="PLATINUM">Khusus Platinum</option>
-                  <option value="DIAMOND">Khusus Diamond</option>
-                  <option value="BLACK">Khusus Black</option>
                 </select>
               </div>
 
