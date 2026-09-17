@@ -153,6 +153,39 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
           tier: result.data.newTier,
         };
         
+        // If the backend used the resilient fallback, we MUST persist it to Firestore via client SDK
+        if (result.isFallback) {
+          try {
+            const { doc, setDoc, updateDoc } = await import('firebase/firestore');
+            const { db } = await import('../lib/firebase');
+            await setDoc(doc(db, 'transactions', savedTrx.id), savedTrx);
+            
+            // Also create an audit log
+            const auditId = 'AL-' + Date.now().toString().slice(-4) + Math.floor(Math.random() * 1000);
+            await setDoc(doc(db, 'audit', auditId), {
+              id: auditId,
+              timestamp: new Date().toISOString(),
+              actorName: cashierName || 'Kasir',
+              actorRole: 'STORE_CASHIER',
+              action: 'POINTS_EARNED',
+              details: `Kasir menambahkan +${savedTrx.pointsDelta} poin untuk ${updatedMember.name} (Struk: ${receiptNo}) - Client Fallback`,
+              module: 'LOYALTY_PROGRAM'
+            });
+
+            await updateDoc(doc(db, 'members', member.id), {
+              points: updatedMember.points,
+              tier: updatedMember.tier,
+              totalSpend: (member.totalSpend || 0) + amount,
+              lifetimePoints: (member.lifetimePoints || 0) + savedTrx.pointsDelta,
+              lastStoreVisited: currentStore?.name || 'Puri Jakarta',
+              lastVisitDate: new Date().toISOString()
+            });
+            console.log("Client SDK fallback write successful.");
+          } catch (clientErr) {
+            console.error("Client SDK fallback write failed:", clientErr);
+          }
+        }
+        
       } catch (backendError: any) {
         console.error("Backend API Error:", backendError);
         showAlert(backendError.message || 'Terjadi kesalahan pada Server-Side Backend saat menambahkan poin', 'Error Server', 'error');

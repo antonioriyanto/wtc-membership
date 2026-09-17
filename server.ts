@@ -276,6 +276,7 @@ async function startServer() {
 
       res.status(200).json({
         success: true,
+        isFallback: true,
         data: {
           calculatedPoints,
           newPoints: calculatedPoints,
