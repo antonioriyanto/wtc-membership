@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
-import admin from 'firebase-admin';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env
@@ -8,11 +9,12 @@ dotenv.config();
 
 // Initialize Firebase Admin
 try {
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
+  if (getApps().length === 0) {
+    initializeApp({
+      credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        // Ensure literal \n is converted to actual newlines
         privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
       }),
     });
@@ -22,7 +24,7 @@ try {
   console.error('❌ Failed to initialize Firebase Admin SDK:', error);
 }
 
-const db = admin.firestore();
+const db = getFirestore();
 
 // Calculate Tier function
 const calculateTier = (points: number): 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'BLACK' => {
