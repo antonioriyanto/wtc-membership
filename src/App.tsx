@@ -40,6 +40,7 @@ import { ManualPointAdjustmentModal } from './components/ManualPointAdjustmentMo
 import { CashierTerminalView } from './components/CashierTerminalView';
 import { CustomerMemberView } from './components/CustomerMemberView';
 import { AdminLogin, MemberLogin } from './components/LoginWall';
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { PortalSwitcher } from './components/PortalSwitcher';
 import { calculateTier } from './lib/loyalty';
 import { generateSequentialMembershipId } from './lib/canonicalMember';
@@ -693,13 +694,16 @@ export default function App() {
             }
             cashierName={cashierName}
             onSignOut={() => {
-              setCashierAuthenticated(false);
-              try { 
-                localStorage.removeItem('wtc_cashier_auth'); 
-                localStorage.removeItem('wtc_cashier_name'); 
-                localStorage.removeItem('wtc_cashier_store'); 
-              } catch {}
-              navigate('/cashier');
+              const auth = getAuth();
+              signOut(auth).then(() => {
+                setCashierAuthenticated(false);
+                try { 
+                  localStorage.removeItem('wtc_cashier_auth'); 
+                  localStorage.removeItem('wtc_cashier_name'); 
+                  localStorage.removeItem('wtc_cashier_store'); 
+                } catch {}
+                navigate('/cashier');
+              });
             }}
             onSwitchPerspective={(p) => navigate(p === 'HO' ? '/admin' : '/' + p.toLowerCase())}
           />

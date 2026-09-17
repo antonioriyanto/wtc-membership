@@ -125,7 +125,7 @@ export function setupFirestoreListeners(callbacks: any) {
         if (data.length >= 20) {
           // If Firestore is already populated with the real store directory,
           // trust Firestore as the single source of truth to avoid duplicates.
-          data = data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          data = data.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
         } else {
           // Fallback to initialStores if Firestore is somehow empty or unseeded
           const storeMap = new Map();

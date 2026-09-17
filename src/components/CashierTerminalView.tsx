@@ -31,6 +31,8 @@ interface CashierTerminalViewProps {
   cashierName?: string;
   onSignOut?: () => void;
   onSwitchPerspective: (view: 'HO' | 'CASHIER' | 'MEMBER') => void;
+  supportTickets?: any[];
+  onSubmitTicket?: (ticket: any) => Promise<void>;
 }
 
 export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
@@ -46,7 +48,9 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
   cashierName,
   onSignOut,
   onSwitchPerspective,
-  stores
+  stores,
+  supportTickets,
+  onSubmitTicket
 }) => {
   const { showAlert } = useCustomDialog();
   const [activeTab, setActiveTab] = useState<CashierTabType>('cashier');

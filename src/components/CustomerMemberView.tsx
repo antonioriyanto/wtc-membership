@@ -156,7 +156,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     background: 'linear-gradient(110deg, #1e293b 0%, #0f172a 100%)'
   };
 
-  const tierTextColorClass = member.tier === 'BLUE' || member.tier === 'GOLD' ? 'text-white' : member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'text-slate-900' : 'text-white';
+  const tierTextColorClass = member.tier === 'BLUE' || member.tier === 'GOLD' ? 'text-white' : member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'text-neutral-900 dark:text-white' : 'text-white';
 
 
   // Support tickets & campaigns state
@@ -422,30 +422,30 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   ] as const;
 
   return (
-    <div className="w-full h-full bg-slate-900 overflow-y-auto">
-      <div className="w-full max-w-[480px] min-h-screen mx-auto bg-slate-50 text-slate-900 pb-[100px] relative shadow-2xl">
+    <div className="w-full h-full bg-black dark:bg-white dark:text-black overflow-y-auto">
+      <div className="w-full max-w-[480px] min-h-screen mx-auto bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-900 dark:text-white pb-[100px] relative shadow-2xl">
         
-        <header className="flex justify-between items-center p-5 bg-slate-50/90 backdrop-blur-md sticky top-0 z-50">
+        <header className="flex justify-between items-center p-5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950/90 backdrop-blur-md sticky top-0 z-50">
           <button 
             type="button"
             onClick={handleHeaderBack} 
             className={`p-2 -ml-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
               canGoBack 
-                ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/70 active:scale-95' 
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/40'
+                ? 'text-neutral-700 dark:text-neutral-300 hover:text-slate-950 hover:bg-slate-200/70 active:scale-95' 
+                : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:text-neutral-400 hover:bg-slate-200/40'
             }`}
             title={canGoBack ? "Kembali ke halaman sebelumnya" : "Beranda"}
             aria-label="Kembali"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <div className="w-[110px] text-slate-900 flex justify-center">
+          <div className="w-[110px] text-neutral-900 dark:text-white flex justify-center">
             <WatchClubLogo />
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('PROFILE')}
-              className="w-10 h-10 rounded-full border border-slate-300 bg-slate-200 flex justify-center items-center font-bold text-slate-500 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 shadow-sm"
+              className="w-10 h-10 rounded-full border border-black/10 dark:border-white/20 bg-slate-200 flex justify-center items-center font-bold text-neutral-500 dark:text-neutral-400 overflow-hidden shrink-0 transition-all cursor-pointer hover:bg-slate-300 shadow-sm"
             >
               {member.avatarUrl ? (
                 <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover object-center" />
@@ -494,13 +494,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             )}
 
             <section className="px-5 pt-4 pb-1">
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h2 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
                 Hello <span className="capitalize">{member.name.split(' ')[0]}</span>! Welcome to the Club!
               </h2>
             </section>
 
             <section className="px-5 mt-2.5">
-              <div 
+                            <div 
                 className={`rounded-[10px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] relative overflow-hidden grid grid-cols-[1.3fr_0.7fr] p-6 aspect-[2/1] cursor-pointer hover:scale-[1.02] transition-transform ${
                   member.tier === 'BLUE' || member.tier === 'GOLD' ? 'text-white' : member.tier === 'SILVER' || member.tier === 'PLATINUM' || member.tier === 'DIAMOND' ? 'text-slate-900' : 'text-white bg-[radial-gradient(circle_at_top_left,#1e293b,#0f172a)]'
                 }`}
@@ -529,11 +529,11 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               </div>
             </section>
 
-            <section className="bg-white m-5 p-5 rounded-[24px] shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] border border-slate-100">
+            <section className="bg-white dark:bg-white/5 m-5 p-5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] border border-black/5 dark:border-white/10">
               <div className="flex justify-between items-end mb-3">
-                <div><span className="font-bold text-sm text-slate-900">{member.tier} Level</span></div>
+                <div><span className="font-bold text-sm text-neutral-900 dark:text-white">{member.tier} Level</span></div>
                 <div className="text-right">
-                  <div className="font-bold text-sm text-slate-900">
+                  <div className="font-bold text-sm text-neutral-900 dark:text-white">
                     {member.tier === 'BLACK' 
                       ? 'Top Tier Reached'
                       : `${((nextTierPoints || 0) - (member.points || 0)).toLocaleString('id-ID')} more points to ${
@@ -544,38 +544,38 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         } Level`
                     }
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">Current Balance: {(member.points || 0).toLocaleString('id-ID')} Points</div>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Current Balance: {(member.points || 0).toLocaleString('id-ID')} Points</div>
                 </div>
               </div>
               <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-900 rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
+                <div className="h-full bg-black dark:bg-white dark:text-black rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
               </div>
             </section>
 
             <section className="m-5">
-              <h2 className="text-base font-bold mb-4 pl-1 text-slate-900">Your {member.tier} Level Benefits</h2>
-              <ul className="bg-white rounded-[24px] shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] px-5 py-2.5 border border-slate-100">
-                <li className="flex items-center py-4 border-b border-slate-100 last:border-0">
-                  <div className="text-lg text-slate-500 mr-4 w-6 text-center"><Percent className="w-5 h-5 mx-auto" /></div>
+              <h2 className="text-base font-bold mb-4 pl-1 text-neutral-900 dark:text-white">Your {member.tier} Level Benefits</h2>
+              <ul className="bg-white dark:bg-white/5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] px-5 py-2.5 border border-black/5 dark:border-white/10">
+                <li className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
+                  <div className="text-lg text-neutral-500 dark:text-neutral-400 mr-4 w-6 text-center"><Percent className="w-5 h-5 mx-auto" /></div>
                   <div className="flex-grow">
-                    <div className="font-semibold text-sm text-slate-900">Additional 10% Discount</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Valid store-wide</div>
+                    <div className="font-semibold text-sm text-neutral-900 dark:text-white">Additional 10% Discount</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Valid store-wide</div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </li>
-                <li className="flex items-center py-4 border-b border-slate-100 last:border-0">
-                  <div className="text-lg text-slate-500 mr-4 w-6 text-center"><Wrench className="w-5 h-5 mx-auto" /></div>
+                <li className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
+                  <div className="text-lg text-neutral-500 dark:text-neutral-400 mr-4 w-6 text-center"><Wrench className="w-5 h-5 mx-auto" /></div>
                   <div className="flex-grow">
-                    <div className="font-semibold text-sm text-slate-900">Watch Services Discount</div>
-                    <div className="text-xs text-slate-500 mt-0.5">10% off repairs</div>
+                    <div className="font-semibold text-sm text-neutral-900 dark:text-white">Watch Services Discount</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">10% off repairs</div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </li>
-                <li className="flex items-center py-4 border-b border-slate-100 last:border-0">
-                  <div className="text-lg text-slate-500 mr-4 w-6 text-center"><Gift className="w-5 h-5 mx-auto" /></div>
+                <li className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
+                  <div className="text-lg text-neutral-500 dark:text-neutral-400 mr-4 w-6 text-center"><Gift className="w-5 h-5 mx-auto" /></div>
                   <div className="flex-grow">
-                    <div className="font-semibold text-sm text-slate-900">Watch Club Sticker Pack</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Free quarterly design</div>
+                    <div className="font-semibold text-sm text-neutral-900 dark:text-white">Watch Club Sticker Pack</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Free quarterly design</div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </li>
@@ -584,18 +584,18 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
             <section className="m-5">
               <div className="flex justify-between items-center mb-4 pl-1">
-                <h2 className="text-base font-bold text-slate-900">Recent Transactions</h2>
+                <h2 className="text-base font-bold text-neutral-900 dark:text-white">Recent Transactions</h2>
               </div>
-              <div className="bg-white rounded-[24px] shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] mb-4 relative overflow-hidden border border-slate-100">
+              <div className="bg-white dark:bg-white/5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] mb-4 relative overflow-hidden border border-black/5 dark:border-white/10">
                 <div className="px-5 pt-2.5 pb-0">
                   {memberTransactions.slice(0, 2).map((trx, idx) => (
-                    <div key={idx} className="flex items-center py-4 border-b border-slate-100 last:border-0">
+                    <div key={idx} className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
                       <div className={`w-10 h-10 shrink-0 rounded-xl flex justify-center items-center mr-4 text-base ${trx.type === 'EARN' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
                         {trx.type === 'EARN' ? <ArrowUp className="w-4 h-4" /> : <Ticket className="w-4 h-4" />}
                       </div>
                       <div className="flex-grow min-w-0 pr-2">
-                        <div className="font-semibold text-sm text-slate-900 truncate">{trx.store}</div>
-                        <div className="text-xs text-slate-500 mt-1 truncate">{trx.date} • {trx.id}</div>
+                        <div className="font-semibold text-sm text-neutral-900 dark:text-white truncate">{trx.store}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 truncate">{trx.date} • {trx.id}</div>
                       </div>
                       <div className={`font-bold text-sm shrink-0 whitespace-nowrap ${trx.type === 'EARN' ? 'text-emerald-500' : 'text-red-500'}`}>
                         {trx.type === 'EARN' ? '+' : '-'}{(trx.points || 0).toLocaleString('id-ID')} Pts
@@ -606,7 +606,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 <div className="relative -mt-7 pt-10 px-5 pb-5 bg-gradient-to-b from-transparent via-white/95 to-white z-10 rounded-b-[24px]">
                   <button 
                     onClick={() => setIsHistoryModalOpen(true)}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 text-slate-900 rounded-full font-semibold text-sm cursor-pointer transition-colors hover:bg-slate-200 shadow-sm"
+                    className="w-full p-3 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 text-neutral-900 dark:text-white rounded-full font-semibold text-sm cursor-pointer transition-colors hover:bg-slate-200 shadow-sm"
                   >
                     Show More History
                   </button>
@@ -615,10 +615,10 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             </section>
 
             <section className="m-5">
-              <h2 className="text-base font-bold mb-4 pl-1 text-slate-900">Your Active Vouchers</h2>
+              <h2 className="text-base font-bold mb-4 pl-1 text-neutral-900 dark:text-white">Your Active Vouchers</h2>
               <div className="flex overflow-x-auto snap-x snap-mandatory gap-5 pb-2.5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {activeCustomerVouchers.map((v, i) => (
-                  <div key={v.id} className="flex-[0_0_calc(100%-40px)] max-w-[400px] bg-slate-900 text-white rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] snap-start flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
+                  <div key={v.id} className="flex-[0_0_calc(100%-40px)] max-w-[400px] bg-black dark:bg-white dark:text-black text-white rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] snap-start flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
                     backgroundImage: v.imagePath ? `url('${v.imagePath}')` : 'linear-gradient(to bottom right, #fef08a, #c7d2fe)',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
@@ -638,7 +638,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                           setSelectedVoucherForQr(v);
                           setIsQrModalOpen(true);
                         }}
-                        className="bg-white text-slate-900 border-none py-3 px-6 rounded-full text-sm font-semibold cursor-pointer transition-transform hover:scale-105 shadow-lg"
+                        className="bg-white dark:bg-white/5 text-neutral-900 dark:text-white border-none py-3 px-6 rounded-full text-sm font-semibold cursor-pointer transition-transform hover:scale-105 shadow-sm dark:shadow-none lg"
                       >
                         Use Now
                       </button>
@@ -654,14 +654,14 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         {activeTab === 'REWARDS' && (
           <div className="animate-fadeIn pb-5">
             <div className="px-5 pt-5 pb-2.5">
-              <h1 className="text-2xl font-bold text-slate-900">My Rewards</h1>
-              <p className="text-sm text-slate-500 mt-1">Your active vouchers and collected points</p>
+              <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">My Rewards</h1>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Your active vouchers and collected points</p>
             </div>
 
             <section className="m-5">
               <div className="flex flex-col gap-6">
                 {activeCustomerVouchers.map(v => (
-                  <div key={v.id} className="w-full bg-slate-900 rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
+                  <div key={v.id} className="w-full bg-black dark:bg-white dark:text-black rounded-[24px] p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] flex flex-col justify-between relative overflow-hidden min-h-[220px]" style={{
                     backgroundImage: v.imagePath ? `url('${v.imagePath}')` : 'linear-gradient(to bottom right, #0f172a, #1e293b)',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
@@ -674,7 +674,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         {v.discountType === 'PERCENTAGE' ? `${v.discountValue}% OFF` : `Rp ${(v.discountValue/1000)}K`}
                       </div>
                       <div className="text-lg font-medium mb-1 text-white">{v.title}</div>
-                      <div className="text-sm text-slate-400 mb-6 font-medium">Valid until {v.validUntil}</div>
+                      <div className="text-sm text-neutral-400 dark:text-neutral-500 mb-6 font-medium">Valid until {v.validUntil}</div>
                       
                       <div className="flex flex-col items-start gap-3 mt-auto">
                         <button 
@@ -698,17 +698,17 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         {activeTab === 'STORES' && (
           <div className="animate-fadeIn pb-5">
             <div className="px-5 pt-5 pb-2.5">
-              <h1 className="text-2xl font-bold text-slate-900">Our Stores</h1>
-              <p className="text-sm text-slate-500 mt-1 mb-4">Official Watch Club store locations across Indonesia</p>
+              <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Our Stores</h1>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1 mb-4">Official Watch Club store locations across Indonesia</p>
               
               <div className="relative w-full">
-                <Search className="absolute left-[18px] top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Search className="absolute left-[18px] top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 w-4 h-4" />
                 <input 
                   type="text" 
                   value={storeSearch}
                   onChange={e => setStoreSearch(e.target.value)}
                   placeholder="Search store name, mall, or city..." 
-                  className="w-full py-3 pr-5 pl-11 rounded-full border border-slate-200 bg-white text-[0.95rem] text-slate-900 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] transition-all focus:outline-none focus:border-slate-400 focus:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+                  className="w-full py-3 pr-5 pl-11 rounded-full border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-[0.95rem] text-neutral-900 dark:text-white shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] transition-all focus:outline-none focus:border-slate-400 focus:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
                 />
               </div>
             </div>
@@ -722,9 +722,9 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
             <div className="flex flex-col gap-4 px-5 py-2.5 pb-5">
               {filteredStores.map((store, idx) => (
-                <div key={store.id} className="bg-white rounded-[24px] shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col transition-transform hover:-translate-y-0.5 border border-slate-100">
+                <div key={store.id} className="bg-white dark:bg-white/5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col transition-transform hover:-translate-y-0.5 border border-black/5 dark:border-white/10">
                   {/* Photo Placeholder */}
-                  <div className="w-full aspect-[20/9] bg-slate-100 overflow-hidden relative border-b border-slate-100">
+                  <div className="w-full aspect-[20/9] bg-slate-100 overflow-hidden relative border-b border-black/5 dark:border-white/10">
                     <img 
                       src={store.imageUrl || (store as any).image || 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'} 
                       alt={store.name}
@@ -757,11 +757,11 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([store.mallName || store.name, store.city].filter(Boolean).join(' '))}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-slate-600 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100 block hover:bg-blue-50/50 hover:border-blue-100 transition-colors cursor-pointer group"
+                      className="text-xs text-neutral-600 dark:text-neutral-400 font-medium bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 p-2.5 rounded-xl border border-black/5 dark:border-white/10 block hover:bg-blue-50/50 hover:border-blue-100 transition-colors cursor-pointer group"
                     >
-                      <div className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">{store.mallName || store.name}</div>
-                      <div className="text-slate-500 mt-0.5 flex items-start gap-1 group-hover:text-blue-600/80 transition-colors">
-                        <MapPin className="text-slate-400 group-hover:text-blue-500 w-3.5 h-3.5 mt-0.5 shrink-0 transition-colors" />
+                      <div className="font-semibold text-neutral-800 dark:text-neutral-200 group-hover:text-blue-700 transition-colors">{store.mallName || store.name}</div>
+                      <div className="text-neutral-500 dark:text-neutral-400 mt-0.5 flex items-start gap-1 group-hover:text-blue-600/80 transition-colors">
+                        <MapPin className="text-neutral-400 dark:text-neutral-500 group-hover:text-blue-500 w-3.5 h-3.5 mt-0.5 shrink-0 transition-colors" />
                         <span>{store.address || `${store.mallName || store.name}, Indonesia`}</span>
                       </div>
                     </a>
@@ -769,7 +769,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                       <div className="flex items-center justify-between gap-2 mt-1">
                         <div className="flex items-center gap-1.5">
                           <MessageCircle className="text-[#25D366] w-4 h-4 shrink-0" />
-                          <span className="text-xs font-semibold text-slate-700">WhatsApp:</span>
+                          <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">WhatsApp:</span>
                         </div>
                         <a 
                           href={`https://wa.me/${store.whatsapp.replace(/[^0-9]/g, '')}`}
@@ -791,16 +791,16 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         {activeTab === 'PROFILE' && (
           <div className="animate-fadeIn pb-5">
             <div className="px-5 pt-5 pb-2.5 text-center">
-              <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-              <p className="text-sm text-slate-500 mt-1">Manage your account information</p>
+              <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">My Profile</h1>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Manage your account information</p>
             </div>
 
             <section className="px-5 pt-2.5 pb-[30px]">
-              <div className="bg-white rounded-[20px] shadow-sm p-6 sm:p-8 flex flex-col items-center border border-slate-200/80">
+              <div className="bg-white dark:bg-white/5 rounded-[20px] shadow-sm dark:shadow-none p-6 sm:p-8 flex flex-col items-center border border-black/5 dark:border-white/10/80">
                 
                 <div className="relative mb-6 flex flex-col items-center">
                   <div 
-                    className="w-[80px] h-[80px] rounded-full bg-slate-900 text-white flex justify-center items-center text-2xl font-bold shadow-sm overflow-hidden group relative cursor-pointer"
+                    className="w-[80px] h-[80px] rounded-full bg-black dark:bg-white dark:text-black text-white flex justify-center items-center text-2xl font-bold shadow-sm overflow-hidden group relative cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     {member.avatarUrl ? (
@@ -821,49 +821,49 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     onChange={handleAvatarUpload}
                   />
                   <div className="text-center mt-3">
-                    <p className="text-xs text-slate-500 font-medium">Click to change picture</p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Click to change picture</p>
                   </div>
                 </div>
 
                 <div className="w-full max-w-[400px] mb-6 grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 text-center">
-                    <div className="text-[0.65rem] uppercase tracking-wider font-bold text-slate-400">Home Store</div>
-                    <div className="text-xs font-bold text-slate-900 mt-0.5 truncate">{member.registeredStore || 'Puri Jakarta'}</div>
+                  <div className="bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 p-3 rounded-xl border border-black/5 dark:border-white/10/60 text-center">
+                    <div className="text-[0.65rem] uppercase tracking-wider font-bold text-neutral-400 dark:text-neutral-500">Home Store</div>
+                    <div className="text-xs font-bold text-neutral-900 dark:text-white mt-0.5 truncate">{member.registeredStore || 'Puri Jakarta'}</div>
                   </div>
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 text-center">
-                    <div className="text-[0.65rem] uppercase tracking-wider font-bold text-slate-400">Tier</div>
-                    <div className="text-xs font-bold text-slate-900 mt-0.5">{member.tier}</div>
+                  <div className="bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 p-3 rounded-xl border border-black/5 dark:border-white/10/60 text-center">
+                    <div className="text-[0.65rem] uppercase tracking-wider font-bold text-neutral-400 dark:text-neutral-500">Tier</div>
+                    <div className="text-xs font-bold text-neutral-900 dark:text-white mt-0.5">{member.tier}</div>
                   </div>
                 </div>
 
                 <form className="w-full max-w-[400px] space-y-4 text-left" onSubmit={e => e.preventDefault()}>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
-                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-sm font-medium" value={member.name} readOnly disabled />
+                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Full Name</label>
+                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member.name} readOnly disabled />
                   </div>
                   
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Phone Number</label>
-                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-sm font-medium" value={member.phone} readOnly disabled />
+                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Phone Number</label>
+                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member.phone} readOnly disabled />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Email Address</label>
-                    <input type="email" className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-slate-900 text-sm font-medium" placeholder="Enter your email" defaultValue={member.email || ''} />
+                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Email Address</label>
+                    <input type="email" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:border-slate-900 text-sm font-medium" placeholder="Enter your email" defaultValue={member.email || ''} />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Delivery Address</label>
-                    <textarea className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-slate-900 text-sm font-medium resize-y min-h-[70px]" placeholder="Enter your full address" defaultValue={member.address || ''}></textarea>
+                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Delivery Address</label>
+                    <textarea className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:border-slate-900 text-sm font-medium resize-y min-h-[70px]" placeholder="Enter your full address" defaultValue={member.address || ''}></textarea>
                   </div>
 
-                  <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm cursor-pointer mt-2">
+                  <button type="submit" className="w-full bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm dark:shadow-none cursor-pointer mt-2">
                     Save Changes
                   </button>
                 </form>
 
                 {/* HELP & SUPPORT TICKET SHORTCUT IN PROFILE */}
-                <div className="w-full max-w-[400px] mt-4 pt-4 border-t border-slate-100">
+                <div className="w-full max-w-[400px] mt-4 pt-4 border-t border-black/5 dark:border-white/10">
                   <button 
                     type="button"
                     onClick={() => {
@@ -877,8 +877,8 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         <HelpCircle className="w-5 h-5" />
                       </div>
                       <div>
-                        <div className="font-bold text-xs text-slate-900">Pusat Bantuan & Komplain Poin</div>
-                        <div className="text-[11px] text-slate-500">Ajukan keluhan atau cek status tiket Anda</div>
+                        <div className="font-bold text-xs text-neutral-900 dark:text-white">Pusat Bantuan & Komplain Poin</div>
+                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Ajukan keluhan atau cek status tiket Anda</div>
                       </div>
                     </div>
                     {myTickets.length > 0 && (
@@ -889,7 +889,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   </button>
                 </div>
 
-                <button type="button" onClick={onBackToHO} className="w-full max-w-[400px] bg-white hover:bg-red-50 text-red-600 border border-red-200 py-3 rounded-xl text-sm font-semibold transition-colors mt-3 flex justify-center items-center gap-2 cursor-pointer">
+                <button type="button" onClick={onBackToHO} className="w-full max-w-[400px] bg-white dark:bg-white/5 hover:bg-red-50 text-red-600 border border-red-200 py-3 rounded-xl text-sm font-semibold transition-colors mt-3 flex justify-center items-center gap-2 cursor-pointer">
                   <LogOut className="w-4 h-4" /> Sign Out
                 </button>
               </div>
@@ -897,7 +897,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
           </div>
         )}
 
-        <nav className="fixed bottom-5 left-1/2 -translate-x-1/2 w-[calc(100%-40px)] max-w-[400px] bg-white/85 backdrop-blur-md rounded-[40px] flex justify-around items-center p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.08)] z-[1000] border border-slate-200/50">
+        <nav className="fixed bottom-5 left-1/2 -translate-x-1/2 w-[calc(100%-40px)] max-w-[400px] bg-white/70 backdrop-blur-lg border border-black/5 dark:bg-black/40 dark:backdrop-blur-lg dark:border-white/10 rounded-[40px] flex justify-around items-center p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:shadow-none z-[1000]">
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -905,9 +905,9 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
-                className={`flex flex-col items-center gap-1 w-[60px] transition-colors bg-transparent border-none cursor-pointer ${isActive ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex flex-col items-center gap-1 w-[60px] transition-colors bg-transparent border-none cursor-pointer ${isActive ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:text-neutral-400'}`}
               >
-                <div className={`w-10 h-10 rounded-full flex justify-center items-center text-[1.2rem] transition-colors ${isActive ? 'bg-slate-900 text-white shadow-sm' : ''}`}>
+                <div className={`w-10 h-10 rounded-full flex justify-center items-center text-[1.2rem] transition-colors ${isActive ? 'bg-black dark:bg-white dark:text-black text-white shadow-sm' : ''}`}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <span className="text-[0.65rem] font-semibold text-center leading-[1.1]">{item.label}</span>
@@ -917,28 +917,28 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         </nav>
 
         {isHistoryModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
-            <div className="bg-white rounded-[24px] text-center shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] w-full max-w-[420px] p-[25px_20px] relative animate-scaleUp">
+          <div className="fixed inset-0 bg-black dark:bg-white dark:text-black/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
+            <div className="bg-white dark:bg-white/5 rounded-[24px] text-center shadow-sm dark:shadow-none [0_20px_40px_-10px_rgba(0,0,0,0.1)] w-full max-w-[420px] p-[25px_20px] relative animate-scaleUp">
               <button 
                 onClick={() => setIsHistoryModalOpen(false)}
-                className="absolute top-4 right-4 bg-slate-100 border-none w-[30px] h-[30px] rounded-full cursor-pointer text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900 flex justify-center items-center"
+                className="absolute top-4 right-4 bg-slate-100 border-none w-[30px] h-[30px] rounded-full cursor-pointer text-neutral-500 dark:text-neutral-400 transition-colors hover:bg-slate-200 hover:text-neutral-900 dark:text-white flex justify-center items-center"
               >
                 <X className="w-4 h-4" />
               </button>
               <div className="mb-4 text-center">
-                <h3 className="mb-1 text-lg font-bold text-slate-900">All Transactions</h3>
-                <p className="text-[0.85rem] text-slate-500 font-medium">Your complete transaction history</p>
+                <h3 className="mb-1 text-lg font-bold text-neutral-900 dark:text-white">All Transactions</h3>
+                <p className="text-[0.85rem] text-neutral-500 dark:text-neutral-400 font-medium">Your complete transaction history</p>
               </div>
               
               <div className="max-h-[60vh] overflow-y-auto text-left pr-2 mt-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {memberTransactions.map((trx, idx) => (
-                  <div key={idx} className="flex items-center py-4 border-b border-slate-100 last:border-0 transition-colors">
+                  <div key={idx} className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0 transition-colors">
                     <div className={`w-10 h-10 shrink-0 rounded-xl flex justify-center items-center mr-4 text-base ${trx.type === 'EARN' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
                       {trx.type === 'EARN' ? <ArrowUp className="w-4 h-4" /> : <Ticket className="w-4 h-4" />}
                     </div>
                     <div className="flex-grow min-w-0 pr-2">
-                      <div className="font-semibold text-[0.9rem] text-slate-900 truncate">{trx.store}</div>
-                      <div className="text-[0.75rem] text-slate-500 mt-1 truncate">{trx.date} • {trx.id}</div>
+                      <div className="font-semibold text-[0.9rem] text-neutral-900 dark:text-white truncate">{trx.store}</div>
+                      <div className="text-[0.75rem] text-neutral-500 dark:text-neutral-400 mt-1 truncate">{trx.date} • {trx.id}</div>
                     </div>
                     <div className={`font-bold text-[0.95rem] shrink-0 whitespace-nowrap ${trx.type === 'EARN' ? 'text-emerald-500' : 'text-red-500'}`}>
                       {trx.type === 'EARN' ? '+' : '-'}{(trx.points || 0).toLocaleString('id-ID')} Pts
@@ -952,23 +952,23 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
         <PwaInstallPrompt />
         {isQrModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
-            <div className="bg-white rounded-[24px] text-center shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] w-[90%] max-w-[340px] p-7 relative animate-scaleUp">
+          <div className="fixed inset-0 bg-black dark:bg-white dark:text-black/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
+            <div className="bg-white dark:bg-white/5 rounded-[24px] text-center shadow-sm dark:shadow-none [0_20px_40px_-10px_rgba(0,0,0,0.1)] w-[90%] max-w-[340px] p-7 relative animate-scaleUp">
               <button 
                 onClick={() => {
                   setIsQrModalOpen(false);
                   setSelectedVoucherForQr(null);
                 }}
-                className="absolute top-4 right-4 bg-slate-100 border-none w-[30px] h-[30px] rounded-full cursor-pointer text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900 flex justify-center items-center"
+                className="absolute top-4 right-4 bg-slate-100 border-none w-[30px] h-[30px] rounded-full cursor-pointer text-neutral-500 dark:text-neutral-400 transition-colors hover:bg-slate-200 hover:text-neutral-900 dark:text-white flex justify-center items-center"
               >
                 <X className="w-4 h-4" />
               </button>
               <div className="mb-6 text-center">
-                <h3 className="mb-2 text-lg font-bold text-slate-900">{selectedVoucherForQr ? 'Scan to Redeem' : 'Cashier Scan'}</h3>
-                <p className="text-[0.85rem] text-slate-500 font-medium">{selectedVoucherForQr ? 'Show this code to the cashier' : 'Present this QR code at checkout'}</p>
+                <h3 className="mb-2 text-lg font-bold text-neutral-900 dark:text-white">{selectedVoucherForQr ? 'Scan to Redeem' : 'Cashier Scan'}</h3>
+                <p className="text-[0.85rem] text-neutral-500 dark:text-neutral-400 font-medium">{selectedVoucherForQr ? 'Show this code to the cashier' : 'Present this QR code at checkout'}</p>
               </div>
               
-              <div className="w-[200px] h-[200px] mx-auto mb-5 bg-white rounded-2xl flex justify-center items-center p-3 shadow-inner border border-slate-200">
+              <div className="w-[200px] h-[200px] mx-auto mb-5 bg-white rounded-2xl flex justify-center items-center p-3 shadow-inner border border-black/5 dark:border-white/10">
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
                     selectedVoucherForQr ? selectedVoucherForQr.code : member.membershipId
@@ -977,8 +977,8 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   className="w-full h-full object-contain"
                 />
               </div>
-              <p className="font-bold text-slate-900 m-0">
-                {selectedVoucherForQr ? 'Code:' : 'ID:'} <span className="font-mono ml-1 text-slate-700 tracking-wide">{selectedVoucherForQr ? selectedVoucherForQr.code : member.membershipId}</span>
+              <p className="font-bold text-neutral-900 dark:text-white m-0">
+                {selectedVoucherForQr ? 'Code:' : 'ID:'} <span className="font-mono ml-1 text-neutral-700 dark:text-neutral-300 tracking-wide">{selectedVoucherForQr ? selectedVoucherForQr.code : member.membershipId}</span>
               </p>
             </div>
           </div>
@@ -987,7 +987,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         {/* 1. PUSH-POP CAMPAIGN BANNER MODAL */}
         {activeCampaignModal && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center z-[10000] p-4 animate-fadeIn">
-            <div className="bg-slate-900 rounded-3xl text-center shadow-2xl w-full max-w-sm overflow-hidden relative animate-scaleUp border border-slate-700">
+            <div className="bg-black dark:bg-white dark:text-black rounded-3xl text-center shadow-2xl w-full max-w-sm overflow-hidden relative animate-scaleUp border border-slate-700">
               <button 
                 onClick={() => setActiveCampaignModal(null)}
                 className="absolute top-3.5 right-3.5 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 transition-colors cursor-pointer z-20 backdrop-blur-sm shadow-md"
@@ -1016,35 +1016,35 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         {/* 2. CUSTOMER SUPPORT & TICKETS MODAL */}
         {isSupportModalOpen && (
           <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex justify-center items-center z-[10000] p-4 animate-fadeIn">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden relative animate-scaleUp border border-slate-200 text-xs">
+            <div className="bg-white dark:bg-white/5 rounded-3xl shadow-sm dark:shadow-none 2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden relative animate-scaleUp border border-black/5 dark:border-white/10 text-xs">
               {/* HEADER */}
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-5 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
                     <HelpCircle className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-slate-900">Pusat Bantuan & Customer Care</h3>
-                    <p className="text-[10px] text-slate-500">Terhubung langsung dengan Watch Club Customer Care</p>
+                    <h3 className="font-bold text-sm text-neutral-900 dark:text-white">Pusat Bantuan & Customer Care</h3>
+                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Terhubung langsung dengan Watch Club Customer Care</p>
                   </div>
                 </div>
 
                 <button 
                   onClick={() => setIsSupportModalOpen(false)}
-                  className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+                  className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-neutral-500 dark:text-neutral-400 flex items-center justify-center cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* TABS */}
-              <div className="flex border-b border-slate-100 bg-slate-50/70">
+              <div className="flex border-b border-black/5 dark:border-white/10 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950/70">
                 <button
                   onClick={() => setSupportModalTab('NEW')}
                   className={`flex-1 py-2.5 text-center font-bold text-xs border-b-2 transition-colors cursor-pointer ${
                     supportModalTab === 'NEW' 
                       ? 'border-blue-600 text-blue-700 bg-white' 
-                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                      : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:text-white'
                   }`}
                 >
                   Ajukan Tiket Baru
@@ -1054,7 +1054,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   className={`flex-1 py-2.5 text-center font-bold text-xs border-b-2 transition-colors cursor-pointer relative ${
                     supportModalTab === 'HISTORY' 
                       ? 'border-blue-600 text-blue-700 bg-white' 
-                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                      : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:text-white'
                   }`}
                 >
                   <span>Riwayat Tiket Saya</span>
@@ -1086,13 +1086,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     )}
 
                     <div>
-                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                      <label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase block mb-1">
                         Kategori Masalah *
                       </label>
                       <select 
                         value={ticketCategory}
                         onChange={(e) => setTicketCategory(e.target.value as any)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none"
+                        className="w-full px-3 py-2 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white font-semibold focus:outline-none"
                       >
                         <option value="MISSING_POINTS">Poin Transaksi Belum Masuk</option>
                         <option value="VOUCHER_CLAIM">Kendala Klaim / Scan Voucher</option>
@@ -1102,13 +1102,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                      <label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase block mb-1">
                         Toko Tempat Transaksi
                       </label>
                       <select
                         value={ticketStore}
                         onChange={(e) => setTicketStore(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:outline-none"
+                        className="w-full px-3 py-2 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white font-medium focus:outline-none"
                       >
                         {stores.map(s => (
                           <option key={s.id} value={s.name}>
@@ -1120,7 +1120,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
                     <div className="grid grid-cols-2 gap-2">
                       <div className="col-span-2">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                        <label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase block mb-1">
                           Judul Singkat Keluhan *
                         </label>
                         <input
@@ -1129,12 +1129,12 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                           value={ticketSubject || ''}
                           onChange={(e) => setTicketSubject(e.target.value)}
                           placeholder="Contoh: Transaksi kemarin poin belum bertambah"
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                          className="w-full px-3 py-2 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:bg-white/5"
                         />
                       </div>
 
                       <div className="col-span-2">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                        <label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase block mb-1">
                           Nomor Struk / Invoice (Opsional)
                         </label>
                         <input
@@ -1142,13 +1142,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                           value={ticketReceipt || ''}
                           onChange={(e) => setTicketReceipt(e.target.value)}
                           placeholder="Contoh: INV-20260820-PUR-001"
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                          className="w-full px-3 py-2 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-xl font-mono text-neutral-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:bg-white/5"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                      <label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase block mb-1">
                         Rincian Keluhan / Pertanyaan *
                       </label>
                       <textarea
@@ -1157,7 +1157,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         value={ticketMessage || ''}
                         onChange={(e) => setTicketMessage(e.target.value)}
                         placeholder="Jelaskan detail transaksi Anda, jam berapa, atau kendala voucher..."
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                        className="w-full px-3 py-2 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:bg-white/5"
                       />
                     </div>
 
@@ -1172,16 +1172,16 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 ) : (
                   <div className="space-y-3">
                     {myTickets.length === 0 ? (
-                      <div className="text-center py-8 text-slate-400">
+                      <div className="text-center py-8 text-neutral-400 dark:text-neutral-500">
                         <HelpCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                        <p className="font-bold text-slate-700">Belum ada riwayat tiket</p>
-                        <p className="text-[11px] text-slate-400">Jika mengalami kendala poin atau voucher, klik tab "Ajukan Tiket Baru".</p>
+                        <p className="font-bold text-neutral-700 dark:text-neutral-300">Belum ada riwayat tiket</p>
+                        <p className="text-[11px] text-neutral-400 dark:text-neutral-500">Jika mengalami kendala poin atau voucher, klik tab "Ajukan Tiket Baru".</p>
                       </div>
                     ) : (
                       myTickets.map(t => (
-                        <div key={t.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                        <div key={t.id} className="p-3.5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 rounded-2xl border border-black/5 dark:border-white/10/80 space-y-2">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                            <span className="font-mono text-[10px] font-bold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-white/5 px-2 py-0.5 rounded border border-black/5 dark:border-white/10">
                               {t.id}
                             </span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1192,10 +1192,10 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                             </span>
                           </div>
 
-                          <div className="font-bold text-slate-900">{t.subject}</div>
+                          <div className="font-bold text-neutral-900 dark:text-white">{t.subject}</div>
 
                           {t.storeName && (
-                            <div className="text-[11px] text-slate-500">
+                            <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
                               Butik: <strong>{t.storeName}</strong> {t.receiptNo ? `• Struk: ${t.receiptNo}` : ''}
                             </div>
                           )}
@@ -1212,7 +1212,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
                           {/* RECENT MESSAGE */}
                           {t.messages.length > 0 && (
-                            <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-[11px] text-slate-700">
+                            <div className="p-2.5 bg-white dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/10 text-[11px] text-neutral-700 dark:text-neutral-300">
                               <div className="font-bold text-blue-600 mb-0.5">
                                 {t.messages[t.messages.length - 1].sender === 'AGENT' ? (t.assignedTo || 'Watch Club Customer Care') : 'Anda'}:
                               </div>

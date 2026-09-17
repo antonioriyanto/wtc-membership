@@ -1,9 +1,10 @@
 import React from 'react';
-import { 
-  Monitor, 
-  Users, 
-  History, 
-  Settings
+import {
+  Monitor,
+  Users,
+  History,
+  Settings,
+  MessageSquare
 } from 'lucide-react';
 import { CashierTabType } from '../types';
 import { WatchClubLogo } from './WatchClubLogo';

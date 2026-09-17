@@ -453,10 +453,10 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               key={index}
               className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
                 filled
-                  ? 'bg-slate-900 border border-slate-900 scale-110 shadow-xs'
+                  ? 'bg-black dark:bg-white dark:text-black border border-slate-900 scale-110 shadow-xs'
                   : active
                   ? 'border-2 border-slate-900 bg-white ring-2 ring-slate-400/25 scale-105'
-                  : 'border border-slate-300 bg-slate-100'
+                  : 'border border-black/10 dark:border-white/20 bg-slate-100'
               }`}
             />
           );
@@ -466,13 +466,13 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-center items-center p-4 sm:p-6 relative font-sans select-none">
+    <div className="min-h-screen bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-900 dark:text-white flex flex-col justify-center items-center p-4 sm:p-6 relative font-sans select-none">
       {/* Subtle Luxury Ambient Glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-slate-200/50 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-slate-200/40 rounded-full blur-2xl pointer-events-none" />
 
       {/* Main Luxury White Card Container */}
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-slate-200/90 p-6 sm:p-8 relative z-10 space-y-5 transition-shadow hover:shadow-md">
+      <div className="w-full max-w-md bg-white dark:bg-white/5 rounded-3xl shadow-sm dark:shadow-none dark:shadow-none border border-black/5 dark:border-white/10 p-6 sm:p-8 relative z-10 space-y-5 transition-shadow hover:shadow-md">
         
         {/* BRAND LOGO - Deep Obsidian Variant */}
         <div className="flex justify-center mb-2">
@@ -500,19 +500,19 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
         {step === 'PHONE' && (
           <div className="space-y-5 animate-fadeIn">
             <div className="text-center">
-              <h2 className="text-xl font-bold tracking-tight text-slate-900">Portal Member Eksklusif</h2>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              <h2 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">Portal Member Eksklusif</h2>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
                 Selamat datang kembali. Masukkan nomor ponsel Anda untuk mengakses privilege member, poin reward, dan reward Anda.
               </p>
             </div>
 
             <form onSubmit={handlePhoneSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
                   Nomor Ponsel
                 </label>
                 <div className="relative">
-                  <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 dark:text-neutral-500" />
                   <input
                     type="tel"
                     value={phone || ''}
@@ -520,7 +520,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                       setPhone(e.target.value);
                       if (error) setError('');
                     }}
-                    className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:bg-white focus:ring-1 focus:ring-slate-800/20 transition-all tracking-wide"
+                    className="w-full pl-10 pr-4 py-3.5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-xl text-sm font-semibold text-neutral-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:bg-white dark:bg-white/5 focus:ring-1 focus:ring-slate-800/20 transition-all tracking-wide"
                     placeholder="Contoh: 081288889999"
                     required
                     autoFocus
@@ -531,7 +531,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                className="w-full py-3.5 bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 active:scale-[0.99] text-white font-semibold text-sm rounded-xl transition-all shadow-sm dark:shadow-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
               >
                 <ShieldCheck className="w-4 h-4 text-white" />
                 <span>{loading ? 'Memverifikasi...' : 'Lanjutkan ke PIN Keamanan'}</span>
@@ -540,14 +540,14 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
 
             {/* Unregistered Member Registration Prompt */}
             {memberInfo && !memberInfo.exists && (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-3 animate-fadeIn">
-                <p className="text-xs text-slate-600 leading-relaxed">
+              <div className="p-4 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-2xl text-center space-y-3 animate-fadeIn">
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
                   Belum menjadi bagian dari Watch Club? Daftar sekarang untuk menikmati berbagai privilege eksklusif.
                 </p>
                 <button
                   type="button"
                   onClick={handleNewGoogleRegister}
-                  className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-xl border border-slate-200 flex items-center justify-center gap-2.5 transition-all shadow-xs cursor-pointer"
+                  className="w-full py-2.5 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-900 dark:text-white text-xs font-semibold rounded-xl border border-black/5 dark:border-white/10 flex items-center justify-center gap-2.5 transition-all shadow-xs dark:shadow-none cursor-pointer"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -561,17 +561,17 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             )}
 
             {/* Strict Portal Isolation: Luxury Customer Care Footer (No /admin or /cashier) */}
-            <div className="pt-4 border-t border-slate-200/80 text-center space-y-2">
-              <div className="flex items-center justify-center text-xs font-medium text-slate-500">
+            <div className="pt-4 border-t border-black/5 dark:border-white/10/80 text-center space-y-2">
+              <div className="flex items-center justify-center text-xs font-medium text-neutral-500 dark:text-neutral-400">
                 <a 
                   href="mailto:customercare@watchclub.co.id" 
-                  className="hover:text-slate-900 transition-colors flex items-center gap-1.5"
+                  className="hover:text-neutral-900 dark:text-white transition-colors flex items-center gap-1.5"
                 >
-                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  <Mail className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
                   <span>Customer Care</span>
                 </a>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
                 &copy; {new Date().getFullYear()} Watch Club Indonesia. All rights reserved.
               </p>
             </div>
@@ -592,21 +592,21 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   setEnteredPin('');
                   setError('');
                 }}
-                className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
+                className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:text-white flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Ganti Nomor
               </button>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-semibold">
-                <Lock className="w-3 h-3 text-slate-600" />
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-black/5 dark:border-white/10 text-neutral-700 dark:text-neutral-300 text-[10px] font-semibold">
+                <Lock className="w-3 h-3 text-neutral-600 dark:text-neutral-400" />
                 <span>Keamanan Akun Terenkripsi</span>
               </div>
             </div>
 
             <div className="text-center pt-1">
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
                 Selamat Datang, {memberInfo?.name || 'Member'}
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                 Ketik 6-Digit PIN Anda untuk {toE164(phone)}
               </p>
             </div>
@@ -623,7 +623,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                 <p className="text-2xl font-mono font-extrabold text-rose-700">
                   {formatLockoutTimer(lockoutSeconds)}
                 </p>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
+                <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
                   Untuk menjaga keamanan dan kerahasiaan poin reward Anda, akses input PIN dinonaktifkan sementara setelah beberapa percobaan tidak sesuai.
                 </p>
                 <button
@@ -633,7 +633,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     setRecoveryError('');
                     setIsRecoveryModalOpen(true);
                   }}
-                  className="mt-2 w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  className="mt-2 w-full py-2.5 bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm dark:shadow-none"
                 >
                   <Fingerprint className="w-4 h-4" />
                   <span>Verifikasi Identitas dengan Akun Google</span>
@@ -652,7 +652,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                       type="button"
                       onClick={() => handleKeypadPress(digit)}
                       disabled={loading || lockoutSeconds > 0}
-                      className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white border border-slate-200 text-lg font-bold text-slate-900 transition-all duration-150 flex items-center justify-center shadow-xs cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="h-14 rounded-2xl bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 active:bg-black dark:bg-white dark:text-black active:text-white border border-black/5 dark:border-white/10 text-lg font-bold text-neutral-900 dark:text-white transition-all duration-150 flex items-center justify-center shadow-xs dark:shadow-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       {digit}
                     </button>
@@ -663,7 +663,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     type="button"
                     onClick={handleKeypadClear}
                     disabled={loading || lockoutSeconds > 0 || !enteredPin}
-                    className="h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-600 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
+                    className="h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-black/5 dark:border-white/10 text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
                   >
                     Clear
                   </button>
@@ -673,7 +673,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     type="button"
                     onClick={() => handleKeypadPress('0')}
                     disabled={loading || lockoutSeconds > 0}
-                    className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white border border-slate-200 text-lg font-bold text-slate-900 transition-all duration-150 flex items-center justify-center shadow-xs cursor-pointer disabled:opacity-30"
+                    className="h-14 rounded-2xl bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 active:bg-black dark:bg-white dark:text-black active:text-white border border-black/5 dark:border-white/10 text-lg font-bold text-neutral-900 dark:text-white transition-all duration-150 flex items-center justify-center shadow-xs dark:shadow-none cursor-pointer disabled:opacity-30"
                   >
                     0
                   </button>
@@ -683,9 +683,9 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                     type="button"
                     onClick={handleKeypadBackspace}
                     disabled={loading || lockoutSeconds > 0 || !enteredPin}
-                    className="h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
+                    className="h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-black/5 dark:border-white/10 text-neutral-600 dark:text-neutral-400 transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
                   >
-                    <Delete className="w-5 h-5 text-slate-600" />
+                    <Delete className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
                   </button>
                 </div>
 
@@ -698,20 +698,20 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                       setRecoveryError('');
                       setIsRecoveryModalOpen(true);
                     }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-200 transition-all cursor-pointer shadow-xs"
+                    className="w-full py-2.5 px-3 rounded-xl bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 hover:bg-slate-100 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:text-white text-xs font-semibold flex items-center justify-center gap-2 border border-black/5 dark:border-white/10 transition-all cursor-pointer shadow-xs"
                   >
-                    <HelpCircle className="w-4 h-4 text-slate-500" />
+                    <HelpCircle className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
                     <span>Lupa Security PIN? Pulihkan Akun</span>
                   </button>
                 </div>
 
                 {/* LUXURY SECURITY BADGE MICROCOPY */}
-                <div className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1 text-xs text-slate-700">
-                  <div className="flex items-center gap-1.5 font-semibold text-slate-900">
-                    <ShieldCheck className="w-4 h-4 text-slate-800" />
+                <div className="p-3.5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-2xl space-y-1 text-xs text-neutral-700 dark:text-neutral-300">
+                  <div className="flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-white">
+                    <ShieldCheck className="w-4 h-4 text-neutral-800 dark:text-neutral-200" />
                     <span>Proteksi Keamanan &amp; Privasi Member</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
                     Security PIN Anda dilindungi dengan enkripsi berstandar perbankan untuk mengamankan hak reward poin serta kerahasiaan arsip aktivitas loyalty Anda.
                   </p>
                 </div>
@@ -729,27 +729,27 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               <button
                 type="button"
                 onClick={() => setStep('PHONE')}
-                className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
+                className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:text-white flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Batal
               </button>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 bg-slate-100 px-2.5 py-1 rounded-full border border-black/5 dark:border-white/10">
                 Langkah 1 dari 2
               </span>
             </div>
 
             <div className="text-center pt-1">
-              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 mb-2">
+              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-neutral-800 dark:text-neutral-200 border border-black/5 dark:border-white/10 mb-2">
                 <KeyRound className="w-5 h-5" />
               </div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
                 {step === 'RESET_PIN_CREATE' 
                   ? 'Buat Security PIN Baru' 
                   : step === 'MANDATORY_PIN_CHANGE_CREATE'
                   ? 'Wajib Buat PIN Baru'
                   : 'Aktivasi Keamanan PIN'}
               </h2>
-              <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-xs mx-auto leading-relaxed">
                 {step === 'RESET_PIN_CREATE'
                   ? 'Verifikasi identitas berhasil. Tentukan 6-digit Security PIN baru Anda.'
                   : step === 'MANDATORY_PIN_CHANGE_CREATE'
@@ -766,7 +766,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   key={digit}
                   type="button"
                   onClick={() => handleKeypadPress(digit)}
-                  className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white border border-slate-200 text-lg font-bold text-slate-900 transition-all flex items-center justify-center shadow-xs cursor-pointer"
+                  className="h-14 rounded-2xl bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 active:bg-black dark:bg-white dark:text-black active:text-white border border-black/5 dark:border-white/10 text-lg font-bold text-neutral-900 dark:text-white transition-all flex items-center justify-center shadow-xs dark:shadow-none cursor-pointer"
                 >
                   {digit}
                 </button>
@@ -774,23 +774,23 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               <button
                 type="button"
                 onClick={handleKeypadClear}
-                className="h-14 rounded-2xl bg-slate-100 text-xs font-bold uppercase text-slate-600 flex items-center justify-center border border-slate-200 cursor-pointer"
+                className="h-14 rounded-2xl bg-slate-100 text-xs font-bold uppercase text-neutral-600 dark:text-neutral-400 flex items-center justify-center border border-black/5 dark:border-white/10 cursor-pointer"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={() => handleKeypadPress('0')}
-                className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white text-lg font-bold text-slate-900 flex items-center justify-center border border-slate-200 cursor-pointer"
+                className="h-14 rounded-2xl bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 active:bg-black dark:bg-white dark:text-black active:text-white text-lg font-bold text-neutral-900 dark:text-white flex items-center justify-center border border-black/5 dark:border-white/10 cursor-pointer"
               >
                 0
               </button>
               <button
                 type="button"
                 onClick={handleKeypadBackspace}
-                className="h-14 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center border border-slate-200 cursor-pointer"
+                className="h-14 rounded-2xl bg-slate-100 text-neutral-600 dark:text-neutral-400 flex items-center justify-center border border-black/5 dark:border-white/10 cursor-pointer"
               >
-                <Delete className="w-5 h-5 text-slate-600" />
+                <Delete className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
               </button>
             </div>
 
@@ -798,7 +798,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               type="button"
               onClick={handleProceedToConfirm}
               disabled={createdPin.length !== 6}
-              className="w-full py-3.5 mt-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-3.5 mt-2 bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-semibold text-sm rounded-xl transition-all shadow-sm dark:shadow-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span>Lanjut Konfirmasi PIN ({createdPin.length}/6)</span>
             </button>
@@ -819,23 +819,23 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   else if (step === 'RESET_PIN_CONFIRM') setStep('RESET_PIN_CREATE');
                   else setStep('MANDATORY_PIN_CHANGE_CREATE');
                 }}
-                className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
+                className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:text-white flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Ubah PIN
               </button>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 bg-slate-100 px-2.5 py-1 rounded-full border border-black/5 dark:border-white/10">
                 Langkah 2 dari 2
               </span>
             </div>
 
             <div className="text-center pt-1">
-              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 mb-2">
+              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-neutral-800 dark:text-neutral-200 border border-black/5 dark:border-white/10 mb-2">
                 <Lock className="w-5 h-5" />
               </div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
                 Konfirmasi Ulang PIN Anda
               </h2>
-              <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-xs mx-auto leading-relaxed">
                 Ketik kembali 6-digit PIN yang baru saja Anda buat untuk memastikan kesesuaian.
               </p>
             </div>
@@ -848,7 +848,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                   key={digit}
                   type="button"
                   onClick={() => handleKeypadPress(digit)}
-                  className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white border border-slate-200 text-lg font-bold text-slate-900 transition-all flex items-center justify-center shadow-xs cursor-pointer"
+                  className="h-14 rounded-2xl bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 active:bg-black dark:bg-white dark:text-black active:text-white border border-black/5 dark:border-white/10 text-lg font-bold text-neutral-900 dark:text-white transition-all flex items-center justify-center shadow-xs dark:shadow-none cursor-pointer"
                 >
                   {digit}
                 </button>
@@ -856,23 +856,23 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               <button
                 type="button"
                 onClick={handleKeypadClear}
-                className="h-14 rounded-2xl bg-slate-100 text-xs font-bold uppercase text-slate-600 flex items-center justify-center border border-slate-200 cursor-pointer"
+                className="h-14 rounded-2xl bg-slate-100 text-xs font-bold uppercase text-neutral-600 dark:text-neutral-400 flex items-center justify-center border border-black/5 dark:border-white/10 cursor-pointer"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={() => handleKeypadPress('0')}
-                className="h-14 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-900 active:text-white text-lg font-bold text-slate-900 flex items-center justify-center border border-slate-200 cursor-pointer"
+                className="h-14 rounded-2xl bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 active:bg-black dark:bg-white dark:text-black active:text-white text-lg font-bold text-neutral-900 dark:text-white flex items-center justify-center border border-black/5 dark:border-white/10 cursor-pointer"
               >
                 0
               </button>
               <button
                 type="button"
                 onClick={handleKeypadBackspace}
-                className="h-14 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center border border-slate-200 cursor-pointer"
+                className="h-14 rounded-2xl bg-slate-100 text-neutral-600 dark:text-neutral-400 flex items-center justify-center border border-black/5 dark:border-white/10 cursor-pointer"
               >
-                <Delete className="w-5 h-5 text-slate-600" />
+                <Delete className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
               </button>
             </div>
 
@@ -880,7 +880,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               type="button"
               onClick={handleProceedToGoogleLink}
               disabled={confirmedPin.length !== 6 || loading}
-              className="w-full py-3.5 mt-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-3.5 mt-2 bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-semibold text-sm rounded-xl transition-all shadow-sm dark:shadow-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ShieldCheck className="w-4 h-4" />
               <span>
@@ -902,24 +902,24 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
         {step === 'FIRST_PIN_LINK_GOOGLE' && (
           <div className="space-y-4 animate-fadeIn">
             <div className="text-center pt-2">
-              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 mb-2">
-                <ShieldCheck className="w-6 h-6 text-slate-800" />
+              <div className="inline-flex p-3 rounded-2xl bg-slate-100 text-neutral-800 dark:text-neutral-200 border border-black/5 dark:border-white/10 mb-2">
+                <ShieldCheck className="w-6 h-6 text-neutral-800 dark:text-neutral-200" />
               </div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
                 Amankan Profil Anda
               </h2>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
                 Hubungkan akun Google Anda untuk mempermudah akses masuk dan melindungi data keanggotaan Anda di masa mendatang.
               </p>
             </div>
 
             {/* SECURITY BADGE & DESCRIPTION */}
-            <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1.5 text-xs text-slate-700">
-              <div className="flex items-center gap-2 font-semibold text-slate-900">
-                <ShieldCheck className="w-4 h-4 text-slate-800" />
+            <div className="p-4 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-2xl space-y-1.5 text-xs text-neutral-700 dark:text-neutral-300">
+              <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
+                <ShieldCheck className="w-4 h-4 text-neutral-800 dark:text-neutral-200" />
                 <span>Privasi &amp; Keamanan Terjamin</span>
               </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
                 Data poin reward, dan privasi Anda dilindungi dengan sistem enkripsi setara perbankan. Kenyamanan dan keamanan Anda adalah prioritas kami.
               </p>
             </div>
@@ -928,7 +928,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
               type="button"
               onClick={handleGoogleLinkAndSave}
               disabled={loading}
-              className="w-full py-3.5 bg-white hover:bg-slate-50 text-slate-900 font-semibold text-sm rounded-xl border border-slate-200 transition-all shadow-xs flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-900 dark:text-white font-semibold text-sm rounded-xl border border-black/5 dark:border-white/10 transition-all shadow-xs dark:shadow-none flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -950,41 +950,41 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
           id="modal-lupa-pin-recovery"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fadeIn"
         >
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl text-slate-900 space-y-5 animate-scaleUp">
+          <div className="bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl dark:shadow-none text-neutral-900 dark:text-white space-y-5 animate-scaleUp">
             {/* Modal Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-slate-100 text-neutral-800 dark:text-neutral-200 border border-black/5 dark:border-white/10 flex items-center justify-center">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-base">Pemulihan Security PIN</h3>
-                  <p className="text-xs text-slate-500">Verifikasi identitas resmi member Watch Club</p>
+                  <h3 className="font-bold text-neutral-900 dark:text-white text-base">Pemulihan Security PIN</h3>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Verifikasi identitas resmi member Watch Club</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsRecoveryModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:text-neutral-300 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Member Card Snapshot */}
-            <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1 text-xs text-slate-600">
+            <div className="p-3.5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10/80 rounded-2xl space-y-1 text-xs text-neutral-600 dark:text-neutral-400">
               <div className="flex justify-between items-center">
                 <span>Member Terdaftar:</span>
-                <span className="font-semibold text-slate-900">{memberInfo?.name || 'Member Watch Club'}</span>
+                <span className="font-semibold text-neutral-900 dark:text-white">{memberInfo?.name || 'Member Watch Club'}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Nomor Ponsel:</span>
-                <span className="font-mono text-slate-900 font-semibold">{phone}</span>
+                <span className="font-mono text-neutral-900 dark:text-white font-semibold">{phone}</span>
               </div>
               {memberInfo?.memberDoc?.recoveryEmail && (
                 <div className="flex justify-between items-center">
                   <span>Google Pemulihan Terdaftar:</span>
-                  <span className="font-mono text-slate-700">
+                  <span className="font-mono text-neutral-700 dark:text-neutral-300">
                     {memberInfo.memberDoc.recoveryEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3')}
                   </span>
                 </div>
@@ -1003,18 +1003,18 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             )}
 
             {/* Path 1: Primary Self-Service (Google OAuth) */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 shadow-xs">
+            <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 space-y-3 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
                   Jalur Utama (Instan)
                 </span>
-                <span className="text-[11px] text-slate-500 font-medium">Proses &lt; 30 Detik</span>
+                <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">Proses &lt; 30 Detik</span>
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <h4 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
                   <span>Verifikasi Akun Google Terkait</span>
                 </h4>
-                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                <p className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-1 leading-relaxed">
                   Buka kunci akun dan buat 6-digit PIN baru secara mandiri dengan verifikasi akun Google yang telah ditautkan ke nomor ini.
                 </p>
               </div>
@@ -1024,7 +1024,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
                 id="btn-confirm-google-recovery"
                 onClick={startGoogleRecovery}
                 disabled={loading}
-                className="w-full py-3 bg-white hover:bg-slate-50 text-slate-900 font-semibold text-xs rounded-xl border border-slate-200 transition-all shadow-xs flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+                className="w-full py-3 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-900 dark:text-white font-semibold text-xs rounded-xl border border-black/5 dark:border-white/10 transition-all shadow-xs dark:shadow-none flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -1037,15 +1037,15 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             </div>
 
             {/* Path 2: In-Store Retail Fallback (Cashier-assisted) */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-200/80 px-2 py-0.5 rounded-full border border-slate-300">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 bg-slate-200/80 px-2 py-0.5 rounded-full border border-black/10 dark:border-white/20">
                   Jalur Alternatif di Gerai
                 </span>
-                <Store className="w-4 h-4 text-slate-600" />
+                <Store className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
               </div>
-              <h4 className="text-xs font-bold text-slate-900">Bantuan Kasir di Butik Watch Club</h4>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Bantuan Kasir di Butik Watch Club</h4>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
                 Tidak memiliki akses ke akun Google? Kunjungi butik resmi Watch Club terdekat dengan membawa kartu identitas asli (KTP/SIM/Paspor). Kasir resmi kami akan memverifikasi fisik dan membantu mereset PIN akun Anda.
               </p>
             </div>
@@ -1054,7 +1054,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             <button
               type="button"
               onClick={() => setIsRecoveryModalOpen(false)}
-              className="w-full py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer"
+              className="w-full py-2.5 rounded-xl border border-black/5 dark:border-white/10 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer"
             >
               Kembali ke Halaman Login
             </button>
