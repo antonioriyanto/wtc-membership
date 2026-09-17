@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { compressImage } from '../lib/image-compressor';
 import { Campaign, Voucher } from '../types';
+import { useCustomDialog } from './CustomDialogProvider';
 
 interface CampaignsTabProps {
   campaigns: Campaign[];
@@ -37,6 +38,8 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
   vouchers,
   isSkeletonLoading = false
 }) => {
+  const { showConfirm, showAlert } = useCustomDialog();
+
   if (isSkeletonLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -303,7 +306,18 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                       {/* Actions */}
                       <td className="py-4 px-5 text-center">
                         <button
-                          onClick={() => onDeleteCampaign(c.id)}
+                          onClick={() => {
+                            showConfirm(
+                              `Apakah Anda yakin ingin menghapus kampanye "${c.name}"? Kampanye ini akan dihentikan dan dihapus dari aplikasi member.`,
+                              'Konfirmasi Hapus Kampanye',
+                              () => {
+                                onDeleteCampaign(c.id);
+                                showAlert(`Kampanye "${c.name}" berhasil dihapus.`, 'Berhasil', 'success');
+                              },
+                              'Ya, Hapus',
+                              'Batal'
+                            );
+                          }}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                           title="Hapus Kampanye"
                         >
