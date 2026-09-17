@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useCustomDialog } from './CustomDialogProvider';
 import { TierBadge } from '../utils/tierBadge';
+import { getBranchInfoByCode } from '../lib/storeMapping';
 
 interface NationalTransactionsTabProps {
   stores: StoreBranch[];
@@ -164,11 +165,17 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
       // Search term
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
+        
+        // Extract display store name for better searching
+        const posCode = trx.receiptNo ? trx.receiptNo.split('/')[1] : null;
+        const branchInfo = posCode ? getBranchInfoByCode(posCode) : null;
+        const displayStoreName = branchInfo ? branchInfo.name : trx.storeName;
+
         const matchReceipt = trx.receiptNo && trx.receiptNo.toLowerCase().includes(term);
         const matchMember = trx.memberName && trx.memberName.toLowerCase().includes(term);
         const matchPhone = trx.memberPhone && trx.memberPhone.toLowerCase().includes(term);
         const matchCashier = trx.cashierName && trx.cashierName.toLowerCase().includes(term);
-        const matchStore = trx.storeName && trx.storeName.toLowerCase().includes(term);
+        const matchStore = displayStoreName && displayStoreName.toLowerCase().includes(term);
         const matchNotes = trx.notes && trx.notes.toLowerCase().includes(term);
         return matchReceipt || matchMember || matchPhone || matchCashier || matchStore || matchNotes;
       }
@@ -202,18 +209,24 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
 
   const handleExportCSV = () => {
     const headers = ['No Struk', 'Toko Cabang', 'Waktu', 'Nama Member', 'No Telepon', 'Tipe', 'Nominal Transaksi', 'Poin Delta', 'Kasir', 'Catatan'];
-    const rows = filteredTransactions.map(t => [
-      t.receiptNo,
-      t.storeName,
-      new Date(t.timestamp).toLocaleString('id-ID'),
-      t.memberName,
-      t.memberPhone,
-      t.type,
-      t.amount || 0,
-      t.pointsDelta,
-      t.cashierName,
-      t.notes || ''
-    ]);
+    const rows = filteredTransactions.map(t => {
+      const posCode = t.receiptNo ? t.receiptNo.split('/')[1] : null;
+      const branchInfo = posCode ? getBranchInfoByCode(posCode) : null;
+      const displayStoreName = branchInfo ? branchInfo.name : t.storeName;
+
+      return [
+        t.receiptNo,
+        displayStoreName,
+        new Date(t.timestamp).toLocaleString('id-ID'),
+        t.memberName,
+        t.memberPhone,
+        t.type,
+        t.amount || 0,
+        t.pointsDelta,
+        t.cashierName,
+        t.notes || ''
+      ];
+    });
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -477,6 +490,11 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                   const isRedeem = trx.type === 'REDEEM' || trx.type === 'VOUCHER_DISCOUNT';
                   const isManual = trx.type === 'MANUAL_ADJUSTMENT';
 
+                  // Extract store code from receipt number (e.g. JL-INV/C0085/...)
+                  const posCode = trx.receiptNo ? trx.receiptNo.split('/')[1] : null;
+                  const branchInfo = posCode ? getBranchInfoByCode(posCode) : null;
+                  const displayStoreName = branchInfo ? branchInfo.name : (trx.storeName || 'Cabang Tidak Diketahui');
+
                   // Find member for tier
                   const memberObj = members.find(m => m.id === trx.memberId || m.name === trx.memberName);
                   const isMenuOpen = activeMenuTrxId === trx.id;
@@ -511,11 +529,11 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                       <td className="py-3.5 px-4">
                         <div className="font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5">
                           <Building className="w-3.5 h-3.5 text-neutral-400" />
-                          <span>{trx.storeName}</span>
+                          <span>{displayStoreName}</span>
                         </div>
                         <div className="text-[11px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1 mt-0.5 font-normal">
                           <MapPin className="w-3 h-3" />
-                          <span>{stores.find(s => s.name === trx.storeName)?.city || 'Nasional'}</span>
+                          <span>{stores.find(s => s.name === displayStoreName)?.city || 'Nasional'}</span>
                         </div>
                       </td>
 
@@ -675,97 +693,107 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
             className="bg-white dark:bg-neutral-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 animate-scaleUp"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100 dark:border-neutral-800 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-xs">
-                  WTC
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Salinan Struk Transaksi</h4>
-                  <p className="text-[11px] text-neutral-500">{selectedReceiptDetail.storeName}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedReceiptDetail(null)}
-                className="w-8 h-8 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-500 flex items-center justify-center cursor-pointer transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            {(() => {
+              const posCode = selectedReceiptDetail.receiptNo ? selectedReceiptDetail.receiptNo.split('/')[1] : null;
+              const branchInfo = posCode ? getBranchInfoByCode(posCode) : null;
+              const displayStoreNameDetail = branchInfo ? branchInfo.name : selectedReceiptDetail.storeName;
 
-            <div className="space-y-3.5 text-xs">
-              <div className="p-3.5 bg-neutral-50 dark:bg-neutral-800/60 rounded-2xl border border-neutral-200/70 dark:border-neutral-700/60 space-y-1">
-                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">No. Struk Resmi</div>
-                <div className="font-mono text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                  <Receipt className="w-4 h-4 text-emerald-600" />
-                  {selectedReceiptDetail.receiptNo}
-                </div>
-                <div className="text-[11px] text-neutral-500">
-                  {new Date(selectedReceiptDetail.timestamp).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'medium' })}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60">
-                  <div className="text-[10px] font-bold text-neutral-400 uppercase">Outlet Cabang</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 text-xs mt-0.5">{selectedReceiptDetail.storeName}</div>
-                  <div className="text-[11px] text-neutral-500">Kasir: {selectedReceiptDetail.cashierName}</div>
-                </div>
-
-                <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60">
-                  <div className="text-[10px] font-bold text-neutral-400 uppercase">Pelanggan</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 text-xs">{selectedReceiptDetail.memberName}</span>
-                    <TierBadge tier={members.find(m => m.id === selectedReceiptDetail.memberId || m.name === selectedReceiptDetail.memberName)?.tier || 'BLUE'} size="sm" />
+              return (
+                <>
+                  <div className="flex items-center justify-between pb-4 border-b border-neutral-100 dark:border-neutral-800 mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center font-bold text-xs">
+                        WTC
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Salinan Struk Transaksi</h4>
+                        <p className="text-[11px] text-neutral-500">{displayStoreNameDetail}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedReceiptDetail(null)}
+                      className="w-8 h-8 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-500 flex items-center justify-center cursor-pointer transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div className="text-[11px] text-neutral-500 font-mono">{selectedReceiptDetail.memberPhone}</div>
-                </div>
-              </div>
 
-              <div className="p-3.5 bg-neutral-50 dark:bg-neutral-800/60 rounded-2xl border border-neutral-200/70 dark:border-neutral-700/60 space-y-2">
-                <div className="flex justify-between items-center text-neutral-600 dark:text-neutral-400">
-                  <span>Nilai Transaksi</span>
-                  <span className="font-bold text-neutral-900 dark:text-white text-sm">
-                    Rp {(selectedReceiptDetail.amount || 0).toLocaleString('id-ID')}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-neutral-600 dark:text-neutral-400">
-                  <span>Mutasi Poin Loyalty</span>
-                  <span className={`font-bold text-sm ${selectedReceiptDetail.pointsDelta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                    {selectedReceiptDetail.pointsDelta >= 0 ? `+${selectedReceiptDetail.pointsDelta}` : selectedReceiptDetail.pointsDelta} Pts
-                  </span>
-                </div>
-                {selectedReceiptDetail.voucherCode && (
-                  <div className="flex justify-between items-center text-purple-700 dark:text-purple-300 pt-1.5 border-t border-neutral-200 dark:border-neutral-700">
-                    <span>Voucher Digunakan</span>
-                    <span className="font-mono font-bold">{selectedReceiptDetail.voucherCode}</span>
+                  <div className="space-y-3.5 text-xs">
+                    <div className="p-3.5 bg-neutral-50 dark:bg-neutral-800/60 rounded-2xl border border-neutral-200/70 dark:border-neutral-700/60 space-y-1">
+                      <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">No. Struk Resmi</div>
+                      <div className="font-mono text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                        <Receipt className="w-4 h-4 text-emerald-600" />
+                        {selectedReceiptDetail.receiptNo}
+                      </div>
+                      <div className="text-[11px] text-neutral-500">
+                        {new Date(selectedReceiptDetail.timestamp).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'medium' })}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60">
+                        <div className="text-[10px] font-bold text-neutral-400 uppercase">Outlet Cabang</div>
+                        <div className="font-semibold text-neutral-800 dark:text-neutral-200 text-xs mt-0.5">{displayStoreNameDetail}</div>
+                        <div className="text-[11px] text-neutral-500">Kasir: {selectedReceiptDetail.cashierName}</div>
+                      </div>
+
+                      <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60">
+                        <div className="text-[10px] font-bold text-neutral-400 uppercase">Pelanggan</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="font-semibold text-neutral-800 dark:text-neutral-200 text-xs">{selectedReceiptDetail.memberName}</span>
+                          <TierBadge tier={members.find(m => m.id === selectedReceiptDetail.memberId || m.name === selectedReceiptDetail.memberName)?.tier || 'BLUE'} size="sm" />
+                        </div>
+                        <div className="text-[11px] text-neutral-500 font-mono">{selectedReceiptDetail.memberPhone}</div>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-neutral-50 dark:bg-neutral-800/60 rounded-2xl border border-neutral-200/70 dark:border-neutral-700/60 space-y-2">
+                      <div className="flex justify-between items-center text-neutral-600 dark:text-neutral-400">
+                        <span>Nilai Transaksi</span>
+                        <span className="font-bold text-neutral-900 dark:text-white text-sm">
+                          Rp {(selectedReceiptDetail.amount || 0).toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-neutral-600 dark:text-neutral-400">
+                        <span>Mutasi Poin Loyalty</span>
+                        <span className={`font-bold text-sm ${selectedReceiptDetail.pointsDelta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {selectedReceiptDetail.pointsDelta >= 0 ? `+${selectedReceiptDetail.pointsDelta}` : selectedReceiptDetail.pointsDelta} Pts
+                        </span>
+                      </div>
+                      {selectedReceiptDetail.voucherCode && (
+                        <div className="flex justify-between items-center text-purple-700 dark:text-purple-300 pt-1.5 border-t border-neutral-200 dark:border-neutral-700">
+                          <span>Voucher Digunakan</span>
+                          <span className="font-mono font-bold">{selectedReceiptDetail.voucherCode}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedReceiptDetail.notes && (
+                      <div className="p-3 bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl text-amber-900 dark:text-amber-300 text-xs">
+                        <span className="font-bold">Catatan: </span> {selectedReceiptDetail.notes}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {selectedReceiptDetail.notes && (
-                <div className="p-3 bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl text-amber-900 dark:text-amber-300 text-xs">
-                  <span className="font-bold">Catatan: </span> {selectedReceiptDetail.notes}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
-              <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 text-neutral-700 dark:text-neutral-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" /> Cetak Salinan
-              </button>
-              <button
-                onClick={() => setSelectedReceiptDetail(null)}
-                className="px-5 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer ml-auto"
-              >
-                Tutup
-              </button>
-            </div>
+                  <div className="mt-6 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
+                    <button
+                      onClick={() => {
+                        window.print();
+                      }}
+                      className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 text-neutral-700 dark:text-neutral-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Cetak Salinan
+                    </button>
+                    <button
+                      onClick={() => setSelectedReceiptDetail(null)}
+                      className="px-5 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer ml-auto"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

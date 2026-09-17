@@ -172,43 +172,43 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
 
             <div className="space-y-4">
               {/* Blue Rule */}
-              <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 rounded-2xl border border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm" style={{ background: 'linear-gradient(135deg, #4375A6 0%, #30466E 25%, #222649 50%, #17182C 75%, #101010 100%)' }}>
                 <div>
                   <TierBadge tier="BLUE" size="md" />
-                  <div className="text-xs text-sky-950/80 mt-1">Starting level for all new registered shoppers (Entry Tier)</div>
+                  <div className="text-xs text-white/70 mt-1">Starting level for all new registered shoppers (Entry Tier)</div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="text-xs font-semibold text-sky-900">
+                  <div className="text-xs font-semibold text-white">
                     0 - {((formData.silverThreshold || 5000) - 1).toLocaleString('id-ID')} Pts
                   </div>
-                  <div className="text-xs font-bold text-sky-950 bg-white px-3 py-1.5 rounded-xl border border-sky-200 shadow-xs">
+                  <div className="text-xs font-bold text-slate-900 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs">
                     1.0x Rate
                   </div>
                 </div>
               </div>
 
               {/* Silver Rule */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 rounded-2xl border border-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm" style={{ background: 'linear-gradient(135deg, #F8F4F3 0%, #A3A3A3 25%, #FCFCFC 50%, #909090 75%, #F4F0F1 100%)' }}>
                 <div>
                   <TierBadge tier="SILVER" size="md" />
-                  <div className="text-xs text-slate-500 mt-1">Regular shoppers with introductory spending</div>
+                  <div className="text-xs text-slate-700 mt-1">Regular shoppers with introductory spending</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="text-xs font-semibold text-slate-600">Min. Points:</div>
+                  <div className="text-xs font-semibold text-slate-800">Min. Points:</div>
                   <input
                     type="number"
                     value={formData.silverThreshold ?? 5000}
                     onChange={(e) => handleChange('silverThreshold', parseInt(e.target.value) || 5000)}
-                    className="w-24 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800"
+                    className="w-24 px-3 py-1.5 bg-white/80 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 backdrop-blur-sm"
                   />
-                  <div className="text-xs font-bold text-slate-900 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
+                  <div className="text-xs font-bold text-slate-900 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs">
                     1.0x Rate
                   </div>
                 </div>
               </div>
 
               {/* Gold Rule */}
-              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 rounded-2xl border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm" style={{ background: 'linear-gradient(135deg, #EEC944 0%, #FAE56F 25%, #DDAF1D 50%, #FFFA8A 75%, #B96F15 100%)' }}>
                 <div>
                   <TierBadge tier="GOLD" size="md" />
                   <div className="text-xs text-amber-900/80 mt-1">Frequent watch collectors and repeat buyers</div>
@@ -219,7 +219,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                     type="number"
                     value={formData.goldThreshold || 0}
                     onChange={(e) => handleChange('goldThreshold', parseInt(e.target.value) || 500)}
-                    className="w-24 px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-amber-900"
+                    className="w-24 px-3 py-1.5 bg-white/80 border border-amber-300 rounded-xl text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 backdrop-blur-sm"
                   />
                   <div className="text-xs font-semibold text-amber-900">Multiplier:</div>
                   <input
@@ -227,32 +227,32 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                     step="0.05"
                     value={formData.goldMultiplier || 0}
                     onChange={(e) => handleChange('goldMultiplier', parseFloat(e.target.value) || 1.25)}
-                    className="w-20 px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-amber-900"
+                    className="w-20 px-3 py-1.5 bg-white/80 border border-amber-300 rounded-xl text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 backdrop-blur-sm"
                   />
                 </div>
               </div>
 
               {/* Platinum Rule */}
-              <div className="p-4 rounded-2xl bg-slate-100 text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-300">
+              <div className="p-4 rounded-2xl border border-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm" style={{ background: 'linear-gradient(135deg, #ECF1F7 0%, #A7B8CA 25%, #E2E7ED 50%, #A7B8CA 75%, #F8F7FC 100%)' }}>
                 <div>
                   <TierBadge tier="PLATINUM" size="md" />
-                  <div className="text-xs text-slate-500 mt-1">Prestige club members (Top Tier VIP)</div>
+                  <div className="text-xs text-slate-600 mt-1">Prestige club members (Top Tier VIP)</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="text-xs font-semibold text-slate-600">Min. Points:</div>
+                  <div className="text-xs font-semibold text-slate-800">Min. Points:</div>
                   <input
                     type="number"
                     value={formData.platinumThreshold || 0}
                     onChange={(e) => handleChange('platinumThreshold', parseInt(e.target.value) || 30000)}
-                    className="w-24 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
+                    className="w-24 px-3 py-1.5 bg-white/80 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 backdrop-blur-sm"
                   />
-                  <div className="text-xs font-semibold text-slate-600">Multiplier:</div>
+                  <div className="text-xs font-semibold text-slate-800">Multiplier:</div>
                   <input
                     type="number"
                     step="0.05"
                     value={formData.platinumMultiplier || 0}
                     onChange={(e) => handleChange('platinumMultiplier', parseFloat(e.target.value) || 2.0)}
-                    className="w-20 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
+                    className="w-20 px-3 py-1.5 bg-white/80 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 backdrop-blur-sm"
                   />
                 </div>
               </div>

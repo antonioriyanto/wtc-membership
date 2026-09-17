@@ -305,12 +305,18 @@ export default function App() {
 
   // Support Ticket Handlers
   
-  const handleDeleteCampaign = (id: string) => {
-    setCampaigns(prev => {
-      const next = prev.filter(c => c.id !== id);
-      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
-      return next;
-    });
+  const handleDeleteCampaign = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'campaigns', id));
+      // Local state will be updated via real-time sync, but we update it optimistically:
+      setCampaigns(prev => {
+        const next = prev.filter(c => c.id !== id);
+        try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
+        return next;
+      });
+    } catch(err) {
+      console.error('Failed to delete campaign:', err);
+    }
   };
   
   const handleUpdateTicket = async (updated: SupportTicket) => {

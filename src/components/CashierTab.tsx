@@ -6,6 +6,8 @@ import { TierBadge } from '../utils/tierBadge';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { CashierPinResetModal } from './CashierPinResetModal';
 import { Portal } from './Portal';
+import { PosType } from '../lib/storeMapping';
+import { ReceiptInput } from './ReceiptInput';
 
 interface CashierTabProps {
   isSubmitting?: boolean;
@@ -51,6 +53,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
   
   const [receiptInput, setReceiptInput] = useState('');
   const [amountInput, setAmountInput] = useState('');
+  const [posType, setPosType] = useState<PosType>('A');
   
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isNotFoundOpen, setIsNotFoundOpen] = useState(false);
@@ -440,15 +443,24 @@ export const CashierTab: React.FC<CashierTabProps> = ({
         </div>
 
         <div className="flex flex-wrap gap-4 mb-4">
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-slate-700 dark:text-slate-300 font-semibold text-[0.85rem] mb-2">Nomor Struk (Receipt No)</label>
-            <input 
-              type="text" 
-              value={receiptInput || ''}
+          <div className="flex-1 min-w-[250px]">
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold text-[0.85rem]">Nomor Struk (Receipt No)</label>
+              <select 
+                value={posType} 
+                onChange={(e) => setPosType(e.target.value as PosType)}
+                disabled={!activeMember || isSubmitting}
+                className="text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 outline-none text-slate-700 dark:text-slate-300"
+              >
+                <option value="A">POS A</option>
+                <option value="B">POS B</option>
+              </select>
+            </div>
+            <ReceiptInput 
+              branchName={currentStore?.name || ''} 
+              posType={posType} 
+              onReceiptChange={setReceiptInput}
               disabled={!activeMember || isSubmitting}
-              onChange={(e) => setReceiptInput(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-emerald-500 disabled:bg-slate-100 dark:disabled:bg-slate-900/40"
-              placeholder="Contoh: INV-00123"
             />
           </div>
           <div className="flex-1 min-w-[150px]">
