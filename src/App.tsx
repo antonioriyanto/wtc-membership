@@ -621,15 +621,24 @@ export default function App() {
               (() => {
                 const search = (cashierStoreName || '').toLowerCase().trim();
                 if (!search) return stores[0] || initialStores[0];
-                return stores.find(s => {
-                  const sName = (s.name || '').toLowerCase();
-                  const sCode = (s.code || '').toLowerCase();
-                  const sId = (s.id || '').toLowerCase();
-                  return (sName && sName.includes(search)) || 
-                         (sName && search.includes(sName)) ||
-                         (sCode && sCode === search) || 
-                         (sId && sId === search);
-                }) || stores[0] || initialStores[0];
+                
+                // 1. Strict exact match first
+                let matched = stores.find(s => (s.name || '').toLowerCase().trim() === search);
+                
+                // 2. Contains match if not found exactly
+                if (!matched) {
+                  matched = stores.find(s => {
+                    const sName = (s.name || '').toLowerCase();
+                    const sCode = (s.code || '').toLowerCase();
+                    const sId = (s.id || '').toLowerCase();
+                    return (sName && sName.includes(search)) || 
+                           (sName && search.includes(sName)) ||
+                           (sCode && sCode === search) || 
+                           (sId && sId === search);
+                  });
+                }
+                
+                return matched || stores[0] || initialStores[0];
               })()
             }
             cashierName={cashierName}
@@ -647,14 +656,26 @@ export default function App() {
         ) : (
           <AdminLogin 
             onLogin={(user, storeName) => {
+              let finalStoreName = storeName;
+              
+              // Find the exact matching store based on the username that just logged in
+              const matchingStore = stores.find(s => 
+                (s.username && s.username.toUpperCase() === user.toUpperCase()) || 
+                (s.code && s.code.toUpperCase() === user.toUpperCase())
+              );
+              
+              if (matchingStore) {
+                 finalStoreName = matchingStore.name;
+              }
+            
               if (user) {
-                const displayUser = (storeName && user.toUpperCase() !== 'ADMIN' && user.toUpperCase() !== 'HO') ? storeName : user;
+                const displayUser = (finalStoreName && user.toUpperCase() !== 'ADMIN' && user.toUpperCase() !== 'HO') ? finalStoreName : user;
                 setCashierName(displayUser);
                 try { localStorage.setItem('wtc_cashier_name', displayUser); } catch {}
               }
-              if (storeName) {
-                setCashierStoreName(storeName);
-                try { localStorage.setItem('wtc_cashier_store', storeName); } catch {}
+              if (finalStoreName) {
+                setCashierStoreName(finalStoreName);
+                try { localStorage.setItem('wtc_cashier_store', finalStoreName); } catch {}
               }
               setCashierAuthenticated(true);
               try { localStorage.setItem('wtc_cashier_auth', 'true'); } catch {}

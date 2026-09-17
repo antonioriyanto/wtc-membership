@@ -368,7 +368,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
           storeName={currentStore?.name || 'Puri Jakarta'}
         />
 
-        <div className="p-4 sm:p-6 lg:p-8 flex-1 max-w-7xl w-full mx-auto">
+        <div className="p-4 md:p-6 lg:p-8 flex-1 w-full max-w-full lg:max-w-[1440px] xl:max-w-[1560px] ml-0 mr-auto transition-all">
           {activeTab === 'cashier' && (
             <CashierTab 
               isSubmitting={isSubmitting}

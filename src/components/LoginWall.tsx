@@ -111,6 +111,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     );
 
     if (foundStore) {
+      // Forcefully update the store name immediately before login proceeds to ensure App state sync
+      try {
+        localStorage.setItem('wtc_cashier_store', foundStore.name);
+      } catch (e) {}
+      
       onLogin(foundStore.username, foundStore.name);
     } else {
       setError('Login ID (Username) atau PIN toko salah. Silakan periksa dan ketik kembali.');
