@@ -170,6 +170,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       count: platinumCount,
       barClass: 'bg-slate-500',
       dotClass: 'bg-slate-500',
+      gradient: 'linear-gradient(135deg, #ECF1F7 0%, #A7B8CA 25%, #E2E7ED 50%, #A7B8CA 75%, #F8F7FC 100%)',
       criteria: '30.000+ Pts'
     },
     {
@@ -177,6 +178,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       count: goldCount,
       barClass: 'bg-amber-500',
       dotClass: 'bg-amber-500',
+      gradient: 'linear-gradient(135deg, #EEC944 0%, #FAE56F 25%, #DDAF1D 50%, #FFFA8A 75%, #B96F15 100%)',
       criteria: '10.000 - 29.999 Pts'
     },
     {
@@ -184,6 +186,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       count: silverCount,
       barClass: 'bg-slate-400',
       dotClass: 'bg-slate-400',
+      gradient: 'linear-gradient(135deg, #F8F4F3 0%, #A3A3A3 25%, #FCFCFC 50%, #909090 75%, #F4F0F1 100%)',
       criteria: '5.000 - 9.999 Pts'
     },
     {
@@ -191,6 +194,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       count: blueCount,
       barClass: 'bg-sky-600',
       dotClass: 'bg-sky-600',
+      gradient: 'linear-gradient(135deg, #4375A6 0%, #30466E 25%, #222649 50%, #17182C 75%, #101010 100%)',
       criteria: '0 - 4.999 Pts'
     },
   ];
@@ -495,7 +499,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   <div key={tier.name} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${tier.dotClass}`} />
+                        <span className="w-2.5 h-2.5 rounded-full shadow-sm border border-black/10 dark:border-white/10" style={{ background: tier.gradient }} />
                         <span className="font-semibold text-neutral-800 dark:text-neutral-200">
                           {tier.name}
                         </span>
@@ -509,10 +513,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       </div>
                     </div>
                     
-                    <div className="w-full h-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden shadow-inner">
                       <div 
-                        className={`h-full rounded-full transition-all duration-500 ${tier.barClass}`}
-                        style={{ width: `${percent}%` }}
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${percent}%`, background: tier.gradient }}
                       />
                     </div>
                   </div>

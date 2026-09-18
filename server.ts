@@ -103,9 +103,12 @@ async function startServer() {
   });
 
   // Secure Authentication Endpoint to mint Custom Tokens for Cashiers & HO Admins
-  app.post('/api/auth/employee-login', async (req, res) => {
+  app.all('/api/auth/employee-login', async (req, res) => {
     try {
-      const { username, pin, type, storeId } = req.body;
+      const username = req.body?.username || req.query?.username;
+      const pin = req.body?.pin || req.query?.pin;
+      const type = req.body?.type || req.query?.type;
+      const storeId = req.body?.storeId || req.query?.storeId;
       
       if (!username || !pin) {
         return res.status(400).json({ error: 'Username dan PIN wajib diisi' });
@@ -148,9 +151,14 @@ async function startServer() {
   });
 
   // Secure Add Points API
-  app.post('/api/loyalty/add-points', async (req, res) => {
+  app.all('/api/loyalty/add-points', async (req, res) => {
     try {
-      const { memberId, amount, receiptNo, storeId, storeName, cashierName } = req.body;
+      const memberId = req.body?.memberId || req.query?.memberId;
+      const amount = req.body?.amount || req.query?.amount;
+      const receiptNo = req.body?.receiptNo || req.query?.receiptNo;
+      const storeId = req.body?.storeId || req.query?.storeId;
+      const storeName = req.body?.storeName || req.query?.storeName;
+      const cashierName = req.body?.cashierName || req.query?.cashierName;
 
       if (!memberId || !amount || !receiptNo) {
         return res.status(400).json({ error: 'Missing required fields' });

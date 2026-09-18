@@ -125,10 +125,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     // Call Backend to get Custom Token
     try {
       const type = isHO ? 'HO' : 'CASHIER';
-      const response = await fetch('/api/auth/employee-login?_t=' + Date.now(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, pin: p, type, storeId })
+      const params = new URLSearchParams({ username: u, pin: p, type, storeId: storeId || '', _t: Date.now().toString() });
+      const response = await fetch('/api/auth/employee-login?' + params.toString(), {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
       });
       
       const rawText = await response.text();
