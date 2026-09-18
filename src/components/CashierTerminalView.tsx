@@ -122,22 +122,20 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       let updatedMember;
       
       try {
-        const params = new URLSearchParams({
-          memberId: member.id || '',
-          amount: amount.toString(),
-          receiptNo: receiptNo || '',
-          storeId: currentStore?.id || currentStore?.code || 'PUR',
-          storeName: currentStore?.name || 'Puri Jakarta',
-          cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
-          _t: Date.now().toString()
-        });
-
-        const response = await fetch('/api/loyalty/add-points?' + params.toString(), {
-          method: 'GET',
+        const response = await fetch('/api/loyalty/add-points', {
+          method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
-          credentials: 'same-origin'
+          body: JSON.stringify({
+            memberId: member.id || '',
+            amount: amount.toString(),
+            receiptNo: receiptNo || '',
+            storeId: currentStore?.id || currentStore?.code || 'PUR',
+            storeName: currentStore?.name || 'Puri Jakarta',
+            cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`
+          })
         });
 
         const rawText = await response.text();

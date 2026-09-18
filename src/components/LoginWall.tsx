@@ -1,181 +1,178 @@
 import React, { useState } from 'react';
-import { WatchClubLogo } from './WatchClubLogo';
-import { Lock, User, KeyRound, Smartphone, ShieldCheck, Eye, EyeOff } from 'lucide-react';
-import { initialMembers } from '../data/mockData';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { getAuth, signInWithCustomToken } from 'firebase/auth';
-import { findMemberByPhoneInFirestore, normalizePhoneNumber, isSamePhoneNumber } from '../lib/syncFirestore';
+import { User, KeyRound, ShieldCheck, Eye, EyeOff, Lock, ChevronDown, LogIn } from 'lucide-react';
+import { hashStringSHA256, STORE_PIN_HASHES, setOfflineMode } from '../lib/authHelper';
 
 export const STORE_ACCOUNTS = [
-  { name: "23 Paskal Shopping Center Bandung", username: "23PSC", pin: "23PSC2026" },
-  { name: "23 Semarang Shopping Center", username: "23SMG", pin: "23SMG2026" },
-  { name: "AEON Mall Sentul City Bogor", username: "AMSC", pin: "AMSC2026" },
-  { name: "Alianyang Singkawang", username: "ALIAN", pin: "ALIAN2026" },
-  { name: "Plaza Ambarrukmo Yogyakarta", username: "AMB", pin: "AMB2026" },
-  { name: "Ayani Megamall Pontianak", username: "AYANI", pin: "AYANI2026" },
-  { name: "BIG Mall Samarinda", username: "BIG", pin: "BIG2026" },
-  { name: "Botani Square Mall Bogor", username: "BOS", pin: "BOS2026" },
-  { name: "Cibinong City Mall Bogor", username: "CCM", pin: "CCM2026" },
-  { name: "Mal Ciputra Semarang", username: "CL", pin: "CL2026" },
-  { name: "DP Mall Semarang", username: "DPM", pin: "DPM2026" },
-  { name: "Duta Mall Banjarmasin 1", username: "DTM1", pin: "DTM12026" },
-  { name: "Duta Mall Banjarmasin 2", username: "DTM2", pin: "DTM22026" },
-  { name: "e-Walk Mall Balikpapan", username: "EWALK", pin: "EWALK2026" },
-  { name: "Gaia Bumi Raya City Pontianak", username: "GAIA", pin: "GAIA2026" },
-  { name: "Citimall Gorontalo", username: "GTLO", pin: "GTLO2026" },
-  { name: "Mal Jayapura", username: "JYP", pin: "JYP2026" },
-  { name: "Jogja City Mall", username: "JCM", pin: "JCM2026" },
-  { name: "The Park Kendari", username: "KDI", pin: "KDI2026" },
-  { name: "Kota Kasablanka Jakarta", username: "KOKAS", pin: "KOKAS2026" },
-  { name: "Level 21 Mall Bali", username: "LVL21", pin: "LVL212026" },
-  { name: "Mall Olympic Garden Malang 1", username: "MOG1", pin: "MOG12026" },
-  { name: "Mall Olympic Garden Malang 2", username: "MOG2", pin: "MOG22026" },
-  { name: "Manado Town Square", username: "MANTS", pin: "MANTS2026" },
-  { name: "Megamall Manado", username: "MEGAM", pin: "MEGAM2026" },
-  { name: "Pakuwon Mall Jogja", username: "PMJ", pin: "PMJ2026" },
-  { name: "Palu Grand Mall", username: "PALU", pin: "PALU2026" },
-  { name: "Mal Panakkukang Makassar", username: "KUKA", pin: "KUKA2026" },
-  { name: "Pollux Mall Paragon Semarang", username: "PRG", pin: "PRG2026" },
-  { name: "Pentacity Shopping Venue Balikpapan", username: "PENTA", pin: "PENTA2026" },
-  { name: "Puri Indah Mall Jakarta", username: "PIM", pin: "PIM2026" },
-  { name: "Singkawang Grand Mall", username: "SGM", pin: "SGM2026" },
-  { name: "Pakuwon Mall Solo Baru", username: "SOBAR", pin: "SOBAR2026" },
-  { name: "Solo Square", username: "SQ", pin: "SQ2026" },
-  { name: "Summarecon Mall Bandung", username: "SMB", pin: "SMB2026" },
-  { name: "The Park Sawangan Depok", username: "SWG", pin: "SWG2026" },
-  { name: "The Park Mall Solo", username: "PARK", pin: "PARK2026" },
-  { name: "Trans Studio Mall Bali", username: "BALI", pin: "BALI2026" },
-  { name: "Trans Studio Mall Bandung", username: "TSM", pin: "TSM2026" },
-  { name: "Trans Studio Mall Cibubur", username: "CBB", pin: "CBB2026" },
-  { name: "Trans Studio Mall Makassar", username: "FINE", pin: "FINE2026" }
+  { name: '23 Paskal Bandung', username: '23PSC' },
+  { name: '23 Semarang', username: '23SMG' },
+  { name: 'AEON Sentul', username: 'AMSC' },
+  { name: 'Alianyang Singkawang', username: 'ALIAN' },
+  { name: 'Ambarukmo Plaza Jogja', username: 'AMB' },
+  { name: 'Ayani Pontianak', username: 'AYANI' },
+  { name: 'BIG Mall Samarinda', username: 'BIG' },
+  { name: 'Bogor Botani', username: 'BOS' },
+  { name: 'Cibinong City Mall', username: 'CCM' },
+  { name: 'Ciputra Semarang', username: 'CL' },
+  { name: 'DP Mall Semarang', username: 'DPM' },
+  { name: 'Duta Mall 1 Banjarmasin', username: 'DTM1' },
+  { name: 'Duta Mall 2 Banjarmasin', username: 'DTM2' },
+  { name: 'E-Walk Balikpapan', username: 'EWALK' },
+  { name: 'Gaia Pontianak', username: 'GAIA' },
+  { name: 'Gorontalo', username: 'GTLO' },
+  { name: 'Jayapura', username: 'JYP' },
+  { name: 'Jogja City Mall', username: 'JCM' },
+  { name: 'Kendari', username: 'KDI' },
+  { name: 'Kota Kasablanka Jakarta', username: 'KOKAS' },
+  { name: 'Level 21 Bali', username: 'LVL21' },
+  { name: 'Mall Olympic Garden 1 Malang', username: 'MOG1' },
+  { name: 'Mall Olympic Garden 2 Malang', username: 'MOG2' },
+  { name: 'Manado Town Square', username: 'MANTS' },
+  { name: 'Pakuwon Mall Yogya', username: 'PMJ' },
+  { name: 'Palu', username: 'PALU' },
+  { name: 'Panakukang', username: 'KUKA' },
+  { name: 'Paragon Semarang', username: 'PRG' },
+  { name: 'Penta City Balikpapan', username: 'PENTA' },
+  { name: 'Puri Jakarta', username: 'PIM' },
+  { name: 'Singkawang Grand Mall', username: 'SGM' },
+  { name: 'Solo Baru', username: 'SOBAR' },
+  { name: 'Solo Square', username: 'SQ' },
+  { name: 'Summarecon Mall Bandung', username: 'SMB' },
+  { name: 'The Park Sawangan Depok', username: 'SWG' },
+  { name: 'The Park Solo', username: 'PARK' },
+  { name: 'TSM Bali', username: 'BALI' },
+  { name: 'TSM Bandung', username: 'TSM' },
+  { name: 'TSM Cibubur', username: 'CBB' },
+  { name: 'TSM Makassar', username: 'FINE' }
 ];
 
-interface AdminLoginProps {
-  onLogin: (userName: string, storeName?: string) => void;
-  title: string;
-  subtitle: string;
+interface LoginWallProps {
+  onLoginSuccess: (role: 'HO_ADMIN' | 'CASHIER' | 'CUSTOMER', storeId?: string) => void;
+  title?: string;
+  subtitle?: string;
+  isHO?: boolean;
+  storeId?: string;
   showStoreQuickSelect?: boolean;
 }
 
-export const AdminLogin: React.FC<AdminLoginProps> = ({ 
-  onLogin, 
-  title, 
-  subtitle, 
-  showStoreQuickSelect = true 
+export const AdminLogin: React.FC<LoginWallProps> = ({ 
+  onLoginSuccess, 
+  title = "Selamat Datang", 
+  subtitle = "Silakan login untuk melanjutkan",
+  isHO = false,
+  storeId,
+  showStoreQuickSelect = false
 }) => {
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
-  const [isStoreDropdownOpen, setIsStoreDropdownOpen] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isStoreDropdownOpen, setIsStoreDropdownOpen] = useState(false);
 
-  const filteredStores = STORE_ACCOUNTS.filter(s =>
-    s.name.toLowerCase().includes(username.toLowerCase()) ||
+  const filteredStores = STORE_ACCOUNTS.filter(s => 
+    s.name.toLowerCase().includes(username.toLowerCase()) || 
     s.username.toLowerCase().includes(username.toLowerCase())
   );
 
   const selectedStoreObj = STORE_ACCOUNTS.find(s => s.username.toUpperCase() === username.toUpperCase());
 
+  const loginMock = (role: 'HO_ADMIN' | 'CASHIER' | 'CUSTOMER', stId?: string) => {
+    // Helper function: if login is successful, redirect dynamically
+    onLoginSuccess(role, stId);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
-    const u = username.trim();
+    setError('');
+
+    const u = username.trim().toUpperCase();
     const p = pin.trim();
 
     if (!u || !p) {
-      setError('Silakan masukkan Username dan PIN.');
+      setError('Mohon lengkapi ID Toko dan PIN');
       setIsLoading(false);
       return;
     }
 
-    // Local validation
-    let isHO = false;
-    let storeName = 'Puri Jakarta';
-    let storeId = u;
-
-    if ((u.toLowerCase() === 'admin' || u.toLowerCase() === 'ho') && (p === 'wtc26' || p.toLowerCase() === 'wtc26')) {
-      isHO = true;
-    } else if (!showStoreQuickSelect) {
-      const isStoreAccount = STORE_ACCOUNTS.some(s => s.username.toUpperCase() === u.toUpperCase());
-      if (isStoreAccount) {
-        setError('Akun ini adalah akun Kasir Toko. Silakan masuk melalui portal kasir.');
-        setIsLoading(false);
-        return;
-      }
-      setError('Kredensial Admin Head Office tidak valid atau Anda tidak memiliki hak akses.');
-      setIsLoading(false);
-      return;
+    let isHOUser = false;
+    if (u === 'ADMIN' || u === 'HO' || u === 'ADMINWTC') {
+      isHOUser = true;
     } else {
-      const foundStore = STORE_ACCOUNTS.find(
-        s => s.username.toUpperCase() === u.toUpperCase() && (s.pin === p || s.pin.toUpperCase() === p.toUpperCase())
-      );
-      if (foundStore) {
-        storeName = foundStore.name;
-        storeId = foundStore.username;
-      } else {
-        setError('Login ID (Username) atau PIN toko salah. Silakan periksa dan ketik kembali.');
-        setIsLoading(false);
-        return;
+      const isStoreAccount = STORE_ACCOUNTS.some(s => s.username.toUpperCase() === u);
+      if (!isStoreAccount && !showStoreQuickSelect) {
+         setError('Akun ini adalah akun Kasir Toko. Silakan masuk melalui portal kasir.');
+         setIsLoading(false);
+         return;
+      } else if (!isStoreAccount) {
+         setError('Login ID (Username) toko tidak ditemukan.');
+         setIsLoading(false);
+         return;
       }
     }
 
-    // Call Backend to get Custom Token
     try {
-      const type = isHO ? 'HO' : 'CASHIER';
-      const params = new URLSearchParams({ username: u, pin: p, type, storeId: storeId || '', _t: Date.now().toString() });
-      const response = await fetch('/api/auth/employee-login?' + params.toString(), {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        credentials: 'same-origin'
+      const type = isHOUser ? 'HO' : 'CASHIER';
+      const currentStoreId = storeId || u;
+      
+      const response = await fetch('/api/auth/employee-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ username: u, pin: p, type, storeId: currentStoreId })
       });
       
       const rawText = await response.text();
-      let result;
-      if (rawText.includes('<!doctype html>') || rawText.includes('<html') || rawText.includes('Action required') || !response.ok) {
-         // Proxy interception or network error. Do local fallback mock login for resilient mode.
-         console.warn('Network or proxy error, falling back to local verification', rawText.substring(0, 50));
-         const isHOValid = isHO && (u.toLowerCase() === 'admin' || u.toLowerCase() === 'ho') && p.toLowerCase() === 'wtc26';
-         
-         if (isHOValid) {
-            loginMock('HO_ADMIN', u);
-            setLoading(false);
-            return;
-         } else if (!isHO && p.toUpperCase() === u.toUpperCase() + '2026') {
-            loginMock('CASHIER', storeId || u);
-            setLoading(false);
-            return;
-         } else {
-            setError('Kredensial tidak valid (Mode Offline)');
-            setLoading(false);
-            return;
-         }
-      }
-      try {
-        result = JSON.parse(rawText);
-      } catch (e) {
-        throw new Error(`Server Response Error (HTTP ${response.status} ${response.statusText}): ${rawText || 'Empty Body'}`);
-      }
+      const isIntercepted = rawText.includes('<!doctype html>') || rawText.includes('<html') || rawText.includes('Action required');
       
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Autentikasi ke server gagal');
+      if (!response.ok || isIntercepted) {
+        throw new Error('Network Issue or Proxy Interception');
       }
 
-      // Sign in with Firebase Auth Custom Token
-      if (result.token) {
-        const auth = getAuth();
-        await signInWithCustomToken(auth, result.token);
+      const result = JSON.parse(rawText);
+      if (result.success) {
+        setOfflineMode(false);
+        
+        let finalStoreId = currentStoreId;
+        if (!isHOUser && showStoreQuickSelect) {
+           const foundStore = STORE_ACCOUNTS.find(s => s.username.toUpperCase() === u);
+           if (foundStore) {
+             finalStoreId = foundStore.username;
+           }
+        }
+        
+        loginMock(result.role, finalStoreId);
+      } else {
+        setError(result.error || 'Gagal masuk');
       }
+    } catch (err) {
+      console.warn('Peladen utama tidak dapat dijangkau. Beralih ke verifikasi kriptografi lokal (Secure Offline Mode)...');
       
-      if (!isHO) {
-        try { localStorage.setItem('wtc_cashier_store', storeName); } catch (e) {}
+      try {
+        const hashedInputPin = await hashStringSHA256(p);
+        const targetStoreId = isHOUser ? 'HO' : (storeId || u);
+        
+        const validHashForStore = STORE_PIN_HASHES[targetStoreId];
+        
+        if (validHashForStore && validHashForStore === hashedInputPin) {
+          setOfflineMode(true);
+          const role = isHOUser ? 'HO_ADMIN' : 'CASHIER';
+          
+          let finalStoreId = targetStoreId;
+          if (!isHOUser && showStoreQuickSelect) {
+             const foundStore = STORE_ACCOUNTS.find(s => s.username.toUpperCase() === u);
+             if (foundStore) finalStoreId = foundStore.username;
+          }
+          
+          loginMock(role, finalStoreId);
+        } else {
+          setError('Kredensial tidak valid (Verifikasi Luring Gagal)');
+        }
+      } catch (hashErr) {
+        setError('Terjadi kesalahan sistem saat memverifikasi keamanan (Kriptografi Gagal).');
       }
-      
-      onLogin(u, storeName);
-    } catch (err: any) {
-      setError(err.message || 'Gagal login. Periksa koneksi jaringan.');
     } finally {
       setIsLoading(false);
     }
