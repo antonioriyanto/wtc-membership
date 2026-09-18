@@ -102,7 +102,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
     const cleanDigits = code.replace(/[^0-9]/g, '');
     const found = members.find(m => {
       const mCleanDigits = (m.phone || '').replace(/[^0-9]/g, '');
-      return mCleanDigits.includes(cleanDigits) || m.id.toLowerCase() === code.toLowerCase() || m.name.toLowerCase().includes(code.toLowerCase());
+      return mCleanDigits.includes(cleanDigits) || (m.id || '').toLowerCase() === (code || '').toLowerCase() || (m.name || '').toLowerCase().includes((code || '').toLowerCase());
     });
     if (found) {
       setActiveMember(found);

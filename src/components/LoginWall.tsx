@@ -125,7 +125,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     // Call Backend to get Custom Token
     try {
       const type = isHO ? 'HO' : 'CASHIER';
-      const response = await fetch('/api/auth/employee-login', {
+      const response = await fetch('/api/auth/employee-login?_t=' + Date.now(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: u, pin: p, type, storeId })
@@ -136,7 +136,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       try {
         result = JSON.parse(rawText);
       } catch (e) {
-        throw new Error(`Server returned invalid response: ${rawText || 'Empty Response'}`);
+        throw new Error(`Server Response Error (HTTP ${response.status} ${response.statusText}): ${rawText || 'Empty Body'}`);
       }
       
       if (!response.ok || !result.success) {

@@ -109,7 +109,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       // Safeguard: Check locally first (optimistic check)
       const isDuplicateRecent = transactions.some(t => 
         t.receiptNo && 
-        t.receiptNo.trim().toLowerCase() === receiptNo.trim().toLowerCase() && 
+        (t.receiptNo || '').trim().toLowerCase() === (receiptNo || '').trim().toLowerCase() && 
         t.memberId === member.id
       );
       if (isDuplicateRecent) {
@@ -137,7 +137,13 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
           })
         });
 
-        const result = await response.json();
+        const rawText = await response.text();
+        let result;
+        try {
+          result = JSON.parse(rawText);
+        } catch (parseError) {
+          throw new Error(`Parse Error: ${parseError.message}. Raw: '${rawText}'`);
+        }
         
         if (!response.ok || !result.success) {
           throw new Error(result.error || 'Gagal menambahkan poin melalui backend server');
