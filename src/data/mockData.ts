@@ -2,12 +2,12 @@ import { Member, Transaction, SupportTicket, StoreBranch, LoyaltyConfig, Voucher
 
 export const initialLoyaltyConfig: LoyaltyConfig = {
   pointsPerAmount: 1,
-  amountUnit: 1000,
+  amountUnit: 10000,
   silverThreshold: 5000,
   goldThreshold: 10000,
   platinumThreshold: 30000,
-  goldMultiplier: 1.5,
-  platinumMultiplier: 2.0,
+  goldMultiplier: 1.25,
+  platinumMultiplier: 1.75,
   pointsExpiryDays: 365,
   birthdayBonusMultiplier: 2.0,
   enableWhatsAppNotifications: true,

@@ -41,9 +41,15 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
     );
   }
   const [formData, setFormData] = useState<LoyaltyConfig>({ ...config });
-  const [testSpend, setTestSpend] = useState<number>(3500000);
-  const [testTier, setTestTier] = useState<'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM'>('GOLD');
+  const [testSpend, setTestSpend] = useState<number>(1254000);
+  const [testTier, setTestTier] = useState<'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM'>('BLUE');
   const [isSaved, setIsSaved] = useState(false);
+
+  React.useEffect(() => {
+    if (config) {
+      setFormData(prev => ({ ...prev, ...config }));
+    }
+  }, [config]);
 
   const handleChange = (field: keyof LoyaltyConfig, value: any) => {
     setFormData(prev => {
@@ -52,6 +58,10 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
       if (typeof value === 'boolean') {
         if (typeof onSaveConfig === 'function') onSaveConfig(next);
         if (typeof setConfig === 'function') setConfig(next);
+        try {
+          localStorage.setItem('wtc_loyalty_config', JSON.stringify(next));
+          window.dispatchEvent(new CustomEvent('wtc_loyalty_config_updated', { detail: next }));
+        } catch {}
         setIsSaved(true);
       }
       return next;
@@ -63,17 +73,30 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSaveConfig) onSaveConfig(formData);
-    if (setConfig) setConfig(formData);
+    const sanitizedConfig = {
+      ...formData,
+      amountUnit: Number(formData.amountUnit) > 0 ? Number(formData.amountUnit) : 10000,
+      pointsPerAmount: Number(formData.pointsPerAmount) > 0 ? Number(formData.pointsPerAmount) : 1,
+      goldMultiplier: Number(formData.goldMultiplier) > 0 ? Number(formData.goldMultiplier) : 1.25,
+      platinumMultiplier: Number(formData.platinumMultiplier) > 0 ? Number(formData.platinumMultiplier) : 1.75,
+    };
+    if (onSaveConfig) onSaveConfig(sanitizedConfig);
+    if (setConfig) setConfig(sanitizedConfig);
+    try {
+      localStorage.setItem('wtc_loyalty_config', JSON.stringify(sanitizedConfig));
+      window.dispatchEvent(new CustomEvent('wtc_loyalty_config_updated', { detail: sanitizedConfig }));
+    } catch {}
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 4000);
   };
 
   // Test Points Calculation
-  const basePoints = Math.floor(testSpend / formData.amountUnit) * formData.pointsPerAmount;
+  const unit = Number(formData.amountUnit) > 0 ? Number(formData.amountUnit) : 10000;
+  const perAmount = Number(formData.pointsPerAmount) > 0 ? Number(formData.pointsPerAmount) : 1;
+  const basePoints = Math.floor(testSpend / unit) * perAmount;
   let multiplier = 1.0;
-  if (testTier === 'GOLD') multiplier = formData.goldMultiplier;
-  if (testTier === 'PLATINUM') multiplier = formData.platinumMultiplier;
+  if (testTier === 'GOLD') multiplier = Number(formData.goldMultiplier) || 1.25;
+  if (testTier === 'PLATINUM') multiplier = Number(formData.platinumMultiplier) || 1.75;
   const calculatedPoints = Math.floor(basePoints * multiplier);
 
   return (

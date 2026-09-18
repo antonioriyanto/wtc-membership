@@ -61,11 +61,19 @@ try {
 }
 
 // Calculate Tier function
-const calculateTier = (points: number): 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' => {
-  if (points >= 30000) return 'PLATINUM';
-  if (points >= 10000) return 'GOLD';
-  if (points >= 5000) return 'SILVER';
+const calculateTierWithConfig = (points: number, config?: any): 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' => {
+  const platinumThreshold = Number(config?.platinumThreshold) || 30000;
+  const goldThreshold = Number(config?.goldThreshold) || 10000;
+  const silverThreshold = Number(config?.silverThreshold) || 5000;
+
+  if (points >= platinumThreshold) return 'PLATINUM';
+  if (points >= goldThreshold) return 'GOLD';
+  if (points >= silverThreshold) return 'SILVER';
   return 'BLUE';
+};
+
+const calculateTier = (points: number): 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' => {
+  return calculateTierWithConfig(points);
 };
 
 async function startServer() {
@@ -99,6 +107,103 @@ async function startServer() {
     } catch (err: any) {
       console.error('Upload Error:', err);
       res.status(500).json({ success: false, error: 'Gagal memproses unggahan berkas' });
+    }
+  });
+
+  // Persistent Server-Side Store Management (stores.json)
+  const dataDir = path.join(process.cwd(), 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  const storesFilePath = path.join(dataDir, 'stores.json');
+
+  const getStoredStores = (): any[] => {
+    try {
+      if (fs.existsSync(storesFilePath)) {
+        const raw = fs.readFileSync(storesFilePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (err) {
+      console.error('[Server] Error reading stores.json:', err);
+    }
+    return [];
+  };
+
+  const saveStoredStores = (storesList: any[]): void => {
+    try {
+      fs.writeFileSync(storesFilePath, JSON.stringify(storesList, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('[Server] Error saving stores.json:', err);
+    }
+  };
+
+  // GET /api/stores - Fetch all persisted stores
+  app.get('/api/stores', (_req, res) => {
+    try {
+      const stores = getStoredStores();
+      res.json({ success: true, stores });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // PUT /api/stores/:id - Update single store profile & photo
+  app.put('/api/stores/:id', async (req, res) => {
+    try {
+      const storeId = req.params.id;
+      const storeData = req.body;
+      if (!storeData) {
+        return res.status(400).json({ success: false, error: 'Store payload required' });
+      }
+
+      const currentStores = getStoredStores();
+      const idx = currentStores.findIndex((s: any) => s && (String(s.id) === String(storeId) || String(s.code) === String(storeId)));
+      let updatedList: any[];
+      if (idx >= 0) {
+        currentStores[idx] = { ...currentStores[idx], ...storeData };
+        updatedList = currentStores;
+      } else {
+        updatedList = [storeData, ...currentStores];
+      }
+      saveStoredStores(updatedList);
+
+      // Also attempt Firebase Admin Firestore sync if available
+      if (db) {
+        try {
+          await db.collection('stores').doc(String(storeId)).set(storeData, { merge: true });
+        } catch (fErr: any) {
+          console.warn('[Server] Firebase Admin stores sync notice:', fErr.message);
+        }
+      }
+
+      res.json({ success: true, store: storeData });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // POST /api/stores/sync-all - Seed or bulk-sync store collection
+  app.post('/api/stores/sync-all', (req, res) => {
+    try {
+      const storesList = req.body?.stores;
+      if (Array.isArray(storesList) && storesList.length > 0) {
+        const existing = getStoredStores();
+        const existingMap = new Map(existing.map((s: any) => [s.id, s]));
+        const merged = storesList.map((s: any) => {
+          const prev = existingMap.get(s.id);
+          // Preserve custom uploaded photo if incoming has empty photo
+          if (prev && prev.imageUrl && !s.imageUrl) {
+            return { ...s, imageUrl: prev.imageUrl };
+          }
+          return s;
+        });
+        saveStoredStores(merged);
+        return res.json({ success: true, count: merged.length });
+      }
+      res.status(400).json({ success: false, error: 'Invalid stores array' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
     }
   });
 
@@ -159,12 +264,39 @@ async function startServer() {
       const storeId = req.body?.storeId || req.query?.storeId;
       const storeName = req.body?.storeName || req.query?.storeName;
       const cashierName = req.body?.cashierName || req.query?.cashierName;
+      const passedConfig = req.body?.loyaltyConfig;
 
       if (!memberId || !amount || !receiptNo) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
       const numericAmount = Number(amount) || 0;
+
+      // Determine dynamic loyalty configuration from request or Firestore
+      let activeConfig = passedConfig || null;
+      if (!activeConfig && db) {
+        try {
+          const configSnap = await db.collection('config').doc('loyalty').get();
+          if (configSnap.exists) {
+            activeConfig = configSnap.data();
+          }
+        } catch (cErr: any) {
+          console.warn('Could not read config/loyalty from DB:', cErr?.message);
+        }
+      }
+
+      const amountUnit = Number(activeConfig?.amountUnit) > 0 ? Number(activeConfig.amountUnit) : 10000;
+      const pointsPerAmount = Number(activeConfig?.pointsPerAmount) > 0 ? Number(activeConfig.pointsPerAmount) : 1;
+      const goldMultiplier = Number(activeConfig?.goldMultiplier) > 0 ? Number(activeConfig.goldMultiplier) : 1.25;
+      const platinumMultiplier = Number(activeConfig?.platinumMultiplier) > 0 ? Number(activeConfig.platinumMultiplier) : 1.75;
+
+      const calcPointsForTier = (amt: number, tier: string): number => {
+        const base = Math.floor(amt / amountUnit) * pointsPerAmount;
+        let mult = 1.0;
+        if (tier === 'PLATINUM') mult = platinumMultiplier;
+        else if (tier === 'GOLD') mult = goldMultiplier;
+        return Math.max(0, Math.floor(base * mult));
+      };
 
       // When Firebase Admin SDK is available, perform atomic server transaction
       if (db) {
@@ -190,12 +322,8 @@ async function startServer() {
               throw new Error('Duplicate receipt: Nomor struk ini sudah ditukarkan.');
             }
 
-            // 3. Calculate points
-            let multiplier = 1.0;
-            if (memberData?.tier === 'PLATINUM') multiplier = 2.0;
-            else if (memberData?.tier === 'GOLD') multiplier = 1.5;
-
-            const calculatedPoints = Math.max(1, Math.floor(Math.floor(numericAmount / 1000) * multiplier));
+            // 3. Calculate points according to HO Admin loyalty settings
+            const calculatedPoints = calcPointsForTier(numericAmount, memberData?.tier || 'BLUE');
             
             const currentPoints = typeof memberData?.points === 'number' ? memberData.points : 0;
             const currentLifetime = typeof memberData?.lifetimePoints === 'number' ? memberData.lifetimePoints : 0;
@@ -204,7 +332,7 @@ async function startServer() {
             const newPoints = currentPoints + calculatedPoints;
             const newLifetime = currentLifetime + calculatedPoints;
             const newTotalSpend = currentTotalSpend + numericAmount;
-            const newTier = calculateTier(newPoints);
+            const newTier = calculateTierWithConfig(newPoints, activeConfig);
 
             // 4. Create Transaction Record
             const transactionId = 'tx_' + Date.now();
@@ -265,7 +393,7 @@ async function startServer() {
 
       // Resilient computation fallback when Admin SDK is unavailable or skipped:
       // Compute deterministic points so the frontend can display and persist via client-side Firestore SDK
-      const calculatedPoints = Math.max(1, Math.floor(numericAmount / 1000));
+      const calculatedPoints = calcPointsForTier(numericAmount, 'BLUE');
       const transactionId = 'tx_' + Date.now();
       const transactionData = {
         id: transactionId,
@@ -288,7 +416,7 @@ async function startServer() {
         data: {
           calculatedPoints,
           newPoints: calculatedPoints,
-          newTier: calculateTier(calculatedPoints),
+          newTier: calculateTierWithConfig(calculatedPoints, activeConfig),
           transactionData
         }
       });

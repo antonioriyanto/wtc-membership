@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, Search, Plus, Barcode, Camera, ShoppingCart, List, Tag, CheckCircle, AlertTriangle, KeyRound, ShieldAlert } from 'lucide-react';
-import { Member, Transaction, StoreBranch } from '../types';
+import { Member, Transaction, StoreBranch, LoyaltyConfig } from '../types';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { TierBadge } from '../utils/tierBadge';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -8,9 +8,11 @@ import { CashierPinResetModal } from './CashierPinResetModal';
 import { Portal } from './Portal';
 import { PosType } from '../lib/storeMapping';
 import { ReceiptInput } from './ReceiptInput';
+import { calculateEarnedPoints, getTierMultiplier, getLoyaltyConfig } from '../lib/loyalty';
 
 interface CashierTabProps {
   isSubmitting?: boolean;
+  loyaltyConfig?: LoyaltyConfig;
   members: Member[];
   transactions: Transaction[];
   currentStore?: StoreBranch;
@@ -24,6 +26,7 @@ interface CashierTabProps {
 }
 
 export const CashierTab: React.FC<CashierTabProps> = ({ 
+  loyaltyConfig,
   members, 
   transactions, 
   currentStore, 
@@ -79,14 +82,43 @@ export const CashierTab: React.FC<CashierTabProps> = ({
     }, 3000);
   };
 
+  // Dynamic loyalty configuration synchronized with Admin Head Office
+  const [syncedConfig, setSyncedConfig] = useState<LoyaltyConfig>(() => loyaltyConfig || getLoyaltyConfig());
+
+  useEffect(() => {
+    if (loyaltyConfig) {
+      setSyncedConfig(loyaltyConfig);
+    }
+  }, [loyaltyConfig]);
+
+  useEffect(() => {
+    const handleConfigUpdate = (e: any) => {
+      if (e?.detail) {
+        setSyncedConfig(e.detail);
+      } else {
+        setSyncedConfig(getLoyaltyConfig());
+      }
+    };
+    window.addEventListener('wtc_loyalty_config_updated', handleConfigUpdate);
+    window.addEventListener('storage', handleConfigUpdate);
+    return () => {
+      window.removeEventListener('wtc_loyalty_config_updated', handleConfigUpdate);
+      window.removeEventListener('storage', handleConfigUpdate);
+    };
+  }, []);
+
   const parsedAmount = parseInt(amountInput.replace(/\./g, '')) || 0;
   
-  let multiplier = 1.0;
-  if (activeMember) {
-    if (activeMember.tier === 'PLATINUM') multiplier = 2.0;
-    else if (activeMember.tier === 'GOLD') multiplier = 1.5;
-  }
-  const estimatedPoints = Math.floor(Math.floor(parsedAmount / 1000) * multiplier);
+  const estimatedPoints = calculateEarnedPoints(
+    parsedAmount,
+    activeMember?.tier || 'BLUE',
+    syncedConfig
+  );
+
+  const multiplier = getTierMultiplier(
+    activeMember?.tier || 'BLUE',
+    syncedConfig
+  );
 
 
   const performSearch = (val: string) => {
@@ -483,8 +515,15 @@ export const CashierTab: React.FC<CashierTabProps> = ({
           </div>
         </div>
 
-        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 text-center my-4 bg-emerald-50 dark:bg-emerald-950/30 py-2 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
-          +{estimatedPoints.toLocaleString('id-ID')} Pts
+        <div className="bg-emerald-50 dark:bg-emerald-950/30 py-2.5 px-3 rounded-xl border border-emerald-100 dark:border-emerald-900/50 my-4 text-center">
+          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            +{estimatedPoints.toLocaleString('id-ID')} Pts
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-emerald-800/80 dark:text-emerald-300/80 font-medium mt-1">
+            <span>Aturan HO: Rp {(syncedConfig.amountUnit || 10000).toLocaleString('id-ID')} = {syncedConfig.pointsPerAmount || 1} Pt</span>
+            <span>&bull;</span>
+            <span>Rate Tier {activeMember?.tier || 'BLUE'}: {multiplier}x</span>
+          </div>
         </div>
 
         <div className="flex gap-3">

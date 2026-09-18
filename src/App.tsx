@@ -240,12 +240,51 @@ export default function App() {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
           const { diamondThreshold, blackThreshold, diamondMultiplier, blackMultiplier, ...clean } = parsed;
-          return { ...initialLoyaltyConfig, ...clean };
+          const effectiveAmountUnit = (!clean.amountUnit || clean.amountUnit === 1000) ? 10000 : clean.amountUnit;
+          const effectiveGoldMultiplier = (!clean.goldMultiplier || clean.goldMultiplier === 1.5) ? 1.25 : clean.goldMultiplier;
+          const effectivePlatinumMultiplier = (!clean.platinumMultiplier || clean.platinumMultiplier === 2.0) ? 1.75 : clean.platinumMultiplier;
+          return { 
+            ...initialLoyaltyConfig, 
+            ...clean,
+            amountUnit: Number(effectiveAmountUnit) || 10000,
+            pointsPerAmount: Number(clean.pointsPerAmount) || 1,
+            goldMultiplier: Number(effectiveGoldMultiplier) || 1.25,
+            platinumMultiplier: Number(effectivePlatinumMultiplier) || 1.75,
+          };
         }
       }
     } catch {}
     return initialLoyaltyConfig;
   });
+
+  const handleSaveLoyaltyConfig = async (newConfig: LoyaltyConfig) => {
+    setLoyaltyConfig(newConfig);
+    try {
+      localStorage.setItem('wtc_loyalty_config', JSON.stringify(newConfig));
+      window.dispatchEvent(new CustomEvent('wtc_loyalty_config_updated', { detail: newConfig }));
+    } catch {}
+
+    try {
+      await safeSetDoc('config', 'loyalty', newConfig);
+    } catch (err) {
+      console.warn("Could not save loyalty config to Firestore:", err);
+    }
+
+    const logId = 'al-cfg-' + Date.now();
+    const newLog: AuditLog = {
+      id: logId,
+      timestamp: new Date().toISOString(),
+      actorName: 'Head Office Admin',
+      actorRole: 'HO_ADMIN',
+      performedBy: 'Head Office Admin',
+      action: 'UPDATE_LOYALTY_RULES',
+      details: `Aturan loyalitas disinkronkan ke seluruh kasir: Rp ${(newConfig.amountUnit || 10000).toLocaleString('id-ID')} = ${newConfig.pointsPerAmount || 1} Pt, Gold: ${newConfig.goldMultiplier}x, Platinum: ${newConfig.platinumMultiplier}x`,
+      module: 'LOYALTY',
+      ipAddress: '10.12.4.99'
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+    safeSetDoc('audit', logId, newLog).catch(() => {});
+  };
 
   // Support Tickets State with LocalStorage Persistence
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
@@ -1040,7 +1079,12 @@ export default function App() {
                   />
                 )}
                 {activeTab === 'loyalty' && (
-                  <LoyaltyRulesTab config={loyaltyConfig} setConfig={setLoyaltyConfig} isSkeletonLoading={isRefreshingData} />
+                  <LoyaltyRulesTab 
+                    config={loyaltyConfig} 
+                    setConfig={setLoyaltyConfig} 
+                    onSaveConfig={handleSaveLoyaltyConfig}
+                    isSkeletonLoading={isRefreshingData} 
+                  />
                 )}
                 {activeTab === 'vouchers' && (
                   <VouchersTab 

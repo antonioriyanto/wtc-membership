@@ -59,7 +59,16 @@ export function cleanAndEnrichStore(rawStore: any): StoreBranch {
   };
 
   const isValidImage = (img: any): boolean => {
-    return typeof img === 'string' && (img.startsWith('http') || img.startsWith('data:image')) && img.length > 15;
+    if (!img || typeof img !== 'string') return false;
+    const trimmed = img.trim();
+    return (
+      trimmed.startsWith('http://') || 
+      trimmed.startsWith('https://') || 
+      trimmed.startsWith('data:image/') || 
+      trimmed.startsWith('/uploads/') || 
+      trimmed.startsWith('./uploads/') ||
+      trimmed.startsWith('/')
+    ) && trimmed.length >= 3;
   };
 
   // If this store belongs to the official 42 Watch Club branches, strictly enforce the master Nama Cabang and metadata!
@@ -170,13 +179,22 @@ export async function syncOfficialStoresToFirestore(force = false) {
       const batch = writeBatch(db);
       initialStores.forEach(s => {
         let storeToSync = { ...s };
+        // 1. Check if Firestore already has a customized image
+        const existingDoc = snap.docs.find(d => d.id === s.id || d.data()?.code === s.code);
+        if (existingDoc) {
+          const docData = existingDoc.data();
+          if (docData?.imageUrl && docData.imageUrl !== s.imageUrl) {
+            storeToSync.imageUrl = docData.imageUrl;
+          }
+        }
+        // 2. Check if localStorage has a customized image
         try {
           const raw = localStorage.getItem('wtc_stores');
           if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
               const existing = parsed.find((item: any) => item.id === s.id || item.code === s.code);
-              if (existing && existing.imageUrl && (existing.imageUrl.startsWith('data:image/') || existing.imageUrl !== s.imageUrl)) {
+              if (existing && existing.imageUrl && existing.imageUrl !== s.imageUrl) {
                 storeToSync.imageUrl = existing.imageUrl;
               }
             }
@@ -414,9 +432,11 @@ export function setupFirestoreListeners(callbacks: any) {
 
   const unsubConfig = onSnapshot(doc(db, 'config', 'loyalty'), (docSnap) => {
     if (docSnap.exists()) {
-      callbacks.setLoyaltyConfig(docSnap.data());
+      const data = docSnap.data();
+      callbacks.setLoyaltyConfig(data);
       try {
-        localStorage.setItem('wtc_loyalty_config', JSON.stringify(docSnap.data()));
+        localStorage.setItem('wtc_loyalty_config', JSON.stringify(data));
+        window.dispatchEvent(new CustomEvent('wtc_loyalty_config_updated', { detail: data }));
       } catch {}
     }
   }, (error) => {

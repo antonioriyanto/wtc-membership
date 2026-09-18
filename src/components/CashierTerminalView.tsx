@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Member, Transaction, StoreBranch, Voucher, LoyaltyConfig } from '../types';
-import { calculateTier } from '../lib/loyalty';
+import { calculateTier, calculateEarnedPoints, getLoyaltyConfig } from '../lib/loyalty';
 import { CashierSidebar } from './CashierSidebar';
 import { CashierSupportTicketsTab } from './CashierSupportTicketsTab';
 import { CashierHeader } from './CashierHeader';
@@ -117,6 +117,8 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
         return;
       }
 
+      const effectiveConfig = loyaltyConfig || getLoyaltyConfig();
+
       // CALLING SECURE SERVER-SIDE BACKEND API
       let savedTrx;
       let updatedMember;
@@ -134,7 +136,8 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
             receiptNo: receiptNo || '',
             storeId: currentStore?.id || currentStore?.code || 'PUR',
             storeName: currentStore?.name || 'Puri Jakarta',
-            cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`
+            cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
+            loyaltyConfig: effectiveConfig
           })
         });
 
@@ -144,20 +147,19 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
         if (rawText.includes('<!doctype html>') || rawText.includes('<html') || rawText.includes('Action required') || !response.ok) {
            console.warn('Network or proxy error, falling back to local verification for points', rawText.substring(0, 50));
            
-           // LOCAL CALCULATION FALLBACK
+           // LOCAL CALCULATION FALLBACK WITH DYNAMIC LOYALTY RULES
            const numericAmount = Number(amount) || 0;
-           let multiplier = 1.0;
-           if (member?.tier === 'PLATINUM') multiplier = 2.0;
-           else if (member?.tier === 'GOLD') multiplier = 1.5;
-           const calculatedPoints = Math.max(1, Math.floor(Math.floor(numericAmount / 1000) * multiplier));
+           const calculatedPoints = calculateEarnedPoints(numericAmount, member?.tier || 'BLUE', effectiveConfig);
+           const newPoints = (member?.points || 0) + calculatedPoints;
+           const newTier = calculateTier(newPoints, effectiveConfig);
            
            result = {
              success: true,
              isFallback: true,
              data: {
                calculatedPoints,
-               newPoints: (member?.points || 0) + calculatedPoints,
-               newTier: member?.tier,
+               newPoints,
+               newTier,
                transactionData: {
                  id: 'tx_local_' + Date.now(),
                  receiptNo: receiptNo.trim(),
@@ -455,6 +457,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
         <div className="p-4 md:p-6 lg:p-8 flex-1 w-full max-w-full lg:max-w-[1440px] xl:max-w-[1560px] ml-0 mr-auto transition-all">
           {activeTab === 'cashier' && (
             <CashierTab 
+              loyaltyConfig={loyaltyConfig}
               isSubmitting={isSubmitting}
               members={members}
               stores={stores}
