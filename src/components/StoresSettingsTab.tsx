@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StoreBranch } from '../types';
 import { initialStores } from '../data/mockData';
-import { cleanAndEnrichStore, syncOfficialStoresToFirestore } from '../lib/syncFirestore';
+import { cleanAndEnrichStore, syncOfficialStoresToFirestore, safeSetDoc } from '../lib/syncFirestore';
 import { useCustomDialog } from './CustomDialogProvider';
 import { compressImage } from '../lib/image-compressor';
 import { 
@@ -163,8 +163,9 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
     if (!file) return;
     setIsUploading(true);
     try {
-      const compressedBase64 = await compressImage(file, 1200, 800, 0.9);
-      setFormData({ ...formData, imageUrl: compressedBase64 });
+      // Compress to optimal dimensions (<60KB) to ensure rapid loading and avoid 1MB document limit
+      const compressedBase64 = await compressImage(file, 800, 600, 0.75);
+      setFormData(prev => ({ ...prev, imageUrl: compressedBase64 }));
       showAlert('Gambar cabang berhasil diunggah dan dikompres.', 'Sukses', 'success');
     } catch (err) {
       console.error('Error compressing image:', err);
@@ -208,26 +209,32 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
           longitude: formData.longitude
         };
         
+        await safeSetDoc('stores', created.id, created);
+        const newStores = [created, ...stores];
+        setStores(newStores);
         try {
-          await setDoc(doc(db, 'stores', created.id), created);
-          setStores([created, ...stores]);
-          showAlert('Cabang baru berhasil disimpan.', 'Sukses', 'success');
-        } catch (err) {
-          console.error('Failed to create store in Firestore', err);
-          setStores([created, ...stores]);
-        }
+          localStorage.setItem('wtc_stores', JSON.stringify(newStores));
+        } catch {}
+        showAlert('Cabang baru berhasil disimpan.', 'Sukses', 'success');
       } else if (mode === 'edit' && editingStoreId) {
-        const updatedData = { ...stores.find(s => s.id === editingStoreId), ...formData } as StoreBranch;
+        const existingStore = stores.find(s => s.id === editingStoreId);
+        const updatedData: StoreBranch = cleanAndEnrichStore({
+          ...existingStore,
+          ...formData,
+          id: editingStoreId
+        });
         
+        await safeSetDoc('stores', updatedData.id, updatedData);
+        const newStores = stores.map(s => s.id === editingStoreId ? updatedData : s);
+        setStores(newStores);
         try {
-          await setDoc(doc(db, 'stores', updatedData.id), updatedData);
-          setStores(stores.map(s => s.id === editingStoreId ? updatedData : s));
-          showAlert('Perubahan cabang berhasil disimpan.', 'Sukses', 'success');
-        } catch (err) {
-          console.error('Failed to update store in Firestore', err);
-          setStores(stores.map(s => s.id === editingStoreId ? updatedData : s));
-        }
+          localStorage.setItem('wtc_stores', JSON.stringify(newStores));
+        } catch {}
+        showAlert(`Perubahan cabang ${updatedData.name} berhasil disimpan.`, 'Sukses', 'success');
       }
+    } catch (err: any) {
+      console.error('Failed to save store in Firestore/Storage', err);
+      showAlert('Gagal menyimpan perubahan cabang: ' + (err?.message || err), 'Peringatan', 'warning');
     } finally {
       setIsSaving(false);
       setMode('list');
@@ -248,7 +255,11 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
         } catch (err) {
           console.error('Failed to delete store', err);
         }
-        setStores(stores.filter(s => s.id !== id));
+        const newStores = stores.filter(s => s.id !== id);
+        setStores(newStores);
+        try {
+          localStorage.setItem('wtc_stores', JSON.stringify(newStores));
+        } catch {}
         if (selectedDetailStore?.id === id) {
           setSelectedDetailStore(null);
         }
@@ -706,17 +717,33 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
 
                       {/* Store Name & Mall */}
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-neutral-900 dark:text-white text-sm group-hover:text-neutral-950 dark:group-hover:text-neutral-100 transition-colors">
-                          {store.name}
-                        </div>
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5 mt-0.5">
-                          <span>{store.mallName}</span>
-                          {store.floorUnit && (
-                            <>
-                              <span className="text-neutral-300 dark:text-neutral-600">•</span>
-                              <span>{store.floorUnit}</span>
-                            </>
+                        <div className="flex items-center gap-3">
+                          {store.imageUrl ? (
+                            <img 
+                              src={store.imageUrl} 
+                              alt={store.name} 
+                              className="w-10 h-10 rounded-xl object-cover shrink-0 border border-neutral-200 dark:border-neutral-700 bg-neutral-100" 
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center justify-center shrink-0 text-neutral-400">
+                              <Store className="w-4 h-4" />
+                            </div>
                           )}
+                          <div className="min-w-0">
+                            <div className="font-semibold text-neutral-900 dark:text-white text-sm group-hover:text-neutral-950 dark:group-hover:text-neutral-100 transition-colors truncate">
+                              {store.name}
+                            </div>
+                            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5 mt-0.5 truncate">
+                              <span>{store.mallName}</span>
+                              {store.floorUnit && (
+                                <>
+                                  <span className="text-neutral-300 dark:text-neutral-600">•</span>
+                                  <span>{store.floorUnit}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
 

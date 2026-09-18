@@ -8,7 +8,7 @@ import { signInWithCustomToken } from 'firebase/auth';
 import { db, auth } from './firebase';
 import { hashPin, verifyPin } from './pinCrypto';
 import { toE164, isAccountLocked, CanonicalMemberDocument } from './canonicalMember';
-import { findMemberByPhoneInFirestore, safeSetDoc } from './syncFirestore';
+import { findMemberByPhoneInFirestore, safeSetDoc, cleanForFirestore, isSamePhoneNumber } from './syncFirestore';
 
 export interface PrecheckResult {
   exists: boolean;
@@ -194,16 +194,30 @@ export async function setCustomerPinClient(params: {
   }
 
   const memberRef = doc(db, 'members', member.id);
-  await updateDoc(memberRef, updatedData).catch(async (err) => {
-    console.warn('Failed to update member in Firestore (rules restriction):', err);
-    try {
-      await safeSetDoc('members', member.id, updatedData).catch(err2 => {
-        console.warn('safeSetDoc also failed:', err2);
-      });
-    } catch(err3) {
-       console.warn('safeSetDoc block threw:', err3);
+  const sanitized = cleanForFirestore(updatedData);
+
+  // Synchronize to localStorage immediately for seamless offline/reconnect state
+  try {
+    const raw = localStorage.getItem('wtc_members');
+    let list: any[] = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) list = [];
+    const idx = list.findIndex(m => m && (m.id === member.id || (m.phone && isSamePhoneNumber(m.phone, member.phone))));
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...sanitized };
+    } else {
+      list = [sanitized, ...list];
     }
-  });
+    localStorage.setItem('wtc_members', JSON.stringify(list));
+  } catch (localErr) {
+    console.warn('Could not save PIN to local storage:', localErr);
+  }
+
+  try {
+    await updateDoc(memberRef, sanitized);
+  } catch (err) {
+    console.warn('updateDoc notice for setCustomerPinClient, using safeSetDoc fallback:', err);
+    await safeSetDoc('members', member.id, sanitized);
+  }
 
   return updatedData as CanonicalMemberDocument;
 }
@@ -292,16 +306,30 @@ export async function resetPinViaGoogleAuthClient(params: {
   };
 
   const memberRef = doc(db, 'members', member.id);
-  await updateDoc(memberRef, updatedData).catch(async (err) => {
-    console.warn('Failed to update member in Firestore (rules restriction):', err);
-    try {
-      await safeSetDoc('members', member.id, updatedData).catch(err2 => {
-        console.warn('safeSetDoc also failed:', err2);
-      });
-    } catch(err3) {
-       console.warn('safeSetDoc block threw:', err3);
+  const sanitized = cleanForFirestore(updatedData);
+
+  // Synchronize to localStorage immediately for instant offline/portal sync
+  try {
+    const raw = localStorage.getItem('wtc_members');
+    let list: any[] = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) list = [];
+    const idx = list.findIndex(m => m && (m.id === member.id || (m.phone && isSamePhoneNumber(m.phone, member.phone))));
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...sanitized };
+    } else {
+      list = [sanitized, ...list];
     }
-  });
+    localStorage.setItem('wtc_members', JSON.stringify(list));
+  } catch (localErr) {
+    console.warn('Could not save member to local storage:', localErr);
+  }
+
+  try {
+    await updateDoc(memberRef, sanitized);
+  } catch (err) {
+    console.warn('updateDoc notice for resetPinViaGoogleAuthClient, using safeSetDoc fallback:', err);
+    await safeSetDoc('members', member.id, sanitized);
+  }
 
   // 4. Commit immutable audit log to /audit_logs and /audit
   const auditId = `audit_rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -407,16 +435,30 @@ export async function cashierAssistedPinResetClient(params: {
     updatedAt: nowIso
   };
 
-  await updateDoc(memberRef, updatedData).catch(async (err) => {
-    console.warn('Failed to update member in Firestore (rules restriction):', err);
-    try {
-      await safeSetDoc('members', member.id, updatedData).catch(err2 => {
-        console.warn('safeSetDoc also failed:', err2);
-      });
-    } catch(err3) {
-       console.warn('safeSetDoc block threw:', err3);
+  const sanitized = cleanForFirestore(updatedData);
+
+  // Synchronize to localStorage immediately for instant offline/cashier sync
+  try {
+    const raw = localStorage.getItem('wtc_members');
+    let list: any[] = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) list = [];
+    const idx = list.findIndex(m => m && (m.id === member.id || (m.phone && isSamePhoneNumber(m.phone, member.phone))));
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...sanitized };
+    } else {
+      list = [sanitized, ...list];
     }
-  });
+    localStorage.setItem('wtc_members', JSON.stringify(list));
+  } catch (localErr) {
+    console.warn('Could not save member to local storage:', localErr);
+  }
+
+  try {
+    await updateDoc(memberRef, sanitized);
+  } catch (err) {
+    console.warn('updateDoc notice for cashierAssistedPinResetClient, using safeSetDoc fallback:', err);
+    await safeSetDoc('members', member.id, sanitized);
+  }
 
   // Record immutable audit log
   const auditId = `audit_csh_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

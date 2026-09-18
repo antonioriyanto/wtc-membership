@@ -169,7 +169,20 @@ export async function syncOfficialStoresToFirestore(force = false) {
       console.log('[Firestore] Syncing official 42 Watch Club branches to Firestore with canonical Nama Cabang...');
       const batch = writeBatch(db);
       initialStores.forEach(s => {
-        batch.set(doc(db, 'stores', s.id), cleanForFirestore(s), { merge: true });
+        let storeToSync = { ...s };
+        try {
+          const raw = localStorage.getItem('wtc_stores');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const existing = parsed.find((item: any) => item.id === s.id || item.code === s.code);
+              if (existing && existing.imageUrl && (existing.imageUrl.startsWith('data:image/') || existing.imageUrl !== s.imageUrl)) {
+                storeToSync.imageUrl = existing.imageUrl;
+              }
+            }
+          }
+        } catch {}
+        batch.set(doc(db, 'stores', s.id), cleanForFirestore(storeToSync), { merge: true });
       });
       await batch.commit();
       console.log('[Firestore] Successfully updated official 42 stores.');
@@ -257,6 +270,12 @@ export async function findMemberByPhoneInFirestore(phone: string): Promise<any |
     }
   } catch {}
 
+  // 4. Fallback to initial base members
+  try {
+    const foundInitial = initialMembers.find((m: any) => m.phone && isSamePhoneNumber(m.phone, normalized));
+    if (foundInitial) return foundInitial;
+  } catch {}
+
   return null;
 }
 
@@ -274,15 +293,57 @@ export async function findMemberByGoogleUidInFirestore(uid: string): Promise<any
       return { id: d.id, ...d.data() };
     }
   } catch (err) {
-    console.error("Error querying member by googleUid in Firestore:", err);
+    console.warn("Notice querying member by googleUid in Firestore:", err);
   }
+
+  // Fallback to local storage members
+  try {
+    const saved = localStorage.getItem('wtc_members');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        const found = parsed.find((m: any) => m.googleUid === uid || (Array.isArray(m.linkedAuthUids) && m.linkedAuthUids.includes(uid)));
+        if (found) return found;
+      }
+    }
+  } catch {}
+
   return null;
 }
 
 export async function safeSetDoc(collectionName: string, docId: string, data: any) {
   const sanitized = cleanForFirestore(data);
-  await setDoc(doc(db, collectionName, String(docId)), sanitized).catch(e => {
-    console.warn("safeSetDoc ignored error:", e.message);
+
+  // Synchronously update local cache so any changes (e.g. uploaded store photo, edited member info)
+  // are guaranteed to persist instantly and stay across views / refreshes
+  try {
+    const storageKey = collectionName === 'stores' ? 'wtc_stores' 
+      : collectionName === 'members' ? 'wtc_members' 
+      : collectionName === 'vouchers' ? 'wtc_vouchers' 
+      : collectionName === 'transactions' ? 'wtc_transactions' 
+      : collectionName === 'campaigns' ? 'wtc_campaigns' 
+      : collectionName === 'audit' || collectionName === 'audit_logs' ? 'wtc_audit_logs'
+      : null;
+
+    if (storageKey) {
+      const existing = localStorage.getItem(storageKey);
+      let list: any[] = existing ? JSON.parse(existing) : [];
+      if (!Array.isArray(list)) list = [];
+      const idx = list.findIndex(item => item && (item.id === docId || (sanitized.id && item.id === sanitized.id) || (sanitized.code && item.code === sanitized.code)));
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...sanitized };
+      } else {
+        list = [sanitized, ...list];
+      }
+      localStorage.setItem(storageKey, JSON.stringify(list));
+    }
+  } catch (localErr) {
+    console.warn("safeSetDoc local sync notice:", localErr);
+  }
+
+  // Attempt Firestore persistence with catch to prevent unhandled rejections
+  await setDoc(doc(db, collectionName, String(docId)), sanitized, { merge: true }).catch(e => {
+    console.warn(`safeSetDoc (${collectionName}/${docId}) Firestore sync notice:`, e.message);
   });
   return sanitized;
 }
