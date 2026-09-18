@@ -133,6 +133,17 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       
       const rawText = await response.text();
       let result;
+      if (rawText.includes('<!doctype html>') || rawText.includes('<html') || rawText.includes('Action required')) {
+         if ('serviceWorker' in navigator) {
+           navigator.serviceWorker.getRegistrations().then(function(regs) {
+             for (let r of regs) r.unregister();
+             window.location.reload();
+           });
+         } else {
+           window.location.reload();
+         }
+         return;
+      }
       try {
         result = JSON.parse(rawText);
       } catch (e) {

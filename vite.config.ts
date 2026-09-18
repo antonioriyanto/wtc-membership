@@ -13,7 +13,8 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon-32x32.png', 'favicon-16x16.png', 'apple-touch-icon.png', 'watch-club-icon.svg'],
         workbox: {
-          maximumFileSizeToCacheInBytes: 5000000 // 5 MB
+          maximumFileSizeToCacheInBytes: 5000000, // 5 MB
+          navigateFallbackDenylist: [/\/api\//]
         },
         manifest: {
           name: 'Watch Club Membership',
