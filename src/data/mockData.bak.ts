@@ -1,4 +1,4 @@
-import { Member, Transaction, SupportTicket, StoreBranch, LoyaltyConfig, Voucher, Campaign, AuditLog } from '../types';
+import { Member, Transaction, SupportTicket, Voucher, Campaign, AuditLog } from '../types';
 
 export const initialLoyaltyConfig: any = {
   

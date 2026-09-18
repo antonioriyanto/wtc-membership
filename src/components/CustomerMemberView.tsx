@@ -1,6 +1,7 @@
 import { initialStores } from "../data/mockData";
 import { cleanAndEnrichStore } from "../lib/syncFirestore";
 import { StoreCard } from "./StoreCard";
+import { MembershipCard } from "./MembershipCard";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Member, Voucher, StoreBranch, Transaction, Campaign, SupportTicket } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';

@@ -101,7 +101,6 @@ export interface Member {
   gender: 'Pria' | 'Wanita';
   birthDate?: string;
   address?: string;
-  avatarUrl?: string;
   status: 'ACTIVE' | 'SUSPENDED';
 
   // Cryptographic Credential & Recovery Attributes

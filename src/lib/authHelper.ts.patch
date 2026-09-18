@@ -1,0 +1,15 @@
+export async function hashStringSHA256(text: string): Promise<string> {
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+    } catch (e) {
+      console.warn('crypto.subtle failed, falling back to pure JS');
+    }
+  }
+  return pureJsSha256(text);
+}

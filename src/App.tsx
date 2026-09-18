@@ -721,7 +721,7 @@ export default function App() {
             vouchers={vouchers}
             setVouchers={setVouchers}
             supportTickets={supportTickets}
-            setSupportTickets={setSupportTickets}
+            
             onSubmitTicket={handleCashierSubmitTicket}
             stores={stores}
             currentStore={
@@ -771,7 +771,7 @@ export default function App() {
           />
         ) : (
           <AdminLogin 
-            onLogin={(user, storeIdentifier) => {
+            onLoginSuccess={(user, storeIdentifier) => {
               let finalStoreName = storeIdentifier;
               
               // Find the exact matching store based on the username that just logged in
@@ -808,7 +808,7 @@ export default function App() {
       <Route path="/member" element={
         loggedInMemberId ? (
           <CustomerMemberView 
-            member={members.find(m => m.id === loggedInMemberId) || members[0] || { id: loggedInMemberId || 'guest', name: 'Member', phone: '', membershipId: 'WTC-000000', points: 0, tier: 'SILVER', registeredAt: new Date().toISOString() }}
+            member={members.find(m => m.id === loggedInMemberId) || members[0] || { id: loggedInMemberId || 'guest', name: 'Member', phone: '', membershipId: 'WTC-000000', points: 0, tier: 'SILVER', joinDate: new Date().toISOString(), registeredStore: 'Puri Jakarta', lastStoreVisited: 'Puri Jakarta', lastVisitDate: new Date().toISOString(), email: '', lifetimePoints: 0, totalSpend: 0 }}
             vouchers={vouchers}
             stores={stores}
             transactions={transactions}
@@ -824,7 +824,7 @@ export default function App() {
         ) : (
           <MemberLogin 
             members={members}
-            onLogin={(id, memberObj) => {
+            onLoginSuccess={(id, memberObj) => {
               if (memberObj) {
                 setMembers(prev => {
                   const exists = prev.some(m => m.id === memberObj.id);
@@ -1288,7 +1288,7 @@ export default function App() {
           </div>
         ) : (
           <AdminLogin 
-            onLogin={() => setAdminAuthenticated(true)} 
+            onLoginSuccess={() => setAdminAuthenticated(true)} 
             title="Portal Manajemen HO" 
             subtitle="Akses Terbatas. Masukkan kredensial otorisasi Kantor Pusat (HO)." 
             showStoreQuickSelect={false} 
