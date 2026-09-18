@@ -176,18 +176,31 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
            }
         }
         
-        if (!response.ok || !result.success) {
-          throw new Error(result.error || 'Gagal menambahkan poin melalui backend server');
+        if (!response.ok && !rawText.includes('<html') && !rawText.includes('<!doctype html>')) {
+          let errMsg = 'Gagal menambahkan poin melalui backend server';
+          try {
+             const parsed = JSON.parse(rawText);
+             if (parsed.error) errMsg = parsed.error;
+          } catch(e) {}
+          throw new Error(errMsg);
         }
         
+        if (result && result.success === false) {
+          throw new Error(result.error || 'Gagal menambahkan poin melalui backend server');
+        }
+           
         // Use the returned server-verified transaction data
         savedTrx = result.data.transactionData;
-        
+           
+        // Calculate correctly in fallback mode
+        const actualNewPoints = result.isFallback ? (member.points || 0) + result.data.calculatedPoints : result.data.newPoints;
+        const actualNewTier = result.isFallback ? member.tier : result.data.newTier;
+
         // Optimistically update the UI member state
         updatedMember = {
           ...member,
-          points: result.data.newPoints,
-          tier: result.data.newTier,
+          points: actualNewPoints,
+          tier: actualNewTier,
         };
         
         // If the backend used the resilient fallback, we MUST persist it to Firestore via client SDK
