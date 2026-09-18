@@ -86,7 +86,7 @@ export function toLocalPhone(phone: string): string {
 /**
  * Checks if a member account is currently locked due to failed PIN attempts.
  */
-export function isAccountLocked(member: Pick<CanonicalMemberDocument, 'lockedUntil'>): {
+export function isAccountLocked(member: { lockedUntil?: string | null }): {
   locked: boolean;
   remainingSeconds: number;
 } {

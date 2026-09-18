@@ -59,11 +59,11 @@ export function cleanAndEnrichStore(rawStore: any): StoreBranch {
   };
 
   const isValidImage = (img: any): boolean => {
-    return typeof img === 'string' && img.startsWith('http') && img.length > 15;
+    return typeof img === 'string' && (img.startsWith('http') || img.startsWith('data:image')) && img.length > 15;
   };
 
   // If this store belongs to the official 42 Watch Club branches, strictly enforce the master Nama Cabang and metadata!
-  const isOfficialBranch = fallback && fallback.id !== 'CUSTOM';
+  const isOfficialBranch = false; // ALLOW DB EDITS TO OVERRIDE MOCK DATA
 
   const name = isOfficialBranch ? fallback.name : (rawStore.name || fallback.name);
   const mallName = isOfficialBranch ? (fallback.mallName || fallback.name) : (rawStore.mallName || name);

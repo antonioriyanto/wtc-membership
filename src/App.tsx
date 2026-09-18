@@ -366,7 +366,7 @@ export default function App() {
     }
   };
 
-  const handleMemberSubmitTicket = async (subject: string, message: string, fileUrl?: string) => {
+  const handleMemberSubmitTicket = async (ticketData: any) => {
     if (!loggedInMemberId) return;
     const member = members.find(m => m.id === loggedInMemberId);
     if (!member) return;
@@ -377,17 +377,16 @@ export default function App() {
       memberId: member.id,
       memberName: member.name,
       memberPhone: member.phone,
-      subject,
-      message,
+      ...ticketData,
       status: 'OPEN',
       priority: 'MEDIUM',
       createdAt: new Date().toISOString(),
       messages: [{
         id: 'msg_' + Date.now(),
         sender: 'MEMBER',
-        content: message,
+        content: ticketData.messageText,
         timestamp: new Date().toISOString(),
-        attachmentUrl: fileUrl
+        attachmentUrl: ticketData.fileUrl
       }]
     };
 
@@ -397,7 +396,7 @@ export default function App() {
       actorName: member.name,
       actorRole: 'CUSTOMER',
       action: 'TICKET_CREATED',
-      details: `Pelanggan mengirimkan tiket bantuan baru: "${subject}".`,
+      details: `Pelanggan mengirimkan tiket bantuan baru: "${ticketData.subject}".`,
       module: 'SUPPORT_TICKETS'
     };
 
@@ -431,13 +430,14 @@ export default function App() {
 
   const handleToggleCampaignStatus = async (id: string) => {
     const target = campaigns.find(c => c.id === id);
-    if (!target) return;
+    if (!target) return false;
     try {
       await setDoc(doc(db, 'campaigns', id), { ...target, status: target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' });
     } catch (err) {}
   };
 
   const handleDirectPointAdjustment = async (memberId: string, pointsDelta: number, note: string, ticketId: string) => {
+    let success = false;
     const target = members.find(m => m.id === memberId);
     if (!target) return;
     const updatedMember = { ...target, points: Math.max(0, target.points + pointsDelta) };
@@ -470,7 +470,9 @@ export default function App() {
       batch.set(doc(db, 'transactions', savedTrx.id), savedTrx);
       batch.set(doc(db, 'audit', auditEntry.id), auditEntry);
       await batch.commit();
+      success = true;
     } catch(err) {}
+    return success;
   };
 
 
@@ -770,30 +772,30 @@ export default function App() {
             onSwitchPerspective={(p) => navigate(p === 'HO' ? '/admin' : '/' + p.toLowerCase())}
           />
         ) : (
-          <AdminLogin 
-            onLoginSuccess={(user, storeIdentifier) => {
+          <AdminLogin
+            onLoginSuccess={(role, storeIdentifier) => {
               let finalStoreName = storeIdentifier;
               
               // Find the exact matching store based on the username that just logged in
               const matchingStore = stores.find(s => 
-                (s.username && s.username.toUpperCase() === user.toUpperCase()) || 
-                (s.code && s.code.toUpperCase() === user.toUpperCase()) ||
-                (s.id && s.id.toUpperCase() === user.toUpperCase())
+                (s.username && storeIdentifier && s.username.toUpperCase() === storeIdentifier.toUpperCase()) || 
+                (s.code && storeIdentifier && s.code.toUpperCase() === storeIdentifier.toUpperCase()) ||
+                (s.id && storeIdentifier && s.id.toUpperCase() === storeIdentifier.toUpperCase())
               );
               
               if (matchingStore) {
                  finalStoreName = matchingStore.name;
               }
             
-              if (user) {
-                const displayUser = (finalStoreName && user.toUpperCase() !== 'ADMIN' && user.toUpperCase() !== 'HO') ? finalStoreName : user;
+              if (storeIdentifier) {
+                const displayUser = (finalStoreName && storeIdentifier.toUpperCase() !== 'ADMIN' && storeIdentifier.toUpperCase() !== 'HO') ? finalStoreName : storeIdentifier;
                 setCashierName(displayUser);
                 try { localStorage.setItem('wtc_cashier_name', displayUser); } catch {}
               }
               
               // Store the robust ID/Code instead of the easily changeable name
-              setCashierStoreName(user);
-              try { localStorage.setItem('wtc_cashier_store', user); } catch {}
+              if(storeIdentifier) { setCashierStoreName(storeIdentifier); }
+              try { localStorage.setItem('wtc_cashier_store', storeIdentifier || ''); } catch {}
               
               setCashierAuthenticated(true);
               try { localStorage.setItem('wtc_cashier_auth', 'true'); } catch {}
@@ -808,7 +810,7 @@ export default function App() {
       <Route path="/member" element={
         loggedInMemberId ? (
           <CustomerMemberView 
-            member={members.find(m => m.id === loggedInMemberId) || members[0] || { id: loggedInMemberId || 'guest', name: 'Member', phone: '', membershipId: 'WTC-000000', points: 0, tier: 'SILVER', joinDate: new Date().toISOString(), registeredStore: 'Puri Jakarta', lastStoreVisited: 'Puri Jakarta', lastVisitDate: new Date().toISOString(), email: '', lifetimePoints: 0, totalSpend: 0 }}
+            member={members.find(m => m.id === loggedInMemberId) || members[0] || { id: loggedInMemberId || 'guest', name: 'Member', phone: '', membershipId: 'WTC-000000', points: 0, tier: 'SILVER', joinDate: new Date().toISOString(), registeredStore: 'Puri Jakarta', lastStoreVisited: 'Puri Jakarta', lastVisitDate: new Date().toISOString(), email: '', lifetimePoints: 0, totalSpend: 0, gender: 'Wanita', status: 'ACTIVE' }}
             vouchers={vouchers}
             stores={stores}
             transactions={transactions}
@@ -824,7 +826,7 @@ export default function App() {
         ) : (
           <MemberLogin 
             members={members}
-            onLoginSuccess={(id, memberObj) => {
+            onLogin={(id, memberObj) => {
               if (memberObj) {
                 setMembers(prev => {
                   const exists = prev.some(m => m.id === memberObj.id);
@@ -1191,10 +1193,10 @@ export default function App() {
                 } else {
                   let created: Voucher = {
                     ...voucherData,
-                    id: voucherData.id || 'vch_' + Date.now(),
+                    id: (voucherData as any).id || 'vch_' + Date.now(),
                     code: (voucherData.code || 'VOUCH-' + Date.now()).toUpperCase(),
-                    totalClaimed: Number(voucherData.totalClaimed) || 0,
-                    totalUsed: Number(voucherData.totalUsed) || 0,
+                    totalClaimed: Number((voucherData as any).totalClaimed) || 0,
+                    totalUsed: Number((voucherData as any).totalUsed) || 0,
                     status: voucherData.status || 'ACTIVE'
                   } as Voucher;
 
@@ -1287,7 +1289,7 @@ export default function App() {
             />
           </div>
         ) : (
-          <AdminLogin 
+          <AdminLogin
             onLoginSuccess={() => setAdminAuthenticated(true)} 
             title="Portal Manajemen HO" 
             subtitle="Akses Terbatas. Masukkan kredensial otorisasi Kantor Pusat (HO)." 

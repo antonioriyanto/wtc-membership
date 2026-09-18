@@ -117,6 +117,7 @@ export interface Member {
 }
 
 export interface StoreBranch {
+  username?: string;
   latitude?: number;
   longitude?: number;
   distance?: number; // Temporary UI field

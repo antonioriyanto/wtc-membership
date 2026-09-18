@@ -442,7 +442,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       <CashierSidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onSwitchPerspective={onSwitchPerspective}
+        
       />
 
       {/* MAIN CASHIER CONTENT AREA */}
