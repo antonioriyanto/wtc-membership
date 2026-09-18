@@ -566,20 +566,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             </section>
 
             <section className="px-5 mt-2.5">
-              <div onClick={() => {
+              <MembershipCard 
+                member={member} 
+                onClickQr={() => {
                   setSelectedVoucherForQr(null);
                   setIsQrModalOpen(true);
-                }} className="cursor-pointer">
-                <MembershipCard member={member} />
-                <div className="mt-4 flex justify-center">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                    <div className="w-8 h-8 bg-white rounded p-1 shadow-sm flex items-center justify-center">
-                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(member.membershipId)}`} alt="QR Code" className="w-full h-full object-contain" />
-                    </div>
-                    <span>Tap card to view full QR Code</span>
-                  </div>
-                </div>
-              </div>
+                }} 
+              />
             </section>
 
             <section className="bg-white dark:bg-white/5 m-5 p-5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] border border-black/5 dark:border-white/10">
