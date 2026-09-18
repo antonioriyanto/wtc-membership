@@ -97,28 +97,24 @@ export async function verifyCustomerPinClient(
     const currentFailures = Number(member.failedPinAttempts || 0) + 1;
     if (currentFailures >= 5) {
       const lockUntilDate = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      await updateDoc(memberRef, {
-        failedPinAttempts: 0,
-        lockedUntil: lockUntilDate
-      }).catch(async () => {
-        // Fallback safeSetDoc
-        await safeSetDoc('members', member.id, {
-          ...member,
+      try {
+        await updateDoc(memberRef, {
           failedPinAttempts: 0,
           lockedUntil: lockUntilDate
         });
-      });
+      } catch (err) {
+        console.warn('Failed to lock account in Firestore (rules restriction):', err);
+      }
 
       throw new Error('PIN salah 5 kali berturut-turut. Akun Anda dikunci selama 15 menit demi keamanan.');
     } else {
-      await updateDoc(memberRef, {
-        failedPinAttempts: currentFailures
-      }).catch(async () => {
-        await safeSetDoc('members', member.id, {
-          ...member,
+      try {
+        await updateDoc(memberRef, {
           failedPinAttempts: currentFailures
         });
-      });
+      } catch (err) {
+        console.warn('Failed to update failed attempts in Firestore (rules restriction):', err);
+      }
 
       const remainingAttempts = 5 - currentFailures;
       throw new Error(`PIN tidak sesuai. Sisa kesempatan: ${remainingAttempts} kali.`);
@@ -126,18 +122,15 @@ export async function verifyCustomerPinClient(
   }
 
   // 4. Success: Clear lock & failed attempts
-  await updateDoc(memberRef, {
-    failedPinAttempts: 0,
-    lockedUntil: null,
-    lastLoginAt: new Date().toISOString()
-  }).catch(async () => {
-    await safeSetDoc('members', member.id, {
-      ...member,
+  try {
+    await updateDoc(memberRef, {
       failedPinAttempts: 0,
       lockedUntil: null,
       lastLoginAt: new Date().toISOString()
-    });
-  });
+    }).catch(e => console.warn('updateDoc failed:', e));
+  } catch (err) {
+    console.warn('Failed to clear failed attempts in Firestore (rules restriction):', err);
+  }
 
   const updatedDoc: CanonicalMemberDocument = {
     ...member,
@@ -201,8 +194,15 @@ export async function setCustomerPinClient(params: {
   }
 
   const memberRef = doc(db, 'members', member.id);
-  await updateDoc(memberRef, updatedData).catch(async () => {
-    await safeSetDoc('members', member.id, updatedData);
+  await updateDoc(memberRef, updatedData).catch(async (err) => {
+    console.warn('Failed to update member in Firestore (rules restriction):', err);
+    try {
+      await safeSetDoc('members', member.id, updatedData).catch(err2 => {
+        console.warn('safeSetDoc also failed:', err2);
+      });
+    } catch(err3) {
+       console.warn('safeSetDoc block threw:', err3);
+    }
   });
 
   return updatedData as CanonicalMemberDocument;
@@ -292,8 +292,15 @@ export async function resetPinViaGoogleAuthClient(params: {
   };
 
   const memberRef = doc(db, 'members', member.id);
-  await updateDoc(memberRef, updatedData).catch(async () => {
-    await safeSetDoc('members', member.id, updatedData);
+  await updateDoc(memberRef, updatedData).catch(async (err) => {
+    console.warn('Failed to update member in Firestore (rules restriction):', err);
+    try {
+      await safeSetDoc('members', member.id, updatedData).catch(err2 => {
+        console.warn('safeSetDoc also failed:', err2);
+      });
+    } catch(err3) {
+       console.warn('safeSetDoc block threw:', err3);
+    }
   });
 
   // 4. Commit immutable audit log to /audit_logs and /audit
@@ -400,8 +407,15 @@ export async function cashierAssistedPinResetClient(params: {
     updatedAt: nowIso
   };
 
-  await updateDoc(memberRef, updatedData).catch(async () => {
-    await safeSetDoc('members', member.id, updatedData);
+  await updateDoc(memberRef, updatedData).catch(async (err) => {
+    console.warn('Failed to update member in Firestore (rules restriction):', err);
+    try {
+      await safeSetDoc('members', member.id, updatedData).catch(err2 => {
+        console.warn('safeSetDoc also failed:', err2);
+      });
+    } catch(err3) {
+       console.warn('safeSetDoc block threw:', err3);
+    }
   });
 
   // Record immutable audit log

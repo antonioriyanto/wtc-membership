@@ -1,5 +1,5 @@
 import { initialStores } from "../data/mockData";
-import { cleanAndEnrichStore } from "../lib/syncFirestore";
+import { cleanAndEnrichStore, safeSetDoc } from "../lib/syncFirestore";
 import { StoreCard } from "./StoreCard";
 import { MembershipCard } from "./MembershipCard";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -184,7 +184,17 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
       const compressedBase64 = await compressImage(file, 400, 400, 0.7);
       
       const memberRef = doc(db, 'members', member.id);
-      await updateDoc(memberRef, { avatarUrl: compressedBase64 });
+      try {
+        await updateDoc(memberRef, { avatarUrl: compressedBase64 });
+      } catch (err2) {
+        console.warn("Avatar updateDoc failed:", err2);
+        try {
+          await safeSetDoc('members', member.id, { ...member, avatarUrl: compressedBase64 });
+        } catch (err3) {
+          console.error("Avatar safeSetDoc failed:", err3);
+          throw err3;
+        }
+      }
       
       showAlert('Success', 'Profile picture updated successfully!');
     } catch (err) {

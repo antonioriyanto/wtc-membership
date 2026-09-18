@@ -281,7 +281,9 @@ export async function findMemberByGoogleUidInFirestore(uid: string): Promise<any
 
 export async function safeSetDoc(collectionName: string, docId: string, data: any) {
   const sanitized = cleanForFirestore(data);
-  await setDoc(doc(db, collectionName, String(docId)), sanitized);
+  await setDoc(doc(db, collectionName, String(docId)), sanitized).catch(e => {
+    console.warn("safeSetDoc ignored error:", e.message);
+  });
   return sanitized;
 }
 
