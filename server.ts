@@ -298,6 +298,22 @@ async function startServer() {
         return Math.max(0, Math.floor(base * mult));
       };
 
+      // Check for duplicate receipt before transaction/writes
+      if (db) {
+        try {
+          const recentTrxQuery = await db.collection('transactions')
+            .where('memberId', '==', memberId)
+            .where('receiptNo', '==', receiptNo.trim())
+            .get();
+            
+          if (!recentTrxQuery.empty) {
+            return res.status(400).json({ success: false, error: 'Nomor struk ini sudah pernah ditukarkan poin sebelumnya.' });
+          }
+        } catch (dupErr: any) {
+          console.warn('Duplicate receipt check warning:', dupErr?.message);
+        }
+      }
+
       // When Firebase Admin SDK is available, perform atomic server transaction
       if (db) {
         try {
@@ -312,17 +328,7 @@ async function startServer() {
 
             const memberData = memberDoc.data();
 
-            // 2. Check for duplicate receipt
-            const recentTrxQuery = await db.collection('transactions')
-              .where('memberId', '==', memberId)
-              .where('receiptNo', '==', receiptNo.trim())
-              .get();
-              
-            if (!recentTrxQuery.empty) {
-              throw new Error('Duplicate receipt: Nomor struk ini sudah ditukarkan.');
-            }
-
-            // 3. Calculate points according to HO Admin loyalty settings
+            // 2. Calculate points according to HO Admin loyalty settings
             const calculatedPoints = calcPointsForTier(numericAmount, memberData?.tier || 'BLUE');
             
             const currentPoints = typeof memberData?.points === 'number' ? memberData.points : 0;
@@ -334,7 +340,7 @@ async function startServer() {
             const newTotalSpend = currentTotalSpend + numericAmount;
             const newTier = calculateTierWithConfig(newPoints, activeConfig);
 
-            // 4. Create Transaction Record
+            // 3. Create Transaction Record
             const transactionId = 'tx_' + Date.now();
             const transactionRef = db.collection('transactions').doc(transactionId);
             const transactionData = {
@@ -352,7 +358,7 @@ async function startServer() {
               timestamp: new Date().toISOString()
             };
 
-            // 5. Create Audit Log
+            // 4. Create Audit Log
             const auditId = 'AL-' + Date.now().toString().slice(-4) + Math.floor(Math.random() * 1000);
             const auditRef = db.collection('audit').doc(auditId);
             const auditData = {
@@ -365,7 +371,7 @@ async function startServer() {
               module: 'LOYALTY_PROGRAM'
             };
 
-            // 6. Execute Writes
+            // 5. Execute Writes
             t.set(transactionRef, transactionData);
             t.set(auditRef, auditData);
             t.update(memberRef, {
@@ -392,7 +398,6 @@ async function startServer() {
       }
 
       // Resilient computation fallback when Admin SDK is unavailable or skipped:
-      // Compute deterministic points so the frontend can display and persist via client-side Firestore SDK
       const calculatedPoints = calcPointsForTier(numericAmount, 'BLUE');
       const transactionId = 'tx_' + Date.now();
       const transactionData = {

@@ -51,9 +51,17 @@ export const WATCH_CLUB_BRANCHES: StoreBranchInfo[] = [
 ];
 
 export function getStoreCode(branchName: string, posType: PosType): string | null {
-  const store = WATCH_CLUB_BRANCHES.find(b => b.name === branchName);
-  if (!store) return null;
-  return posType === 'A' ? store.posA : store.posB;
+  if (!branchName) return 'C0086';
+  const clean = branchName.toLowerCase().trim();
+  let store = WATCH_CLUB_BRANCHES.find(b => b.name.toLowerCase() === clean);
+  if (!store) {
+    store = WATCH_CLUB_BRANCHES.find(b => b.name.toLowerCase().includes(clean) || clean.includes(b.name.toLowerCase().split(' ')[0]));
+  }
+  if (!store) {
+    return 'C0086';
+  }
+  const code = posType === 'A' ? store.posA : store.posB;
+  return code || store.posA || 'C0086';
 }
 
 export function getBranchInfoByCode(posCode: string): { name: string, posType: PosType } | null {

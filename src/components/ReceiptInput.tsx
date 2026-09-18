@@ -26,6 +26,13 @@ export const ReceiptInput: React.FC<ReceiptInputProps> = ({ branchName, posType,
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 5);
     setRunningNumber(val);
+    if (val.trim() !== '') {
+      const padded = val.padStart(5, '0');
+      const fullReceipt = `JL-INV/${storeCode}/${yymm}/${padded}`;
+      onReceiptChange(fullReceipt);
+    } else {
+      onReceiptChange('');
+    }
   };
 
   // Event Blur: Eksekusi Auto-Padding menjadi 5 digit dan tembak data ke parent
