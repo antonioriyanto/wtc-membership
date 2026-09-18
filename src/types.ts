@@ -96,6 +96,8 @@ export interface Member {
   registeredStore: string;
   lastStoreVisited: string;
   lastVisitDate: string;
+  profileImageUrl?: string;
+  avatarUrl?: string;
   gender: 'Pria' | 'Wanita';
   birthDate?: string;
   address?: string;

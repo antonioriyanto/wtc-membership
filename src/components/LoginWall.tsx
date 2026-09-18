@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, KeyRound, ShieldCheck, Eye, EyeOff, Lock, ChevronDown, LogIn } from 'lucide-react';
+import { WatchClubLogo } from './WatchClubLogo';
 import { hashStringSHA256, STORE_PIN_HASHES, setOfflineMode } from '../lib/authHelper';
 
 export const STORE_ACCOUNTS = [
