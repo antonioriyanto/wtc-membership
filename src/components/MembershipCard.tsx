@@ -1,6 +1,7 @@
 import React from 'react';
 import { Member } from '../types';
 import { WatchClubLogo } from './WatchClubLogo';
+import { TIER_CARD_GRADIENTS } from '../utils/tierBadge';
 
 interface MembershipCardProps {
   member?: Member;
@@ -25,59 +26,57 @@ export const MembershipCard: React.FC<MembershipCardProps> = ({
   const tierRaw = propTier || member?.tier || 'BLUE';
   const tier = tierRaw.toUpperCase();
 
-  // Tier color themes according to canonical specifications
-  let bgGradient = 'from-blue-900 via-blue-800 to-slate-900';
-  let textColor = 'text-blue-50';
-  let subTextColor = 'text-blue-200/80';
+  // Canonical Tier configuration matching the tier list & loading bar
+  const tierConfig = TIER_CARD_GRADIENTS[tier as keyof typeof TIER_CARD_GRADIENTS] || TIER_CARD_GRADIENTS.BLUE;
+
+  let textColor = 'text-white';
+  let subTextColor = 'text-blue-100/80';
   let badgeBg = 'bg-white/20 text-white border-white/30';
   let logoVariant: 'white' | 'dark' = 'white';
   let cardBorder = 'border-white/20';
-  let glowColor = 'bg-blue-400/20';
+  let glowColor = 'bg-[#4375A6]/30';
 
   switch (tier) {
     case 'SILVER':
-      bgGradient = 'from-gray-200 via-gray-100 to-gray-300';
-      textColor = 'text-gray-900';
-      subTextColor = 'text-gray-600';
-      badgeBg = 'bg-gray-900/10 text-gray-900 border-gray-900/20';
+      textColor = 'text-slate-900';
+      subTextColor = 'text-slate-600 font-medium';
+      badgeBg = 'bg-black/10 text-slate-900 border-black/20';
       logoVariant = 'dark';
       cardBorder = 'border-black/10';
-      glowColor = 'bg-white/40';
+      glowColor = 'bg-white/50';
       break;
     case 'GOLD':
-      bgGradient = 'from-amber-600 via-yellow-400 to-amber-700';
       textColor = 'text-amber-950';
-      subTextColor = 'text-amber-900/85';
+      subTextColor = 'text-amber-900/85 font-medium';
       badgeBg = 'bg-black/15 text-amber-950 border-amber-950/25';
       logoVariant = 'dark';
       cardBorder = 'border-amber-900/20';
-      glowColor = 'bg-yellow-200/30';
+      glowColor = 'bg-yellow-200/40';
       break;
     case 'PLATINUM':
-      bgGradient = 'from-slate-700 via-slate-500 to-slate-800';
-      textColor = 'text-white';
-      subTextColor = 'text-slate-200/80';
-      badgeBg = 'bg-amber-400/20 text-amber-300 border-amber-400/40';
-      logoVariant = 'white';
-      cardBorder = 'border-white/20';
-      glowColor = 'bg-slate-300/20';
+      textColor = 'text-slate-900';
+      subTextColor = 'text-slate-600 font-medium';
+      badgeBg = 'bg-black/10 text-slate-900 border-black/20';
+      logoVariant = 'dark';
+      cardBorder = 'border-slate-500/20';
+      glowColor = 'bg-slate-200/40';
       break;
     case 'BLUE':
     default:
-      bgGradient = 'from-blue-900 via-blue-800 to-slate-900';
-      textColor = 'text-blue-50';
+      textColor = 'text-white';
       subTextColor = 'text-blue-200/80';
       badgeBg = 'bg-white/20 text-white border-white/30';
       logoVariant = 'white';
       cardBorder = 'border-white/20';
-      glowColor = 'bg-blue-400/20';
+      glowColor = 'bg-[#4375A6]/30';
       break;
   }
 
   return (
     <div 
       onClick={onClickQr}
-      className={`relative overflow-hidden rounded-3xl p-5 sm:p-6 bg-gradient-to-br ${bgGradient} ${textColor} shadow-xl border ${cardBorder} backdrop-blur-xl transition-all duration-300 mx-auto w-full max-w-xl aspect-[2/1] flex flex-col justify-between cursor-pointer select-none group hover:shadow-2xl hover:scale-[1.01]`}
+      style={{ background: tierConfig.background }}
+      className={`relative overflow-hidden rounded-3xl p-5 sm:p-6 ${textColor} shadow-xl border ${cardBorder} backdrop-blur-xl transition-all duration-300 mx-auto w-full max-w-xl aspect-[2/1] flex flex-col justify-between cursor-pointer select-none group hover:shadow-2xl hover:scale-[1.01]`}
     >
       {/* Subtle Atmospheric Light Flares */}
       <div className={`absolute -top-16 -right-16 w-52 h-52 ${glowColor} rounded-full blur-3xl pointer-events-none`}></div>
@@ -100,29 +99,17 @@ export const MembershipCard: React.FC<MembershipCardProps> = ({
 
       {/* Bottom Row: Member Details & Interactive Mini QR Code */}
       <div className="relative z-10 flex justify-between items-end gap-3 mt-auto">
-        {/* Left Info: Cardholder, ID & Points */}
+        {/* Left Info: Cardholder & ID */}
         <div className="flex flex-col justify-end min-w-0 pr-1">
-          <div className="mb-2.5">
-            <p className={`text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-widest ${subTextColor}`}>
-              Cardholder
-            </p>
-            <p className="text-sm sm:text-base font-bold tracking-wide uppercase truncate max-w-[190px] sm:max-w-[260px] leading-tight">
-              {name}
-            </p>
-            <p className="font-mono text-[11px] sm:text-xs font-bold tracking-[0.22em] opacity-90 mt-0.5">
-              {id}
-            </p>
-          </div>
-
-          <div>
-            <p className={`text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-widest ${subTextColor}`}>
-              Points Balance
-            </p>
-            <p className="text-base sm:text-xl font-black tracking-tight leading-tight">
-              {pts.toLocaleString('id-ID')}{' '}
-              <span className="text-[10px] sm:text-xs font-semibold opacity-85">PTS</span>
-            </p>
-          </div>
+          <p className={`text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-widest ${subTextColor}`}>
+            Cardholder
+          </p>
+          <p className="text-sm sm:text-base font-bold tracking-wide uppercase truncate max-w-[200px] sm:max-w-[280px] leading-tight mt-0.5">
+            {name}
+          </p>
+          <p className="font-mono text-[11px] sm:text-xs font-bold tracking-[0.22em] opacity-90 mt-1">
+            {id}
+          </p>
         </div>
 
         {/* Right Info: Clean Integrated Mini QR Tile */}

@@ -3,6 +3,7 @@ import { cleanAndEnrichStore, safeSetDoc } from "../lib/syncFirestore";
 import { StoreCard } from "./StoreCard";
 import { MembershipCard } from "./MembershipCard";
 import { TierBenefitsList } from "./TierBenefitsList";
+import { VoucherTermsModal } from "./VoucherTermsModal";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Member, Voucher, StoreBranch, Transaction, Campaign, SupportTicket } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
@@ -39,7 +40,8 @@ import {
   Navigation,
   Compass,
   Phone,
-  ExternalLink
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { WatchClubLogo } from './WatchClubLogo';
@@ -133,6 +135,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     !redeemedVoucherCodes.has(v.code.trim().toUpperCase().replace(/^VOUCHER-/, ''))
   );
   const [selectedVoucherForQr, setSelectedVoucherForQr] = useState<Voucher | null>(null);
+  const [selectedVoucherForTerms, setSelectedVoucherForTerms] = useState<Voucher | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -599,9 +602,6 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
             <TierBenefitsList 
               currentTier={(member.tier as any) || 'BLUE'} 
-              onSelectBenefit={(title) => {
-                showAlert(`Benefit "${title}" aktif untuk member tier ${member.tier}. Nikmati keistimewaannya di seluruh gerai Watch Club Indonesia!`, 'Benefit Member', 'info');
-              }}
             />
 
             <section className="m-5">
@@ -646,25 +646,49 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     backgroundPosition: 'center',
                   }}>
                     <div className="absolute inset-0 bg-black/40 z-0"></div>
+
+                    {/* S&K Icon Button at Top-Right of Card */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedVoucherForTerms(v);
+                      }}
+                      className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 hover:bg-black/75 active:scale-95 backdrop-blur-md text-white text-xs font-bold border border-white/20 transition-all cursor-pointer shadow-md group"
+                      title="Syarat & Ketentuan (Terms & Conditions)"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
+                      <span>S&K</span>
+                    </button>
+
                     <div className="relative z-10 h-full flex flex-col">
-                    <div className="text-xs font-bold tracking-wider mb-1 text-white/90 uppercase drop-shadow-md">{v.subtitle}</div>
-                    <div className="text-5xl font-bold leading-none mb-1 tracking-tight text-white drop-shadow-md">
-                      {v.discountType === 'PERCENTAGE' ? `${v.discountValue}% OFF` : `Rp ${(v.discountValue/1000)}K`}
-                    </div>
-                    <div className="text-base font-semibold mb-1 text-white drop-shadow-md">{v.title}</div>
-                    <div className="text-xs text-white/80 mb-6 font-medium drop-shadow-md">Valid until {v.validUntil}</div>
-                    
-                    <div className="flex flex-col items-start gap-2.5 relative mt-auto z-10">
-                      <button 
-                        onClick={() => {
-                          setSelectedVoucherForQr(v);
-                          setIsQrModalOpen(true);
-                        }}
-                        className="bg-white dark:bg-white/5 text-neutral-900 dark:text-white border-none py-3 px-6 rounded-full text-sm font-semibold cursor-pointer transition-transform hover:scale-105 shadow-sm dark:shadow-none lg"
-                      >
-                        Use Now
-                      </button>
-                    </div>
+                      <div className="text-xs font-bold tracking-wider mb-1 text-white/90 uppercase drop-shadow-md pr-16">{v.subtitle}</div>
+                      <div className="text-5xl font-bold leading-none mb-1 tracking-tight text-white drop-shadow-md">
+                        {v.discountType === 'PERCENTAGE' ? `${v.discountValue}% OFF` : `Rp ${(v.discountValue/1000)}K`}
+                      </div>
+                      <div className="text-base font-semibold mb-1 text-white drop-shadow-md">{v.title}</div>
+                      <div className="text-xs text-white/80 mb-6 font-medium drop-shadow-md">Valid until {v.validUntil}</div>
+                      
+                      <div className="flex items-center gap-2.5 relative mt-auto z-10">
+                        <button 
+                          onClick={() => {
+                            setSelectedVoucherForQr(v);
+                            setIsQrModalOpen(true);
+                          }}
+                          className="bg-white dark:bg-white/5 text-neutral-900 dark:text-white border-none py-3 px-6 rounded-full text-sm font-semibold cursor-pointer transition-transform hover:scale-105 shadow-sm dark:shadow-none"
+                        >
+                          Use Now
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedVoucherForTerms(v)}
+                          className="py-3 px-4 rounded-full text-xs font-semibold text-white/90 hover:text-white bg-white/15 hover:bg-white/25 active:scale-95 backdrop-blur-md border border-white/20 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                          title="Lihat Syarat & Ketentuan (S&K)"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-amber-300" />
+                          <span>S&K</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -689,16 +713,30 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     backgroundPosition: 'center',
                   }}>
                     <div className="absolute inset-0 bg-black/50 z-0"></div>
+
+                    {/* S&K Icon Button at Top-Right of Card */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedVoucherForTerms(v);
+                      }}
+                      className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 hover:bg-black/75 active:scale-95 backdrop-blur-md text-white text-xs font-bold border border-white/20 transition-all cursor-pointer shadow-md group"
+                      title="Syarat & Ketentuan (Terms & Conditions)"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
+                      <span>S&K</span>
+                    </button>
                     
                     <div className="relative z-20 h-full flex flex-col">
-                      <div className="text-xs font-bold tracking-wider mb-1 text-slate-300 uppercase">{v.subtitle}</div>
+                      <div className="text-xs font-bold tracking-wider mb-1 text-slate-300 uppercase pr-16">{v.subtitle}</div>
                       <div className="text-[3.5rem] font-bold leading-none mb-1 tracking-[-2px] text-white">
                         {v.discountType === 'PERCENTAGE' ? `${v.discountValue}% OFF` : `Rp ${(v.discountValue/1000)}K`}
                       </div>
                       <div className="text-lg font-medium mb-1 text-white">{v.title}</div>
                       <div className="text-sm text-neutral-400 dark:text-neutral-500 mb-6 font-medium">Valid until {v.validUntil}</div>
                       
-                      <div className="flex flex-col items-start gap-3 mt-auto">
+                      <div className="flex items-center gap-3 mt-auto">
                         <button 
                           onClick={() => {
                             setSelectedVoucherForQr(v);
@@ -707,6 +745,15 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                           className="bg-slate-800 text-white border border-white/10 py-2.5 px-6 rounded-full text-sm font-semibold cursor-pointer transition-colors hover:bg-slate-950 hover:border-slate-500 self-start shadow-md"
                         >
                           Use Now
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedVoucherForTerms(v)}
+                          className="py-2.5 px-4 rounded-full text-xs font-semibold text-slate-200 hover:text-white bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                          title="Lihat Syarat & Ketentuan (S&K)"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-amber-300" />
+                          <span>S&K</span>
                         </button>
                       </div>
                     </div>
@@ -932,6 +979,18 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         )}
 
         <PwaInstallPrompt />
+
+        {/* VOUCHER TERMS & CONDITIONS (S&K) MODAL */}
+        <VoucherTermsModal
+          voucher={selectedVoucherForTerms}
+          onClose={() => setSelectedVoucherForTerms(null)}
+          onUseNow={(voucher) => {
+            setSelectedVoucherForTerms(null);
+            setSelectedVoucherForQr(voucher);
+            setIsQrModalOpen(true);
+          }}
+        />
+
         {isQrModalOpen && (
           <div className="fixed inset-0 bg-slate-100 dark:bg-black/40 backdrop-blur-sm flex justify-center items-center z-[9999] p-4 animate-fadeIn">
             <div className="bg-white dark:bg-white/5 rounded-[24px] text-center shadow-sm dark:shadow-none [0_20px_40px_-10px_rgba(0,0,0,0.1)] w-[90%] max-w-[340px] p-7 relative animate-scaleUp">

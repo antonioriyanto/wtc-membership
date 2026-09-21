@@ -1196,7 +1196,83 @@ export const initialStores: StoreBranch[] = [
 ];
 
 export const initialMembers: Member[] = [];
-export const initialVouchers: Voucher[] = [];
+export const initialVouchers: Voucher[] = [
+  {
+    id: 'voucher-welcome-2026',
+    code: 'WELCOME100K',
+    title: 'Welcome Member Voucher Rp 100.000',
+    subtitle: 'NEW MEMBER PRIVILEGE',
+    discountType: 'FIXED',
+    discountValue: 100000,
+    minPurchase: 1000000,
+    validFrom: '2026-01-01',
+    validUntil: '2026-12-31',
+    scope: 'ALL_STORES',
+    applicableStoreIds: [],
+    totalClaimed: 1,
+    totalUsed: 0,
+    maxUsageLimit: 1,
+    status: 'ACTIVE',
+    terms: [
+      'Voucher senilai Rp 100.000 berlaku untuk pembelian jam tangan original di seluruh 40+ boutique Watch Club Indonesia.',
+      'Berlaku dengan minimum transaksi pembelanjaan senilai Rp 1.000.000.',
+      'Wajib menunjukkan QR Code voucher dari aplikasi Customer PWA kepada kasir sebelum struk pembayaran diproses.',
+      'Hanya dapat digunakan untuk 1 (satu) kali transaksi dan tidak dapat diuangkan (non-refundable).',
+      'Dapat digabungkan dengan program cicilan 0% dari bank rekanan resmi Watch Club.',
+      'Masa berlaku voucher aktif hingga 31 Desember 2026.'
+    ],
+    imagePath: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&q=80'
+  },
+  {
+    id: 'voucher-payday-15',
+    code: 'PAYDAY15OFF',
+    title: 'Payday Horology 15% OFF',
+    subtitle: 'LIMITED LUXURY REWARD',
+    discountType: 'PERCENTAGE',
+    discountValue: 15,
+    minPurchase: 2500000,
+    validFrom: '2026-01-01',
+    validUntil: '2026-12-31',
+    scope: 'ALL_STORES',
+    applicableStoreIds: [],
+    totalClaimed: 0,
+    totalUsed: 0,
+    maxUsageLimit: 1,
+    status: 'ACTIVE',
+    terms: [
+      'Diskon 15% berlaku untuk koleksi jam tangan, strap original, dan aksesori tertentu.',
+      'Berlaku dengan minimum transaksi pembelanjaan senilai Rp 2.500.000 dalam 1 struk.',
+      'Tunjukkan kode QR voucher pada kasir saat melakukan transaksi di boutique Watch Club.',
+      'Tidak berlaku untuk produk bertanda khusus Limited Collector Edition.',
+      'Voucher berlaku selama periode Payday hingga 31 Desember 2026.'
+    ],
+    imagePath: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&q=80'
+  },
+  {
+    id: 'voucher-care-polish',
+    code: 'FREESHINE',
+    title: 'Complimentary Watch Polish & Care',
+    subtitle: 'AFTER-SALES SERVICE',
+    discountType: 'FIXED',
+    discountValue: 150000,
+    minPurchase: 0,
+    validFrom: '2026-01-01',
+    validUntil: '2026-12-31',
+    scope: 'ALL_STORES',
+    applicableStoreIds: [],
+    totalClaimed: 0,
+    totalUsed: 0,
+    maxUsageLimit: 1,
+    status: 'ACTIVE',
+    terms: [
+      'Gratis jasa Light Case Polishing & Ultrasonic Bracelet Cleaning senilai Rp 150.000.',
+      'Berlaku tanpa minimum transaksi pembelanjaan di seluruh Watch Club Service Counter.',
+      'Berlaku untuk 1 unit jam tangan original per penukaran voucher.',
+      'Wajib menunjukkan QR Code voucher kepada teknisi atau kasir sebelum unit jam diproses.'
+    ],
+    imagePath: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80'
+  }
+];
 export const initialTransactions: Transaction[] = [];
 export const initialSupportTickets: SupportTicket[] = [];
 export const initialCampaigns: Campaign[] = [];
