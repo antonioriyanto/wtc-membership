@@ -59,6 +59,7 @@ interface CustomerMemberViewProps {
   campaigns?: Campaign[];
   tickets?: SupportTicket[];
   onSubmitTicket?: (ticket: Omit<SupportTicket, 'id' | 'createdAt' | 'updatedAt' | 'messages'> & { messageText: string }) => void;
+  onUpdateMember?: (updated: Member) => void;
   onBackToHO: () => void;
 }
 
@@ -70,12 +71,24 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   campaigns,
   tickets,
   onSubmitTicket,
+  onUpdateMember,
   onBackToHO,
 }) => {
   const { showAlert } = useCustomDialog();
   // Live single-document reactive stream (<500ms latency directly from Firestore)
-  const { profile: liveProfile } = useMemberLiveProfile(initialMember?.id || null);
+  const { profile: liveProfile, error: liveError } = useMemberLiveProfile(initialMember?.id || null);
   const member = liveProfile || initialMember;
+
+  // React to deleted or missing member profile
+  useEffect(() => {
+    if (liveError === 'Profile document not found') {
+      try {
+        localStorage.removeItem('wtc_logged_in_member');
+      } catch {}
+      showAlert('Akun member ini tidak ditemukan atau telah dihapus oleh Admin HO.', 'Sesi Berakhir', 'info');
+      onBackToHO();
+    }
+  }, [liveError, onBackToHO, showAlert]);
 
   if (!member) {
     return (
@@ -139,6 +152,15 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const [storeSearch, setStoreSearch] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [profileEmail, setProfileEmail] = useState(member?.email || '');
+  const [profileAddress, setProfileAddress] = useState(member?.address || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  useEffect(() => {
+    if (member?.email !== undefined) setProfileEmail(member.email || '');
+    if (member?.address !== undefined) setProfileAddress(member.address || '');
+  }, [member?.email, member?.address]);
 
   const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -149,32 +171,26 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
+          const width = img.width;
+          const height = img.height;
 
-          if (width > height) {
-            if (width > maxWidth) {
-              height = Math.round((height * maxWidth) / width);
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width = Math.round((width * maxHeight) / height);
-              height = maxHeight;
-            }
-          }
+          // Square center crop & scale to keep avatar round and crisp
+          const minDim = Math.min(width, height);
+          const startX = (width - minDim) / 2;
+          const startY = (height - minDim) / 2;
 
-          canvas.width = width;
-          canvas.height = height;
+          const targetSize = Math.min(maxWidth, minDim);
+          canvas.width = targetSize;
+          canvas.height = targetSize;
           const ctx = canvas.getContext('2d');
-          if (!ctx) return reject(new Error('Failed to get canvas context'));
+          if (!ctx) return reject(new Error('Gagal memproses kanvas gambar'));
           
-          ctx.drawImage(img, 0, 0, width, height);
+          ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, targetSize, targetSize);
           resolve(canvas.toDataURL('image/jpeg', quality));
         };
-        img.onerror = (err) => reject(err);
+        img.onerror = () => reject(new Error('Gagal memproses file gambar'));
       };
-      reader.onerror = (err) => reject(err);
+      reader.onerror = () => reject(new Error('Gagal membaca file gambar'));
     });
   };
 
@@ -182,28 +198,103 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size? Even if large, we compress it immediately.
+    if (!file.type.startsWith('image/')) {
+      showAlert('Silakan pilih file gambar yang valid (JPG, PNG, atau WEBP).', 'Format Tidak Didukung', 'warning');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setIsUploadingAvatar(true);
     try {
-      showAlert('Processing', 'Compressing and uploading image...');
-      const compressedBase64 = await compressImage(file, 400, 400, 0.7);
+      const compressedBase64 = await compressImage(file, 320, 320, 0.75);
       
-      const memberRef = doc(db, 'members', member.id);
-      try {
-        await updateDoc(memberRef, { avatarUrl: compressedBase64 });
-      } catch (err2) {
-        console.warn("Avatar updateDoc failed:", err2);
-        try {
-          await safeSetDoc('members', member.id, { ...member, avatarUrl: compressedBase64 });
-        } catch (err3) {
-          console.error("Avatar safeSetDoc failed:", err3);
-          throw err3;
-        }
+      const updatedMemberData: Member = {
+        ...member,
+        avatarUrl: compressedBase64,
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Update Firestore
+      await safeSetDoc('members', member.id, updatedMemberData);
+
+      // 2. Persist to Express backend
+      fetch(`/api/members/${member.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: compressedBase64 })
+      }).catch(err => console.warn('[Avatar] Server sync notice:', err));
+
+      // 3. Notify parent app state
+      if (onUpdateMember) {
+        onUpdateMember(updatedMemberData);
       }
-      
-      showAlert('Success', 'Profile picture updated successfully!');
-    } catch (err) {
-      showAlert('Error', 'Failed to update profile picture.');
-      console.error(err);
+
+      // 4. Update localStorage
+      try {
+        const raw = localStorage.getItem('wtc_members');
+        if (raw) {
+          const list = JSON.parse(raw);
+          const next = list.map((m: any) => m.id === member.id ? { ...m, avatarUrl: compressedBase64 } : m);
+          localStorage.setItem('wtc_members', JSON.stringify(next));
+        }
+      } catch {}
+
+      showAlert('Foto profil berhasil diubah!', 'Foto Diperbarui', 'success');
+    } catch (err: any) {
+      console.error('Avatar upload error:', err);
+      showAlert('Gagal memperbarui foto profil: ' + (err.message || 'Ukuran gambar terlalu besar atau terjadi kendala jaringan'), 'Gagal Mengunggah', 'error');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!member?.id) return;
+    setIsSavingProfile(true);
+    try {
+      const cleanEmail = profileEmail.trim();
+      const cleanAddress = profileAddress.trim();
+
+      const updatedMemberData: Member = {
+        ...member,
+        email: cleanEmail,
+        address: cleanAddress,
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Update Firestore
+      await safeSetDoc('members', member.id, updatedMemberData);
+
+      // 2. Update Server API
+      fetch(`/api/members/${member.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, address: cleanAddress })
+      }).catch(err => console.warn('[Profile] Server PUT sync notice:', err));
+
+      // 3. Notify parent app state
+      if (onUpdateMember) {
+        onUpdateMember(updatedMemberData);
+      }
+
+      // 4. Update localStorage
+      try {
+        const raw = localStorage.getItem('wtc_members');
+        if (raw) {
+          const list = JSON.parse(raw);
+          const next = list.map((m: any) => m.id === member.id ? { ...m, ...updatedMemberData } : m);
+          localStorage.setItem('wtc_members', JSON.stringify(next));
+        }
+      } catch {}
+
+      showAlert('Alamat pengiriman dan email berhasil disimpan!', 'Berhasil Disimpan', 'success');
+    } catch (err: any) {
+      console.error('Failed to save profile changes:', err);
+      showAlert('Gagal menyimpan perubahan alamat: ' + (err.message || 'Periksa koneksi internet'), 'Gagal Menyimpan', 'error');
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -372,27 +463,55 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [geolocationError, setGeolocationError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>('ALL');
+
+  const requestUserLocation = () => {
+    if (!('geolocation' in navigator)) {
+      setGeolocationError('Perangkat Anda tidak mendukung fitur Geolocation GPS.');
+      return;
+    }
+    setIsLocating(true);
+    setGeolocationError(null);
+
+    const onSuccess = (position: GeolocationPosition) => {
+      setUserLocation({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      });
+      setGeolocationError(null);
+      setIsLocating(false);
+    };
+
+    const onError = (error: GeolocationPositionError) => {
+      console.warn('High accuracy geolocation failed, trying standard accuracy...', error);
+      navigator.geolocation.getCurrentPosition(
+        onSuccess,
+        (fallbackError) => {
+          console.warn('Geolocation completely unavailable:', fallbackError);
+          setIsLocating(false);
+          let errorMsg = 'Izin lokasi belum aktif. Aktifkan GPS atau gunakan pencarian nama mall / filter wilayah.';
+          if (fallbackError.code === fallbackError.PERMISSION_DENIED) {
+            errorMsg = 'Akses lokasi ditolak di browser. Aktifkan izin lokasi di pengaturan browser untuk mengurutkan cabang terdekat.';
+          } else if (fallbackError.code === fallbackError.TIMEOUT) {
+            errorMsg = 'Pencarian sinyal GPS memakan waktu terlalu lama. Gunakan pencarian manual atau filter wilayah di bawah.';
+          }
+          setGeolocationError(errorMsg);
+        },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
+      );
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      onSuccess,
+      onError,
+      { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
+    );
+  };
 
   useEffect(() => {
-    if (activeTab === 'STORES') {
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setUserLocation({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            });
-            setGeolocationError(null);
-          },
-          (error) => {
-            console.warn('Geolocation error:', error);
-            setGeolocationError('Please enable GPS to see nearby stores, or use the search bar above.');
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-        );
-      } else {
-        setGeolocationError('GPS is not supported on this device. Use the search bar to find stores.');
-      }
+    if (activeTab === 'STORES' && !userLocation && !geolocationError) {
+      requestUserLocation();
     }
   }, [activeTab]);
 
@@ -426,6 +545,36 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
       result = result.filter(s => s.id !== 'HO' && s.type !== 'HO');
     }
 
+    // Apply Region Filter chip
+    if (selectedRegionFilter !== 'ALL') {
+      result = result.filter(s => {
+        const reg = (s.region || '').toLowerCase();
+        const city = (s.city || '').toLowerCase();
+        const name = (s.name || '').toLowerCase();
+        const addr = (s.address || '').toLowerCase();
+        
+        if (selectedRegionFilter === 'JAKARTA') {
+          return reg.includes('jakarta') || city.includes('jakarta') || addr.includes('jakarta') || name.includes('jakarta') || name.includes('puri') || name.includes('kokas');
+        }
+        if (selectedRegionFilter === 'BOGOR_DEPOK_BEKASI') {
+          return city.includes('bogor') || city.includes('depok') || city.includes('bekasi') || city.includes('tangerang') || reg.includes('jabodetabek');
+        }
+        if (selectedRegionFilter === 'JAWA_BARAT') {
+          return reg.includes('jawa barat') || city.includes('bandung') || city.includes('cirebon') || city.includes('karawang');
+        }
+        if (selectedRegionFilter === 'JAWA_TENGAH_DIY') {
+          return reg.includes('jawa tengah') || reg.includes('diy') || city.includes('semarang') || city.includes('solo') || city.includes('yogyakarta');
+        }
+        if (selectedRegionFilter === 'JAWA_TIMUR') {
+          return reg.includes('jawa timur') || city.includes('surabaya') || city.includes('malang') || city.includes('sidoarjo') || city.includes('jember');
+        }
+        if (selectedRegionFilter === 'LUAR_JAWA') {
+          return reg.includes('bali') || reg.includes('kalimantan') || reg.includes('sulawesi') || reg.includes('sumatera') || reg.includes('papua');
+        }
+        return true;
+      });
+    }
+
     if (userLocation) {
       result = result.map(s => {
         if (typeof s.latitude === 'number' && !isNaN(s.latitude) && typeof s.longitude === 'number' && !isNaN(s.longitude)) {
@@ -444,7 +593,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
       });
     }
     return result;
-  }, [stores, storeSearch, userLocation]);
+  }, [stores, storeSearch, selectedRegionFilter, userLocation]);
 
   // Map transactions using provided store dataset
     const memberTransactions = useMemo(() => {
@@ -769,35 +918,102 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
           <div className="animate-fadeIn pb-5">
             <div className="px-5 pt-5 pb-2.5">
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Our Stores</h1>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1 mb-4">Official Watch Club store locations across Indonesia</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1 mb-4">Lokasi resmi butik Watch Club di seluruh Indonesia</p>
               
-              <div className="relative w-full">
+              <div className="relative w-full mb-3">
                 <Search className="absolute left-[18px] top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 w-4 h-4" />
                 <input 
                   type="text" 
                   value={storeSearch}
                   onChange={e => setStoreSearch(e.target.value)}
-                  placeholder="Search store name, mall, or city..." 
-                  className="w-full py-3 pr-5 pl-11 rounded-full border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-[0.95rem] text-neutral-900 dark:text-white shadow-sm dark:shadow-none transition-all focus:outline-none focus:border-slate-400 focus:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+                  placeholder="Cari nama mall, kota, atau cabang..." 
+                  className="w-full py-3 pr-5 pl-11 rounded-full border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-[0.95rem] text-neutral-900 dark:text-white shadow-sm dark:shadow-none transition-all focus:outline-none focus:border-amber-500 focus:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
                 />
+              </div>
+
+              {/* REGION FILTER CHIPS */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                {[
+                  { id: 'ALL', label: 'Semua Cabang' },
+                  { id: 'JAKARTA', label: 'Jakarta' },
+                  { id: 'BOGOR_DEPOK_BEKASI', label: 'BODETABEK' },
+                  { id: 'JAWA_BARAT', label: 'Jawa Barat' },
+                  { id: 'JAWA_TENGAH_DIY', label: 'Jateng & DIY' },
+                  { id: 'JAWA_TIMUR', label: 'Jawa Timur' },
+                  { id: 'LUAR_JAWA', label: 'Luar Jawa & Bali' }
+                ].map((chip) => {
+                  const isActive = selectedRegionFilter === chip.id;
+                  return (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => setSelectedRegionFilter(chip.id)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 shadow-sm'
+                          : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-600 dark:bg-white/5 dark:text-neutral-400 dark:hover:bg-white/10'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {geolocationError && (
-              <div className="mx-5 mb-2 p-3 bg-amber-50 text-amber-800 text-[13px] font-medium rounded-xl border border-amber-200/50 flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
-                <p>{geolocationError}</p>
+            {/* GPS STATUS BANNER */}
+            {userLocation ? (
+              <div className="mx-5 mb-3 p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-medium rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-between gap-2 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span>GPS Aktif: Mengurutkan cabang dari yang terdekat</span>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={requestUserLocation}
+                  disabled={isLocating}
+                  className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/60 dark:hover:bg-emerald-900 text-emerald-900 dark:text-emerald-200 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                >
+                  <Navigation className={`w-3 h-3 ${isLocating ? 'animate-spin' : ''}`} />
+                  {isLocating ? 'Mencari...' : 'Perbarui'}
+                </button>
               </div>
-            )}
+            ) : geolocationError ? (
+              <div className="mx-5 mb-3 p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs font-medium rounded-xl border border-amber-200/60 dark:border-amber-800/40 flex items-center justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0">
+                  <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <p className="truncate">{geolocationError}</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={requestUserLocation}
+                  disabled={isLocating}
+                  className="px-3 py-1.5 bg-amber-200/80 hover:bg-amber-300 dark:bg-amber-900/60 dark:hover:bg-amber-800 text-amber-950 dark:text-amber-100 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0"
+                >
+                  {isLocating ? 'Mendeteksi...' : 'Aktifkan GPS'}
+                </button>
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-4 px-5 py-2.5 pb-5">
-              {filteredStores.map((store, idx) => (
-                <StoreCard 
-                  key={store.id || idx} 
-                  store={store} 
-                  index={idx} 
-                />
-              ))}
+              {filteredStores.length === 0 ? (
+                <div className="text-center py-12 text-neutral-400">
+                  <MapPin className="w-10 h-10 mx-auto text-neutral-300 dark:text-neutral-600 mb-2" />
+                  <p className="font-semibold text-sm">Tidak ada toko yang cocok</p>
+                  <p className="text-xs mt-1">Coba gunakan kata kunci pencarian lain atau pilih filter "Semua Cabang"</p>
+                </div>
+              ) : (
+                filteredStores.map((store, idx) => (
+                  <StoreCard 
+                    key={store.id || idx} 
+                    store={store} 
+                    index={idx} 
+                  />
+                ))
+              )}
             </div>
           </div>
         )}
@@ -806,7 +1022,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
           <div className="animate-fadeIn pb-5">
             <div className="px-5 pt-5 pb-2.5 text-center">
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">My Profile</h1>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Manage your account information</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Kelola data akun dan alamat pengiriman Anda</p>
             </div>
 
             <section className="px-5 pt-2.5 pb-[30px]">
@@ -814,18 +1030,25 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 
                 <div className="relative mb-6 flex flex-col items-center">
                   <div 
-                    className="w-[80px] h-[80px] rounded-full bg-slate-100 dark:bg-black text-white flex justify-center items-center text-2xl font-bold shadow-sm overflow-hidden group relative cursor-pointer"
-                    onClick={() => fileInputRef.current?.click()}
+                    className="w-[88px] h-[88px] rounded-full bg-slate-100 dark:bg-black text-white flex justify-center items-center text-2xl font-bold shadow-md overflow-hidden group relative cursor-pointer ring-4 ring-neutral-200 dark:ring-neutral-800"
+                    onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
                   >
-                    {member.avatarUrl ? (
+                    {isUploadingAvatar ? (
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
+                        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin mb-1"></div>
+                        <span className="text-[10px] font-medium">Menyimpan...</span>
+                      </div>
+                    ) : member.avatarUrl ? (
                       <img src={member.avatarUrl} alt={member.name || 'Member'} className="w-full h-full object-cover object-center" />
                     ) : (
                       (member.name || 'M').charAt(0).toUpperCase()
                     )}
                     
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Camera className="w-6 h-6 text-white" />
-                    </div>
+                    {!isUploadingAvatar && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="w-6 h-6 text-white" />
+                      </div>
+                    )}
                   </div>
                   <input 
                     type="file" 
@@ -835,7 +1058,13 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     onChange={handleAvatarUpload}
                   />
                   <div className="text-center mt-3">
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Click to change picture</p>
+                    <button
+                      type="button"
+                      onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
+                      className="text-xs text-amber-600 dark:text-amber-400 hover:underline font-semibold cursor-pointer"
+                    >
+                      {isUploadingAvatar ? 'Mengunggah foto...' : 'Ubah Foto Profil'}
+                    </button>
                   </div>
                 </div>
 
@@ -850,32 +1079,51 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   </div>
                 </div>
 
-                <form className="w-full max-w-[400px] space-y-4 text-left" onSubmit={e => e.preventDefault()}>
+                <form className="w-full max-w-[400px] space-y-4 text-left" onSubmit={handleSaveProfile}>
                   <div>
-                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Full Name</label>
-                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member.name} readOnly disabled />
+                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Nama Lengkap</label>
+                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-100 dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member.name} readOnly disabled />
                   </div>
                   
                   <div>
-                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Phone Number</label>
-                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member.phone} readOnly disabled />
+                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Nomor WhatsApp / HP</label>
+                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-100 dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member.phone} readOnly disabled />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Email Address</label>
-                    <input type="email" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:border-slate-900 text-sm font-medium" placeholder="Enter your email" defaultValue={member.email || ''} />
+                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Alamat Email</label>
+                    <input 
+                      type="email" 
+                      value={profileEmail}
+                      onChange={e => setProfileEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm font-medium transition-all" 
+                      placeholder="nama@email.com" 
+                    />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Delivery Address</label>
-                    <textarea className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:border-slate-900 text-sm font-medium resize-y min-h-[70px]" placeholder="Enter your full address" defaultValue={member.address || ''}></textarea>
+                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Alamat Pengiriman (Delivery Address)</label>
+                    <textarea 
+                      value={profileAddress}
+                      onChange={e => setProfileAddress(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm font-medium resize-y min-h-[80px] transition-all" 
+                      placeholder="Tuliskan alamat lengkap pengiriman hadiah voucher/merchandise..."
+                    ></textarea>
                   </div>
 
                   <button 
                     type="submit" 
-                    className="w-full h-11 sm:h-12 bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-100 dark:text-neutral-950 rounded-xl text-xs sm:text-[13px] font-semibold tracking-wide transition-all duration-200 shadow-xs active:scale-[0.99] cursor-pointer mt-2"
+                    disabled={isSavingProfile}
+                    className="w-full h-11 sm:h-12 bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-100 dark:text-neutral-950 disabled:opacity-50 rounded-xl text-xs sm:text-[13px] font-semibold tracking-wide transition-all duration-200 shadow-sm active:scale-[0.99] cursor-pointer mt-2 flex items-center justify-center gap-2"
                   >
-                    Save Changes
+                    {isSavingProfile ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                        <span>Menyimpan Perubahan...</span>
+                      </>
+                    ) : (
+                      <span>Simpan Perubahan</span>
+                    )}
                   </button>
                 </form>
 

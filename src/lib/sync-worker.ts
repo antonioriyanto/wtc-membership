@@ -198,6 +198,21 @@ async function executeMemberSyncPassInternal(
 
   try {
     const deletedIds = getDeletedMemberIds();
+
+    // Query backend for centrally deleted IDs
+    try {
+      const delRes = await fetch('/api/members/deleted-ids');
+      if (delRes.ok) {
+        const delJson = await delRes.json();
+        if (Array.isArray(delJson.deletedIds)) {
+          delJson.deletedIds.forEach((id: string) => {
+            deletedIds.add(id);
+            recordDeletedMemberId(id);
+          });
+        }
+      }
+    } catch {}
+
     // Working copy of local members
     let workingLocal = [...localMembers];
     const storage = getStorage();
@@ -356,23 +371,40 @@ async function executeMemberSyncPassInternal(
         (fm) => fm.id === localMem.id || isSamePhoneNumber(fm.phone || '', localMem.phone || '')
       );
       if (!existsInFirestore) {
-        discrepanciesCount++;
-        try {
-          await retryWithBackoff(() => safeSetDoc("members", localMem.id, localMem), { maxAttempts: 2, initialDelayMs: 250 });
-          firestoreMembers.push(localMem);
-          resolvedCount++;
-          actions.push(`Synced local member ${localMem.name} (${localMem.id}) to Firestore`);
-        } catch (err: any) {
-          console.warn(`[SyncWorker] Could not sync local member ${localMem.id} to Firestore:`, err);
+        if ((localMem as any).isPendingSync) {
+          discrepanciesCount++;
+          try {
+            await retryWithBackoff(() => safeSetDoc("members", localMem.id, localMem), { maxAttempts: 2, initialDelayMs: 250 });
+            firestoreMembers.push(localMem);
+            resolvedCount++;
+            actions.push(`Synced new offline member ${localMem.name} (${localMem.id}) to Firestore`);
+          } catch (err: any) {
+            console.warn(`[SyncWorker] Could not sync local member ${localMem.id} to Firestore:`, err);
+          }
+        } else if (firestoreMembers.length > 0) {
+          // If Firestore is populated and member is missing, it was deleted in HO database!
+          // Mark as deleted so it is completely purged from local state and cannot be resurrected
+          deletedIds.add(localMem.id);
+          recordDeletedMemberId(localMem.id);
+          actions.push(`Pruned unverified local member ${localMem.name || localMem.id} from local cache`);
         }
       }
     }
 
     // 4. CHECK: Member exists in Firestore but missing or outdated in local state
     const reconciledLocalMap = new Map<string, Member>();
-    for (const localMem of workingLocal) {
-      if (localMem && localMem.id && !deletedIds.has(localMem.id)) {
-        reconciledLocalMap.set(localMem.id, localMem);
+    // When Firestore has authoritative data, we only keep members that exist in Firestore or are pending sync
+    if (firestoreMembers.length > 0) {
+      for (const localMem of workingLocal) {
+        if (localMem && localMem.id && (localMem as any).isPendingSync && !deletedIds.has(localMem.id)) {
+          reconciledLocalMap.set(localMem.id, localMem);
+        }
+      }
+    } else {
+      for (const localMem of workingLocal) {
+        if (localMem && localMem.id && !deletedIds.has(localMem.id)) {
+          reconciledLocalMap.set(localMem.id, localMem);
+        }
       }
     }
 
@@ -501,6 +533,22 @@ async function executeMemberSyncPassInternal(
         }
       } catch (err) {
         console.warn("Could not write reconciled members to localStorage:", err);
+      }
+    }
+
+    // Validate customer session against authoritative database:
+    // If logged-in member was deleted from database, purge session immediately
+    if (loggedInMemberId) {
+      const activeId = updatedLoggedInId || loggedInMemberId;
+      const sessionStillValid = finalMembersList.some(m => m.id === activeId);
+      if (!sessionStillValid && firestoreMembers.length > 0) {
+        console.warn(`[SyncWorker] Customer session ${activeId} was deleted from database. Purging session.`);
+        if (storage) {
+          storage.removeItem('wtc_logged_in_member');
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('wtc_auth_session_invalidated'));
+        }
       }
     }
 

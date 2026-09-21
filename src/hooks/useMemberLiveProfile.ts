@@ -31,6 +31,15 @@ export function useMemberLiveProfile(memberId: string | null) {
         } else {
           setProfile(null);
           setError('Profile document not found');
+          // Document has been deleted from Firestore: invalidate local session immediately
+          try {
+            const current = localStorage.getItem('wtc_logged_in_member');
+            if (current === memberId) {
+              console.warn(`[useMemberLiveProfile] Member ${memberId} missing or deleted from Firestore. Clearing session.`);
+              localStorage.removeItem('wtc_logged_in_member');
+              window.dispatchEvent(new Event('wtc_auth_session_invalidated'));
+            }
+          } catch {}
         }
         setLoading(false);
       },

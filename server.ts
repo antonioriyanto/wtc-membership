@@ -209,6 +209,30 @@ async function startServer() {
 
   // Persistent Server-Side Member Management (members.json)
   const membersFilePath = path.join(dataDir, 'members.json');
+  const deletedMembersFilePath = path.join(dataDir, 'deleted_members.json');
+
+  const getStoredDeletedMemberIds = (): string[] => {
+    try {
+      if (fs.existsSync(deletedMembersFilePath)) {
+        const raw = fs.readFileSync(deletedMembersFilePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  };
+
+  const addDeletedMemberId = (id: string) => {
+    try {
+      const current = getStoredDeletedMemberIds();
+      if (!current.includes(id)) {
+        current.push(id);
+        fs.writeFileSync(deletedMembersFilePath, JSON.stringify(current, null, 2), 'utf-8');
+      }
+    } catch (e) {
+      console.warn('[Server] Could not write deleted_members.json:', e);
+    }
+  };
 
   const normalizePhone = (phoneStr: string): string => {
     if (!phoneStr) return '';
@@ -402,6 +426,43 @@ async function startServer() {
       const newMember = { id: memberId, ...updateData };
       saveStoredMembers([newMember, ...members]);
       res.json({ success: true, member: newMember });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // DELETE /api/members/:id - Permanently delete member from stored members and Firestore
+  app.delete('/api/members/:id', async (req, res) => {
+    try {
+      const memberId = req.params.id;
+      const members = getStoredMembers();
+      const updatedList = members.filter((m: any) => 
+        String(m.id) !== String(memberId) && 
+        String(m.membershipId) !== String(memberId)
+      );
+      saveStoredMembers(updatedList);
+
+      // Record tombstone permanently
+      addDeletedMemberId(memberId);
+
+      if (db) {
+        try {
+          await db.collection('members').doc(String(memberId)).delete();
+        } catch (fErr: any) {
+          console.warn('[Server] Firebase Admin member delete notice:', fErr.message);
+        }
+      }
+
+      res.json({ success: true, message: 'Member deleted successfully', deletedId: memberId });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // GET /api/members/deleted-ids - Fetch list of permanently deleted member IDs
+  app.get('/api/members/deleted-ids', (_req, res) => {
+    try {
+      res.json({ success: true, deletedIds: getStoredDeletedMemberIds() });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err?.message || err });
     }

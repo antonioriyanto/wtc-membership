@@ -102,6 +102,7 @@ export interface Member {
   birthDate?: string;
   address?: string;
   status: 'ACTIVE' | 'SUSPENDED';
+  updatedAt?: string;
 
   // Cryptographic Credential & Recovery Attributes
   pinHash?: string;

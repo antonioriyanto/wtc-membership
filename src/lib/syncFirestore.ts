@@ -108,17 +108,19 @@ export function cleanAndEnrichStore(rawStore: any): StoreBranch {
 
   const email = isOfficialBranch && fallback.email ? fallback.email : (rawStore.email || fallback.email);
 
-  const latitude = (isOfficialBranch && fallback.latitude !== undefined)
+  // For official branches, ALWAYS enforce verified real GPS coordinates from initialStores!
+  // This prevents corrupted Firestore or localStorage coordinates from misplacing stores (e.g. Semarang vs Jakarta Barat).
+  const latitude = (fallback.latitude !== undefined && fallback.latitude !== null && !isNaN(fallback.latitude))
     ? fallback.latitude
     : ((rawStore.latitude !== undefined && rawStore.latitude !== null && !isNaN(Number(rawStore.latitude)))
       ? Number(rawStore.latitude)
-      : fallback.latitude);
+      : undefined);
 
-  const longitude = (isOfficialBranch && fallback.longitude !== undefined)
+  const longitude = (fallback.longitude !== undefined && fallback.longitude !== null && !isNaN(fallback.longitude))
     ? fallback.longitude
     : ((rawStore.longitude !== undefined && rawStore.longitude !== null && !isNaN(Number(rawStore.longitude)))
       ? Number(rawStore.longitude)
-      : fallback.longitude);
+      : undefined);
 
   return {
     ...fallback,

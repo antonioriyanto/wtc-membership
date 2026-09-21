@@ -935,7 +935,7 @@ export default function App() {
       <Route path="/member" element={
         loggedInMemberId ? (
           <CustomerMemberView 
-            member={members.find(m => m.id === loggedInMemberId) || members[0] || { id: loggedInMemberId || 'guest', name: 'Member', phone: '', membershipId: 'WTC-000000', points: 0, tier: 'SILVER', joinDate: new Date().toISOString(), registeredStore: 'Puri Jakarta', lastStoreVisited: 'Puri Jakarta', lastVisitDate: new Date().toISOString(), email: '', lifetimePoints: 0, totalSpend: 0, gender: 'Wanita', status: 'ACTIVE' }}
+            member={members.find(m => m.id === loggedInMemberId) || { id: loggedInMemberId, name: 'Member', phone: '', membershipId: 'WTC-000000', points: 0, tier: 'SILVER', joinDate: new Date().toISOString(), registeredStore: 'Puri Jakarta', lastStoreVisited: 'Puri Jakarta', lastVisitDate: new Date().toISOString(), email: '', lifetimePoints: 0, totalSpend: 0, gender: 'Wanita', status: 'ACTIVE' }}
             vouchers={vouchers}
             stores={stores}
             transactions={transactions}
@@ -947,6 +947,14 @@ export default function App() {
             campaigns={campaigns}
             tickets={supportTickets}
             onSubmitTicket={handleMemberSubmitTicket}
+            onUpdateMember={(updated) => {
+              setMembers(prev => {
+                const exists = prev.some(m => m.id === updated.id);
+                const next = exists ? prev.map(m => m.id === updated.id ? { ...m, ...updated } : m) : [updated, ...prev];
+                try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+                return next;
+              });
+            }}
           />
         ) : (
           <MemberLogin 
