@@ -19,7 +19,7 @@ interface CashierTabProps {
   stores?: StoreBranch[];
   cashierName?: string;
   autoSelectMemberId?: string;
-  onAddPoints: (memberId: string, amount: number, receiptNo: string) => void;
+  onAddPoints: (memberId: string, amount: number, receiptNo: string) => Promise<boolean | void> | boolean | void;
   onRedeemVoucher: (memberId: string, voucherCode: string) => void;
   onOpenCreateMember: () => void;
   onMemberUpdated?: (updated: Member) => void;
@@ -165,23 +165,26 @@ export const CashierTab: React.FC<CashierTabProps> = ({
     }
   });
 
-  const handleAddPointsSubmit = () => {
+  const handleAddPointsSubmit = async () => {
     if (!activeMember || !receiptInput || parsedAmount <= 0 || isSubmitting || isSubmittingPointsRef.current) return;
     isSubmittingPointsRef.current = true;
     const currentMemberId = activeMember.id;
     const currentAmount = parsedAmount;
     const currentReceipt = receiptInput;
 
-    setReceiptInput('');
-    setAmountInput('');
-    setActiveMember(null);
-
     try {
-      onAddPoints(currentMemberId, currentAmount, currentReceipt);
+      const res = await onAddPoints(currentMemberId, currentAmount, currentReceipt);
+      if (res !== false) {
+        setReceiptInput('');
+        setAmountInput('');
+        setActiveMember(null);
+      }
+    } catch (err) {
+      console.error("Point addition failed:", err);
     } finally {
       setTimeout(() => {
         isSubmittingPointsRef.current = false;
-      }, 1000);
+      }, 500);
     }
   };
 

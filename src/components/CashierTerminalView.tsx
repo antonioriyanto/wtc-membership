@@ -104,7 +104,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       const member = members.find(m => m.id === memberId || m.membershipId === memberId || m.phone === memberId);
       if (!member) {
         showAlert('Data member tidak ditemukan dalam sistem.', 'Member Tidak Ditemukan', 'error');
-        return;
+        return false;
       }
 
       const cleanReceipt = (receiptNo || '').trim();
@@ -112,23 +112,22 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
 
       if (!cleanReceipt) {
         showAlert('Silakan masukkan nomor struk transaksi.', 'Nomor Struk Kosong', 'warning');
-        return;
+        return false;
       }
 
       if (numericAmount <= 0) {
         showAlert('Nilai transaksi belanja harus lebih besar dari Rp 0.', 'Nominal Tidak Valid', 'warning');
-        return;
+        return false;
       }
 
       // Safeguard: Check locally first (optimistic check)
       const isDuplicateRecent = transactions.some(t => 
         t.receiptNo && 
-        (t.receiptNo || '').trim().toLowerCase() === cleanReceipt.toLowerCase() && 
-        (t.memberId === member.id || t.memberId === member.membershipId)
+        (t.receiptNo || '').trim().toLowerCase() === cleanReceipt.toLowerCase()
       );
       if (isDuplicateRecent) {
         showAlert('Nomor struk ini sudah pernah ditukarkan poin sebelumnya.', 'Transaksi Ditolak', 'error');
-        return;
+        return false;
       }
 
       const effectiveConfig = loyaltyConfig || getLoyaltyConfig();
@@ -186,7 +185,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
         } else if (parsed && parsed.error && (parsed.error.includes('sudah pernah') || parsed.error.includes('duplicate'))) {
           // Reject genuine duplicate receipt from server
           showAlert(parsed.error, 'Transaksi Ditolak', 'error');
-          return;
+          return false;
         } else {
           console.warn('Backend API add-points response was non-OK or non-standard, adopting resilient local sync:', rawText?.substring(0, 100));
         }
@@ -261,19 +260,25 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       showAlert(`Transaksi berhasil! +${savedTrx.pointsDelta} Poin ditambahkan ke ${updatedMember.name}.`, 'Transaksi Berhasil', 'success');
 
       if (loyaltyConfig?.enableWhatsAppNotifications && updatedMember.phone) {
-        let phoneNum = updatedMember.phone.replace(/\D/g, '');
-        if (phoneNum.startsWith('0')) {
-          phoneNum = '62' + phoneNum.substring(1);
-        }
-        if (phoneNum.length >= 10) {
-          const waText = `Halo ${updatedMember.name}, Terima kasih telah berbelanja di ${savedTrx.storeName}. Transaksi Anda (Struk: ${savedTrx.receiptNo}) senilai Rp ${savedTrx.amount.toLocaleString('id-ID')} telah berhasil. Anda mendapatkan +${savedTrx.pointsDelta} Poin! Total Poin Anda saat ini adalah ${updatedMember.points} Poin.`;
-          const encodedText = encodeURIComponent(waText);
-          window.open(`https://wa.me/${phoneNum}?text=${encodedText}`, '_blank');
+        try {
+          let phoneNum = updatedMember.phone.replace(/\D/g, '');
+          if (phoneNum.startsWith('0')) {
+            phoneNum = '62' + phoneNum.substring(1);
+          }
+          if (phoneNum.length >= 10) {
+            const waText = `Halo ${updatedMember.name}, Terima kasih telah berbelanja di ${savedTrx.storeName}. Transaksi Anda (Struk: ${savedTrx.receiptNo}) senilai Rp ${savedTrx.amount.toLocaleString('id-ID')} telah berhasil. Anda mendapatkan +${savedTrx.pointsDelta} Poin! Total Poin Anda saat ini adalah ${updatedMember.points} Poin.`;
+            const encodedText = encodeURIComponent(waText);
+            window.open(`https://wa.me/${phoneNum}?text=${encodedText}`, '_blank');
+          }
+        } catch (waErr) {
+          console.warn("WhatsApp notification popup blocked or unsupported:", waErr);
         }
       }
+      return true;
     } catch (unexpectedErr: any) {
       console.error("Unexpected points handler error:", unexpectedErr);
       showAlert(unexpectedErr?.message || 'Terjadi kesalahan sistem saat memproses poin.', 'Error', 'error');
+      return false;
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
