@@ -44,7 +44,7 @@ type LoginStep =
   | 'MANDATORY_PIN_CHANGE_CREATE'
   | 'MANDATORY_PIN_CHANGE_CONFIRM';
 
-export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoogle }) => {
+export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoogle, members = [] }) => {
   const [step, setStep] = useState<LoginStep>('PHONE');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -111,7 +111,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
     setSuccessMsg('');
 
     try {
-      const result = await precheckCustomer(cleanPhone);
+      const result = await precheckCustomer(cleanPhone, members);
       setMemberInfo(result);
 
       if (!result.exists) {
@@ -225,7 +225,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
     setError('');
 
     try {
-      const res = await verifyCustomerPinClient(phone, pinToVerify);
+      const res = await verifyCustomerPinClient(phone, pinToVerify, members);
       if (res.success) {
         // If customer account requires mandatory PIN change (e.g. from cashier temporary PIN)
         if (res.memberDoc?.forcePinChangeOnNextLogin) {
@@ -561,7 +561,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             )}
 
             {/* Strict Portal Isolation: Luxury Customer Care Footer (No /admin or /cashier) */}
-            <div className="pt-4 border-t border-black/5 dark:border-white/10/80 text-center space-y-2">
+            <div className="pt-4 border-t border-black/5 dark:border-white/10 text-center space-y-2">
               <div className="flex items-center justify-center text-xs font-medium text-neutral-500 dark:text-neutral-400">
                 <a 
                   href="mailto:customercare@watchclub.co.id" 
@@ -972,7 +972,7 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
             </div>
 
             {/* Member Card Snapshot */}
-            <div className="p-3.5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10/80 rounded-2xl space-y-1 text-xs text-neutral-600 dark:text-neutral-400">
+            <div className="p-3.5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-2xl space-y-1 text-xs text-neutral-600 dark:text-neutral-400">
               <div className="flex justify-between items-center">
                 <span>Member Terdaftar:</span>
                 <span className="font-semibold text-neutral-900 dark:text-white">{memberInfo?.name || 'Member Watch Club'}</span>

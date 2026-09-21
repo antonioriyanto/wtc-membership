@@ -32,14 +32,21 @@ export interface VerifyPinResult {
  * Pre-checks a customer's registered status and PIN configuration by phone.
  * Never leaks the pinHash or pinSalt to the calling UI.
  */
-export async function precheckCustomer(rawPhone: string): Promise<PrecheckResult> {
-  const phoneE164 = toE164(rawPhone);
-  if (!phoneE164) {
+export async function precheckCustomer(rawPhone: string, fallbackMembers?: any[]): Promise<PrecheckResult> {
+  const cleanPhone = (rawPhone || '').trim();
+  const digits = cleanPhone.replace(/[^0-9]/g, '');
+  if (digits.length < 8) {
     return { exists: false, isPinSet: false, isLocked: false, remainingLockoutSeconds: 0 };
   }
 
-  // Find member in Firestore
-  const member = await findMemberByPhoneInFirestore(rawPhone);
+  // 1. Find member via Server API, Firestore, or LocalStorage
+  let member = await findMemberByPhoneInFirestore(rawPhone);
+
+  // 2. If not found, check caller-passed members state
+  if (!member && Array.isArray(fallbackMembers) && fallbackMembers.length > 0) {
+    member = fallbackMembers.find((m: any) => m && m.phone && isSamePhoneNumber(m.phone, rawPhone)) || null;
+  }
+
   if (!member) {
     return { exists: false, isPinSet: false, isLocked: false, remainingLockoutSeconds: 0 };
   }
@@ -64,14 +71,20 @@ export async function precheckCustomer(rawPhone: string): Promise<PrecheckResult
  */
 export async function verifyCustomerPinClient(
   rawPhone: string, 
-  enteredPin: string
+  enteredPin: string,
+  fallbackMembers?: any[]
 ): Promise<VerifyPinResult> {
-  const phoneE164 = toE164(rawPhone);
-  if (!phoneE164 || !enteredPin) {
+  const cleanPhone = (rawPhone || '').trim();
+  const digits = cleanPhone.replace(/[^0-9]/g, '');
+  if (digits.length < 8 || !enteredPin) {
     throw new Error('Nomor HP dan 6-digit PIN wajib diisi.');
   }
 
-  const member = await findMemberByPhoneInFirestore(rawPhone);
+  let member = await findMemberByPhoneInFirestore(rawPhone);
+  if (!member && Array.isArray(fallbackMembers) && fallbackMembers.length > 0) {
+    member = fallbackMembers.find((m: any) => m && m.phone && isSamePhoneNumber(m.phone, rawPhone)) || null;
+  }
+
   if (!member) {
     throw new Error('Akun member tidak ditemukan.');
   }

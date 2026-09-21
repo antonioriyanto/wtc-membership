@@ -207,6 +207,249 @@ async function startServer() {
     }
   });
 
+  // Persistent Server-Side Member Management (members.json)
+  const membersFilePath = path.join(dataDir, 'members.json');
+
+  const normalizePhone = (phoneStr: string): string => {
+    if (!phoneStr) return '';
+    let digits = String(phoneStr).replace(/[^0-9]/g, '');
+    if (digits.startsWith('62')) {
+      digits = '0' + digits.slice(2);
+    } else if (!digits.startsWith('0') && digits.length >= 8) {
+      digits = '0' + digits;
+    }
+    return digits;
+  };
+
+  const isPhoneMatch = (p1: string, p2: string): boolean => {
+    const n1 = normalizePhone(p1);
+    const n2 = normalizePhone(p2);
+    if (!n1 || !n2) return false;
+    if (n1 === n2) return true;
+    if (n1.length >= 8 && n2.length >= 8) {
+      return n1.slice(-8) === n2.slice(-8);
+    }
+    return false;
+  };
+
+  const getStoredMembers = (): any[] => {
+    try {
+      if (fs.existsSync(membersFilePath)) {
+        const raw = fs.readFileSync(membersFilePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (err) {
+      console.error('[Server] Error reading members.json:', err);
+    }
+    const defaultSeed = [
+      {
+        id: 'mem_kokas_0001',
+        membershipId: 'KOKAS0001',
+        name: 'Aan',
+        phone: '081903987051',
+        email: '',
+        birthDate: '',
+        gender: 'Pria',
+        registeredStore: 'Kota Kasablanka Jakarta',
+        lastStoreVisited: 'Kota Kasablanka Jakarta',
+        lastVisitDate: '2026-09-21T07:00:00.000Z',
+        joinDate: '2026-09-17T00:00:00.000Z',
+        points: 857,
+        lifetimePoints: 857,
+        totalSpend: 8570000,
+        tier: 'BLUE',
+        status: 'ACTIVE',
+        address: '',
+        isPinSet: false
+      },
+      {
+        id: 'mem_kokas_0002',
+        membershipId: 'KOKAS0002',
+        name: 'Aan',
+        phone: '081234567891',
+        email: '',
+        birthDate: '',
+        gender: 'Pria',
+        registeredStore: 'Kota Kasablanka Jakarta',
+        lastStoreVisited: 'Kota Kasablanka Jakarta',
+        lastVisitDate: '2026-09-21T07:00:00.000Z',
+        joinDate: '2026-09-17T00:00:00.000Z',
+        points: 0,
+        lifetimePoints: 0,
+        totalSpend: 0,
+        tier: 'BLUE',
+        status: 'ACTIVE',
+        address: '',
+        isPinSet: false
+      }
+    ];
+    try {
+      fs.writeFileSync(membersFilePath, JSON.stringify(defaultSeed, null, 2), 'utf-8');
+    } catch {}
+    return defaultSeed;
+  };
+
+  const saveStoredMembers = (membersList: any[]): void => {
+    try {
+      fs.writeFileSync(membersFilePath, JSON.stringify(membersList, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('[Server] Error saving members.json:', err);
+    }
+  };
+
+  // GET /api/members - Fetch all registered members
+  app.get('/api/members', (_req, res) => {
+    try {
+      const members = getStoredMembers();
+      res.json({ success: true, members });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // GET /api/members/by-phone/:phone - Lookup member by phone
+  app.get('/api/members/by-phone/:phone', (req, res) => {
+    try {
+      const phoneParam = req.params.phone;
+      const members = getStoredMembers();
+      const found = members.find((m: any) => m && m.phone && isPhoneMatch(m.phone, phoneParam));
+      if (found) {
+        return res.json({ success: true, exists: true, member: found });
+      }
+      return res.json({ success: true, exists: false, member: null });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // POST /api/members - Create or update member
+  app.post('/api/members', async (req, res) => {
+    try {
+      const memberData = req.body;
+      if (!memberData || (!memberData.phone && !memberData.id)) {
+        return res.status(400).json({ success: false, error: 'Valid member payload with id or phone required' });
+      }
+
+      const members = getStoredMembers();
+      const idx = members.findIndex((m: any) => 
+        (memberData.id && m.id === memberData.id) || 
+        (memberData.membershipId && m.membershipId === memberData.membershipId) ||
+        (memberData.phone && m.phone && isPhoneMatch(m.phone, memberData.phone))
+      );
+
+      let savedMember: any;
+      let updatedList: any[];
+
+      if (idx >= 0) {
+        savedMember = { ...members[idx], ...memberData };
+        members[idx] = savedMember;
+        updatedList = members;
+      } else {
+        savedMember = {
+          id: memberData.id || 'mem_' + Date.now(),
+          membershipId: memberData.membershipId || ('MEM' + Date.now().toString().slice(-6)),
+          name: memberData.name || 'Member',
+          phone: memberData.phone || '',
+          points: Number(memberData.points) || 0,
+          tier: memberData.tier || 'BLUE',
+          status: memberData.status || 'ACTIVE',
+          joinDate: memberData.joinDate || new Date().toISOString(),
+          ...memberData
+        };
+        updatedList = [savedMember, ...members];
+      }
+
+      saveStoredMembers(updatedList);
+
+      if (db && savedMember.id) {
+        try {
+          await db.collection('members').doc(String(savedMember.id)).set(savedMember, { merge: true });
+        } catch (fErr: any) {
+          console.warn('[Server] Firebase Admin member sync notice:', fErr.message);
+        }
+      }
+
+      res.json({ success: true, member: savedMember });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // PUT /api/members/:id - Update member by ID
+  app.put('/api/members/:id', async (req, res) => {
+    try {
+      const memberId = req.params.id;
+      const updateData = req.body;
+      if (!updateData) {
+        return res.status(400).json({ success: false, error: 'Update payload required' });
+      }
+
+      const members = getStoredMembers();
+      const idx = members.findIndex((m: any) => String(m.id) === String(memberId));
+      if (idx >= 0) {
+        members[idx] = { ...members[idx], ...updateData, id: memberId };
+        saveStoredMembers(members);
+
+        if (db) {
+          try {
+            await db.collection('members').doc(String(memberId)).set(members[idx], { merge: true });
+          } catch {}
+        }
+        return res.json({ success: true, member: members[idx] });
+      }
+
+      const newMember = { id: memberId, ...updateData };
+      saveStoredMembers([newMember, ...members]);
+      res.json({ success: true, member: newMember });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // POST /api/members/sync-all - Bulk merge members from client / localStorage
+  app.post('/api/members/sync-all', (req, res) => {
+    try {
+      const incoming = req.body?.members;
+      if (Array.isArray(incoming) && incoming.length > 0) {
+        const current = getStoredMembers();
+        const memberMap = new Map<string, any>();
+        current.forEach((m: any) => {
+          if (m && m.id) memberMap.set(m.id, m);
+        });
+
+        incoming.forEach((m: any) => {
+          if (!m || !m.phone) return;
+          const existingById = m.id ? memberMap.get(m.id) : null;
+          let existingByPhone: any = null;
+          if (!existingById) {
+            for (const existing of memberMap.values()) {
+              if (existing.phone && isPhoneMatch(existing.phone, m.phone)) {
+                existingByPhone = existing;
+                break;
+              }
+            }
+          }
+
+          const target = existingById || existingByPhone;
+          if (target) {
+            memberMap.set(target.id, { ...target, ...m });
+          } else {
+            const newId = m.id || ('mem_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+            memberMap.set(newId, { ...m, id: newId });
+          }
+        });
+
+        const merged = Array.from(memberMap.values());
+        saveStoredMembers(merged);
+        return res.json({ success: true, count: merged.length });
+      }
+      res.status(400).json({ success: false, error: 'Invalid members array' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
   // Secure Authentication Endpoint to mint Custom Tokens for Cashiers & HO Admins
   app.all('/api/auth/employee-login', async (req, res) => {
     try {

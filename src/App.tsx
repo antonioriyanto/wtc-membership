@@ -445,8 +445,11 @@ export default function App() {
       batch.set(doc(db, 'audit', auditEntry.id), auditEntry);
       await batch.commit();
     } catch (err) {
-      console.error("Firestore error:", err);
+      console.warn("Firestore error saving ticket, updating local state:", err);
     }
+    // Update local state and localStorage so the user immediately sees their ticket
+    setSupportTickets(prev => [created, ...prev]);
+    setAuditLogs(prev => [auditEntry, ...prev]);
   };
 
   const handleAddCampaign = async (campaign: any) => {
@@ -464,15 +467,23 @@ export default function App() {
       batch.set(doc(db, 'campaigns', campaign.id), campaign);
       batch.set(doc(db, 'audit', auditEntry.id), auditEntry);
       await batch.commit();
-    } catch (err) {}
+    } catch (err) {
+      console.warn("Firestore error saving campaign:", err);
+    }
+    setCampaigns(prev => [campaign, ...prev]);
+    setAuditLogs(prev => [auditEntry, ...prev]);
   };
 
   const handleToggleCampaignStatus = async (id: string) => {
     const target = campaigns.find(c => c.id === id);
     if (!target) return false;
+    const newStatus = target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+    setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
     try {
-      await setDoc(doc(db, 'campaigns', id), { ...target, status: target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' });
-    } catch (err) {}
+      await setDoc(doc(db, 'campaigns', id), { ...target, status: newStatus });
+    } catch (err) {
+      console.warn("Firestore error toggling campaign status:", err);
+    }
   };
 
   const handleDirectPointAdjustment = async (memberId: string, pointsDelta: number, note: string, ticketId: string) => {
@@ -731,8 +742,8 @@ export default function App() {
     }
   };
 
-  // Toggle floating portal switcher (dinonaktifkan sementara sesuai permintaan pengguna)
-  const SHOW_PORTAL_SWITCHER = false;
+  // Floating portal switcher allows seamless role-switching across HO, Cashier, and Customer Member PWA
+  const SHOW_PORTAL_SWITCHER = true;
 
   const handleSwitchPortal = (portal: 'HO' | 'CASHIER' | 'MEMBER') => {
     if (portal === 'HO') {

@@ -237,6 +237,52 @@ export async function findMemberByPhoneInFirestore(phone: string): Promise<any |
   const normalized = normalizePhoneNumber(phone);
   if (!normalized || normalized.length < 8) return null;
 
+  // 0. Primary check: Query persistent Server API (works across ALL devices, incognito, new phones)
+  try {
+    const res = await fetch(`/api/members/by-phone/${encodeURIComponent(normalized)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.exists && json.member) {
+        // Cache to localStorage for instant offline access
+        try {
+          const saved = localStorage.getItem('wtc_members');
+          const parsed = saved ? JSON.parse(saved) : [];
+          if (Array.isArray(parsed)) {
+            const exists = parsed.some((m: any) => m.id === json.member.id);
+            const next = exists ? parsed.map((m: any) => m.id === json.member.id ? json.member : m) : [json.member, ...parsed];
+            localStorage.setItem('wtc_members', JSON.stringify(next));
+          }
+        } catch {}
+        return json.member;
+      }
+    }
+  } catch (apiErr) {
+    // Gracefully continue to Firestore & fallbacks
+  }
+
+  // 0b. Also check all members from Server API if by-phone lookup missed format variations
+  try {
+    const allRes = await fetch('/api/members');
+    if (allRes.ok) {
+      const allJson = await allRes.json();
+      if (allJson.success && Array.isArray(allJson.members)) {
+        const match = allJson.members.find((m: any) => m && m.phone && isSamePhoneNumber(m.phone, normalized));
+        if (match) {
+          try {
+            const saved = localStorage.getItem('wtc_members');
+            const parsed = saved ? JSON.parse(saved) : [];
+            if (Array.isArray(parsed)) {
+              const exists = parsed.some((m: any) => m.id === match.id);
+              const next = exists ? parsed.map((m: any) => m.id === match.id ? match : m) : [match, ...parsed];
+              localStorage.setItem('wtc_members', JSON.stringify(next));
+            }
+          } catch {}
+          return match;
+        }
+      }
+    }
+  } catch {}
+
   try {
     // 1. Direct indexed queries for common phone formats
     const candidates = Array.from(new Set([
@@ -359,6 +405,21 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
     console.warn("safeSetDoc local sync notice:", localErr);
   }
 
+  // Server API backup sync (guarantees cross-device & incognito persistence)
+  if (collectionName === 'members') {
+    fetch('/api/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sanitized)
+    }).catch(err => console.warn('[Server Sync] Notice syncing member to /api/members:', err));
+  } else if (collectionName === 'stores') {
+    fetch(`/api/stores/${encodeURIComponent(docId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sanitized)
+    }).catch(err => console.warn('[Server Sync] Notice syncing store to /api/stores:', err));
+  }
+
   // Attempt Firestore persistence with catch to prevent unhandled rejections
   await setDoc(doc(db, collectionName, String(docId)), sanitized, { merge: true }).catch(e => {
     console.warn(`safeSetDoc (${collectionName}/${docId}) Firestore sync notice:`, e.message);
@@ -368,6 +429,34 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
 
 export function setupFirestoreListeners(callbacks: any) {
   const unsubscribes: any[] = [];
+
+  // Proactively fetch persistent members from Server API (guarantees availability on new devices and incognito)
+  fetch('/api/members')
+    .then(r => r.json())
+    .then(json => {
+      if (json.success && Array.isArray(json.members) && json.members.length > 0) {
+        callbacks.setMembers?.(json.members);
+        try {
+          localStorage.setItem('wtc_members', JSON.stringify(json.members));
+        } catch {}
+
+        // Also check if local storage had any extra offline members, and sync them to server
+        try {
+          const raw = localStorage.getItem('wtc_members');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > json.members.length) {
+              fetch('/api/members/sync-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ members: parsed })
+              }).catch(() => {});
+            }
+          }
+        } catch {}
+      }
+    })
+    .catch(err => console.warn('[Server Members] Initial fetch notice:', err));
 
   const collections = [
     { name: 'stores', set: callbacks.setStores, storageKey: 'wtc_stores' },

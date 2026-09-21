@@ -922,16 +922,22 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
 
               {/* Quick Communication & Navigation Buttons */}
               <div className="grid grid-cols-2 gap-2">
-                <a
-                  href={`https://wa.me/${(selectedDetailStore.whatsapp || selectedDetailStore.phone || '').replace(/[^0-9]/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <WhatsAppLogo className="w-3.5 h-3.5 text-[#25D366] shrink-0" />
-                  <span>Hubungi WhatsApp</span>
-                  <ExternalLink className="w-3 h-3 ml-0.5 opacity-60" />
-                </a>
+                {(() => {
+                  const rawNum = (selectedDetailStore.whatsapp || selectedDetailStore.phone || '').replace(/[^0-9]/g, '');
+                  const waNum = rawNum.startsWith('0') ? '62' + rawNum.slice(1) : (rawNum.startsWith('62') ? rawNum : (rawNum ? '62' + rawNum : '628129868888'));
+                  return (
+                    <a
+                      href={`https://wa.me/${waNum}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <WhatsAppLogo className="w-3.5 h-3.5 text-[#25D366] shrink-0" />
+                      <span>Hubungi WhatsApp</span>
+                      <ExternalLink className="w-3 h-3 ml-0.5 opacity-60" />
+                    </a>
+                  );
+                })()}
 
                 <a
                   href={

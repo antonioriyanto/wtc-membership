@@ -1195,7 +1195,48 @@ export const initialStores: StoreBranch[] = [
   }
 ];
 
-export const initialMembers: Member[] = [];
+export const initialMembers: Member[] = [
+  {
+    id: 'mem_kokas_0001',
+    membershipId: 'KOKAS0001',
+    name: 'Aan',
+    phone: '081903987051',
+    email: '',
+    birthDate: '',
+    gender: 'Pria',
+    registeredStore: 'Kota Kasablanka Jakarta',
+    lastStoreVisited: 'Kota Kasablanka Jakarta',
+    lastVisitDate: '2026-09-21T07:00:00.000Z',
+    joinDate: '2026-09-17T00:00:00.000Z',
+    points: 857,
+    lifetimePoints: 857,
+    totalSpend: 8570000,
+    tier: 'BLUE',
+    status: 'ACTIVE',
+    address: '',
+    isPinSet: false
+  },
+  {
+    id: 'mem_kokas_0002',
+    membershipId: 'KOKAS0002',
+    name: 'Aan',
+    phone: '081234567891',
+    email: '',
+    birthDate: '',
+    gender: 'Pria',
+    registeredStore: 'Kota Kasablanka Jakarta',
+    lastStoreVisited: 'Kota Kasablanka Jakarta',
+    lastVisitDate: '2026-09-17T00:00:00.000Z',
+    joinDate: '2026-09-17T00:00:00.000Z',
+    points: 0,
+    lifetimePoints: 0,
+    totalSpend: 0,
+    tier: 'BLUE',
+    status: 'ACTIVE',
+    address: '',
+    isPinSet: false
+  }
+];
 export const initialVouchers: Voucher[] = [
   {
     id: 'voucher-welcome-2026',

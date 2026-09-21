@@ -89,14 +89,20 @@ export const CashierSettingsTab: React.FC<SettingsTabProps> = ({ cashierName, st
                     <Phone className="w-3.5 h-3.5 text-emerald-500" />
                     <span className="font-semibold">{currentStore.phone || currentStore.whatsapp}</span>
                   </div>
-                  <a
-                    href={`https://wa.me/${(currentStore.whatsapp || currentStore.phone || '').replace(/[^0-9]/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-                  >
-                    Buka WA ↗
-                  </a>
+                  {(() => {
+                    const rawNum = (currentStore.whatsapp || currentStore.phone || '').replace(/[^0-9]/g, '');
+                    const waNum = rawNum.startsWith('0') ? '62' + rawNum.slice(1) : (rawNum.startsWith('62') ? rawNum : (rawNum ? '62' + rawNum : '628129868888'));
+                    return (
+                      <a
+                        href={`https://wa.me/${waNum}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                      >
+                        Buka WA ↗
+                      </a>
+                    );
+                  })()}
                 </div>
               )}
               {currentStore?.latitude !== undefined && currentStore?.longitude !== undefined && (

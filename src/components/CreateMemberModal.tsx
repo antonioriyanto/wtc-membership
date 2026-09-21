@@ -76,11 +76,8 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
   useEffect(() => {
     if (phone && members) {
       const cleanDigits = phone.replace(/[^0-9]/g, '');
-      if (cleanDigits.length >= 4) {
-        const existing = members.find(m => {
-          const mDigits = (m.phone || '').replace(/[^0-9]/g, '');
-          return m.phone === phone || (mDigits.length >= 4 && (mDigits.includes(cleanDigits) || cleanDigits.includes(mDigits)));
-        });
+      if (cleanDigits.length >= 8) {
+        const existing = members.find(m => isSamePhoneNumber(m.phone || '', phone));
         
         if (existing && onExistingMember) {
           onExistingMember(existing);

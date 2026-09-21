@@ -361,13 +361,14 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   };
 
   let nextTierPoints = 5000;
-  if (member.points >= 30000 || member.tier === 'PLATINUM') nextTierPoints = 30000; // maxed out (top tier)
-  else if (member.points >= 10000 || member.tier === 'GOLD') nextTierPoints = 30000;
-  else if (member.points >= 5000 || member.tier === 'SILVER') nextTierPoints = 10000;
+  const currentPoints = Number(member?.points || 0);
+  if (currentPoints >= 30000 || member?.tier === 'PLATINUM') nextTierPoints = 30000; // maxed out (top tier)
+  else if (currentPoints >= 10000 || member?.tier === 'GOLD') nextTierPoints = 30000;
+  else if (currentPoints >= 5000 || member?.tier === 'SILVER') nextTierPoints = 10000;
 
-  const progressPercent = (member.tier === 'PLATINUM' || member.points >= 30000)
+  const progressPercent = (member?.tier === 'PLATINUM' || currentPoints >= 30000)
     ? 100 
-    : Math.min(100, Math.max(0, (member.points / nextTierPoints) * 100));
+    : Math.min(100, Math.max(0, (currentPoints / nextTierPoints) * 100));
 
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [geolocationError, setGeolocationError] = useState<string | null>(null);
@@ -427,7 +428,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
     if (userLocation) {
       result = result.map(s => {
-        if (s.latitude !== undefined && s.longitude !== undefined) {
+        if (typeof s.latitude === 'number' && !isNaN(s.latitude) && typeof s.longitude === 'number' && !isNaN(s.longitude)) {
           return {
             ...s,
             distance: getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, s.latitude, s.longitude)
@@ -436,9 +437,9 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         return s;
       });
       result.sort((a, b) => {
-        if (a.distance !== undefined && b.distance !== undefined) return a.distance - b.distance;
-        if (a.distance !== undefined) return -1;
-        if (b.distance !== undefined) return 1;
+        if (typeof a.distance === 'number' && typeof b.distance === 'number') return a.distance - b.distance;
+        if (typeof a.distance === 'number') return -1;
+        if (typeof b.distance === 'number') return 1;
         return 0;
       });
     }
@@ -565,7 +566,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
             <section className="px-5 pt-4 pb-1">
               <h2 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-                Hello <span className="capitalize">{member.name.split(' ')[0]}</span>! Welcome to the Club!
+                Hello <span className="capitalize">{(member?.name || 'Member').split(' ')[0]}</span>! Welcome to the Club!
               </h2>
             </section>
 
@@ -579,7 +580,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               />
             </section>
 
-            <section className="bg-white dark:bg-white/5 m-5 p-5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] border border-black/5 dark:border-white/10">
+            <section className="bg-white dark:bg-white/5 m-5 p-5 rounded-[24px] shadow-sm dark:shadow-none border border-black/5 dark:border-white/10">
               <div className="flex justify-between items-end mb-3">
                 <div><span className="font-bold text-sm text-neutral-900 dark:text-white">{member.tier} Level</span></div>
                 <div className="text-right">
@@ -608,7 +609,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               <div className="flex justify-between items-center mb-4 pl-1">
                 <h2 className="text-base font-bold text-neutral-900 dark:text-white">Recent Transactions</h2>
               </div>
-              <div className="bg-white dark:bg-white/5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] mb-4 relative overflow-hidden border border-black/5 dark:border-white/10">
+              <div className="bg-white dark:bg-white/5 rounded-[24px] shadow-sm dark:shadow-none mb-4 relative overflow-hidden border border-black/5 dark:border-white/10">
                 <div className="px-5 pt-2.5 pb-0">
                   {memberTransactions.slice(0, 2).map((trx, idx) => (
                     <div key={idx} className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
@@ -664,7 +665,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     <div className="relative z-10 h-full flex flex-col">
                       <div className="text-xs font-bold tracking-wider mb-1 text-white/90 uppercase drop-shadow-md pr-16">{v.subtitle}</div>
                       <div className="text-5xl font-bold leading-none mb-1 tracking-tight text-white drop-shadow-md">
-                        {v.discountType === 'PERCENTAGE' ? `${v.discountValue}% OFF` : `Rp ${(v.discountValue/1000)}K`}
+                        {v.discountType === 'PERCENTAGE' ? `${v.discountValue || 0}% OFF` : `Rp ${Math.round((v.discountValue || 0) / 1000)}K`}
                       </div>
                       <div className="text-base font-semibold mb-1 text-white drop-shadow-md">{v.title}</div>
                       <div className="text-xs text-white/80 mb-6 font-medium drop-shadow-md">Valid until {v.validUntil}</div>
@@ -731,7 +732,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     <div className="relative z-20 h-full flex flex-col">
                       <div className="text-xs font-bold tracking-wider mb-1 text-slate-300 uppercase pr-16">{v.subtitle}</div>
                       <div className="text-[3.5rem] font-bold leading-none mb-1 tracking-[-2px] text-white">
-                        {v.discountType === 'PERCENTAGE' ? `${v.discountValue}% OFF` : `Rp ${(v.discountValue/1000)}K`}
+                        {v.discountType === 'PERCENTAGE' ? `${v.discountValue || 0}% OFF` : `Rp ${Math.round((v.discountValue || 0) / 1000)}K`}
                       </div>
                       <div className="text-lg font-medium mb-1 text-white">{v.title}</div>
                       <div className="text-sm text-neutral-400 dark:text-neutral-500 mb-6 font-medium">Valid until {v.validUntil}</div>
@@ -777,7 +778,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   value={storeSearch}
                   onChange={e => setStoreSearch(e.target.value)}
                   placeholder="Search store name, mall, or city..." 
-                  className="w-full py-3 pr-5 pl-11 rounded-full border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-[0.95rem] text-neutral-900 dark:text-white shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] transition-all focus:outline-none focus:border-slate-400 focus:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+                  className="w-full py-3 pr-5 pl-11 rounded-full border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-[0.95rem] text-neutral-900 dark:text-white shadow-sm dark:shadow-none transition-all focus:outline-none focus:border-slate-400 focus:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
                 />
               </div>
             </div>
@@ -809,7 +810,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
             </div>
 
             <section className="px-5 pt-2.5 pb-[30px]">
-              <div className="bg-white dark:bg-white/5 rounded-[20px] shadow-sm dark:shadow-none p-6 sm:p-8 flex flex-col items-center border border-black/5 dark:border-white/10/80">
+              <div className="bg-white dark:bg-white/5 rounded-[20px] shadow-sm dark:shadow-none p-6 sm:p-8 flex flex-col items-center border border-black/5 dark:border-white/10">
                 
                 <div className="relative mb-6 flex flex-col items-center">
                   <div 
@@ -817,9 +818,9 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     onClick={() => fileInputRef.current?.click()}
                   >
                     {member.avatarUrl ? (
-                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover object-center" />
+                      <img src={member.avatarUrl} alt={member.name || 'Member'} className="w-full h-full object-cover object-center" />
                     ) : (
-                      member.name.charAt(0).toUpperCase()
+                      (member.name || 'M').charAt(0).toUpperCase()
                     )}
                     
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -839,11 +840,11 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 </div>
 
                 <div className="w-full max-w-[400px] mb-6 grid grid-cols-2 gap-3">
-                  <div className="bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 p-3 rounded-xl border border-black/5 dark:border-white/10/60 text-center">
+                  <div className="bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 p-3 rounded-xl border border-black/5 dark:border-white/10 text-center">
                     <div className="text-[0.65rem] uppercase tracking-wider font-bold text-neutral-400 dark:text-neutral-500">Home Store</div>
                     <div className="text-xs font-bold text-neutral-900 dark:text-white mt-0.5 truncate">{member.registeredStore || 'Puri Jakarta'}</div>
                   </div>
-                  <div className="bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 p-3 rounded-xl border border-black/5 dark:border-white/10/60 text-center">
+                  <div className="bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 p-3 rounded-xl border border-black/5 dark:border-white/10 text-center">
                     <div className="text-[0.65rem] uppercase tracking-wider font-bold text-neutral-400 dark:text-neutral-500">Tier</div>
                     <div className="text-xs font-bold text-neutral-900 dark:text-white mt-0.5">{member.tier}</div>
                   </div>
@@ -1219,7 +1220,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                       </div>
                     ) : (
                       myTickets.map(t => (
-                        <div key={t.id} className="p-3.5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 rounded-2xl border border-black/5 dark:border-white/10/80 space-y-2">
+                        <div key={t.id} className="p-3.5 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 rounded-2xl border border-black/5 dark:border-white/10 space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-mono text-[10px] font-bold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-white/5 px-2 py-0.5 rounded border border-black/5 dark:border-white/10">
                               {t.id}

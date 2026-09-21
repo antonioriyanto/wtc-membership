@@ -64,7 +64,7 @@ export interface Campaign {
   name: string;
   headline?: string;
   type: 'POPUP_BANNER' | 'PUSH' | 'SMS' | 'EMAIL';
-  status: 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'COMPLETED';
+  status: 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'COMPLETED' | 'PAUSED';
   targetAudience: 'ALL' | 'BLUE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'INACTIVE';
   content: string;
   bannerImage?: string;

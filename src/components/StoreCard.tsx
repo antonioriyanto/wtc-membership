@@ -15,7 +15,8 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, index }) => {
     ? '62' + cleanPhone.slice(1) 
     : (cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone);
 
-  const mapsUrl = (store.latitude !== undefined && store.longitude !== undefined)
+  const hasCoords = typeof store.latitude === 'number' && !isNaN(store.latitude) && typeof store.longitude === 'number' && !isNaN(store.longitude);
+  const mapsUrl = hasCoords
     ? `https://www.google.com/maps/search/?api=1&query=${store.latitude},${store.longitude}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([store.mallName || store.name, store.address, store.city, 'Indonesia'].filter(Boolean).join(', '))}`;
 
@@ -39,7 +40,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, index }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent"></div>
 
         {/* Glassmorphism Distance Badge Overlay (Only if distance is known, no Boutique Resmi) */}
-        {store.distance !== undefined && (
+        {typeof store.distance === 'number' && !isNaN(store.distance) && (
           <div className="absolute top-3 right-3 flex items-center gap-2">
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-white bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/15 shadow-sm">
               <Navigation className="w-3 h-3 stroke-[1.5] text-white/90" />
