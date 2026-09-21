@@ -94,6 +94,28 @@ export default function App() {
     return null;
   });
 
+  // State preview pengalih peran sistem - HANYA aktif jika ada sesi admin HO yang membuka preview
+  const [isRolePreviewActive, setIsRolePreviewActive] = useState(() => {
+    try {
+      const isAdmin = localStorage.getItem('wtc_admin_auth') === 'true';
+      if (!isAdmin) return false;
+      return sessionStorage.getItem('wtc_ho_role_preview') === 'true' || localStorage.getItem('wtc_ho_role_preview') === 'true';
+    } catch {}
+    return false;
+  });
+
+  useEffect(() => {
+    try {
+      if (adminAuthenticated && isRolePreviewActive) {
+        sessionStorage.setItem('wtc_ho_role_preview', 'true');
+        localStorage.setItem('wtc_ho_role_preview', 'true');
+      } else {
+        sessionStorage.removeItem('wtc_ho_role_preview');
+        localStorage.removeItem('wtc_ho_role_preview');
+      }
+    } catch {}
+  }, [adminAuthenticated, isRolePreviewActive]);
+
   useEffect(() => {
     try {
       localStorage.setItem('wtc_admin_auth', String(adminAuthenticated));
@@ -742,18 +764,71 @@ export default function App() {
     }
   };
 
-  // Floating portal switcher allows seamless role-switching across HO, Cashier, and Customer Member PWA
-  const SHOW_PORTAL_SWITCHER = true;
+  // Pengalih Peran Sistem (Switch System Role)
+  // Portal ini HANYA menyala jika ada sesi admin HO yang mengklik preview pengalih peran system.
+  // Jika tidak ada login HO pada web cashier dan web pwa tidak akan bisa muncul dan berfungsi.
+  const handleSwitchPerspective = (role: 'HO' | 'CASHIER' | 'MEMBER') => {
+    // Pengalih peran hanya diizinkan untuk sesi Admin HO yang aktif
+    if (!adminAuthenticated) {
+      console.warn("Fitur Pengalih Peran Sistem hanya dapat diakses melalui sesi Admin HO yang terautentikasi.");
+      return;
+    }
 
-  const handleSwitchPortal = (portal: 'HO' | 'CASHIER' | 'MEMBER') => {
-    if (portal === 'HO') {
+    // Aktifkan sesi preview pengalih peran
+    setIsRolePreviewActive(true);
+
+    if (role === 'HO') {
       navigate('/admin');
-    } else if (portal === 'CASHIER') {
+    } else if (role === 'CASHIER') {
+      // Kasir toko dibuat default: 23 Semarang (23 Semarang Shopping Center / 23SMG)
+      const semarangStore = stores.find(s => 
+        (s.code && s.code.toUpperCase() === '23SMG') ||
+        (s.id && s.id.toUpperCase() === '23SMG') ||
+        (s.name && s.name.toLowerCase().includes('23 semarang'))
+      );
+
+      const targetStoreName = semarangStore ? semarangStore.name : '23 Semarang Shopping Center';
+      setCashierStoreName(targetStoreName);
+      setCashierName('Kasir 23 Semarang');
+      setCashierAuthenticated(true);
+      try {
+        localStorage.setItem('wtc_cashier_store', targetStoreName);
+        localStorage.setItem('wtc_cashier_name', 'Kasir 23 Semarang');
+        localStorage.setItem('wtc_cashier_auth', 'true');
+      } catch {}
+
       navigate('/cashier');
-    } else if (portal === 'MEMBER') {
+    } else if (role === 'MEMBER') {
+      // Customer dibuat default nomor telepon dengan akun user 081903987051 (Aan)
+      const targetMember = members.find(m => 
+        m.phone && (
+          m.phone.replace(/\D/g, '').endsWith('81903987051') || 
+          m.phone.includes('081903987051')
+        )
+      ) || members.find(m => m.id === 'mem_kokas_0001') || members[0];
+
+      if (targetMember) {
+        setLoggedInMemberId(targetMember.id);
+        try {
+          localStorage.setItem('wtc_logged_in_member', targetMember.id);
+        } catch {}
+      }
+
       navigate('/member');
     }
   };
+
+  const handleExitRolePreview = () => {
+    setIsRolePreviewActive(false);
+    try {
+      sessionStorage.removeItem('wtc_ho_role_preview');
+      localStorage.removeItem('wtc_ho_role_preview');
+    } catch {}
+    navigate('/admin');
+  };
+
+  // Portal floating switcher HANYA menyala jika ada sesi admin HO yang mengklik preview pengalih peran system
+  const SHOW_PORTAL_SWITCHER = adminAuthenticated && isRolePreviewActive;
 
   if (loading) {
     return <div className="flex h-screen items-center justify-center bg-slate-50"><p className="text-slate-500 animate-pulse">Connecting to Database...</p></div>;
@@ -819,7 +894,7 @@ export default function App() {
                 navigate('/cashier');
               });
             }}
-            onSwitchPerspective={(p) => navigate(p === 'HO' ? '/admin' : '/' + p.toLowerCase())}
+            onSwitchPerspective={handleSwitchPerspective}
           />
         ) : (
           <AdminLogin
@@ -1022,7 +1097,12 @@ export default function App() {
               onOpenQuickLauncher={() => setIsQuickLauncherOpen(true)}
               onLogout={() => {
                 setAdminAuthenticated(false);
-                try { localStorage.removeItem('wtc_admin_auth'); } catch {}
+                setIsRolePreviewActive(false);
+                try { 
+                  localStorage.removeItem('wtc_admin_auth'); 
+                  localStorage.removeItem('wtc_ho_role_preview');
+                  sessionStorage.removeItem('wtc_ho_role_preview');
+                } catch {}
                 navigate('/admin');
               }}
             />
@@ -1179,7 +1259,7 @@ export default function App() {
             <QuickStoreSwitchModal 
               isOpen={isQuickLauncherOpen} 
               onClose={() => setIsQuickLauncherOpen(false)} 
-              onSwitchView={(p) => navigate(p === 'HO' ? '/admin' : '/' + p.toLowerCase())} 
+              onSwitchView={handleSwitchPerspective} 
               currentView="HO" 
             />
 
@@ -1376,8 +1456,13 @@ export default function App() {
       <Route path="*" element={<Navigate to="/member" replace />} />
       </Routes>
 
-      {/* FLOATING PORTAL SWITCHER (HO - KASIR - CUSTOMER) - Sementara disembunyikan */}
-      {SHOW_PORTAL_SWITCHER && <PortalSwitcher onSwitch={handleSwitchPortal} />}
+      {/* FLOATING PORTAL SWITCHER: Hanya menyala jika sesi Admin HO mengklik preview pengalih peran sistem */}
+      {SHOW_PORTAL_SWITCHER && (
+        <PortalSwitcher 
+          onSwitch={handleSwitchPerspective} 
+          onExitPreview={handleExitRolePreview}
+        />
+      )}
     </>
   );
 }
