@@ -2,6 +2,7 @@ import { initialStores } from "../data/mockData";
 import { cleanAndEnrichStore, safeSetDoc } from "../lib/syncFirestore";
 import { StoreCard } from "./StoreCard";
 import { MembershipCard } from "./MembershipCard";
+import { TierBenefitsList } from "./TierBenefitsList";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Member, Voucher, StoreBranch, Transaction, Campaign, SupportTicket } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
@@ -596,35 +597,12 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               </div>
             </section>
 
-            <section className="m-5">
-              <h2 className="text-base font-bold mb-4 pl-1 text-neutral-900 dark:text-white">Your {member.tier} Level Benefits</h2>
-              <ul className="bg-white dark:bg-white/5 rounded-[24px] shadow-sm dark:shadow-none [0_10px_25px_-5px_rgba(0,0,0,0.05)] px-5 py-2.5 border border-black/5 dark:border-white/10">
-                <li className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
-                  <div className="text-lg text-neutral-500 dark:text-neutral-400 mr-4 w-6 text-center"><Percent className="w-5 h-5 mx-auto" /></div>
-                  <div className="flex-grow">
-                    <div className="font-semibold text-sm text-neutral-900 dark:text-white">Additional 10% Discount</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Valid store-wide</div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300" />
-                </li>
-                <li className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
-                  <div className="text-lg text-neutral-500 dark:text-neutral-400 mr-4 w-6 text-center"><Wrench className="w-5 h-5 mx-auto" /></div>
-                  <div className="flex-grow">
-                    <div className="font-semibold text-sm text-neutral-900 dark:text-white">Watch Services Discount</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">10% off repairs</div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300" />
-                </li>
-                <li className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
-                  <div className="text-lg text-neutral-500 dark:text-neutral-400 mr-4 w-6 text-center"><Gift className="w-5 h-5 mx-auto" /></div>
-                  <div className="flex-grow">
-                    <div className="font-semibold text-sm text-neutral-900 dark:text-white">Watch Club Sticker Pack</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Free quarterly design</div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300" />
-                </li>
-              </ul>
-            </section>
+            <TierBenefitsList 
+              currentTier={(member.tier as any) || 'BLUE'} 
+              onSelectBenefit={(title) => {
+                showAlert(`Benefit "${title}" aktif untuk member tier ${member.tier}. Nikmati keistimewaannya di seluruh gerai Watch Club Indonesia!`, 'Benefit Member', 'info');
+              }}
+            />
 
             <section className="m-5">
               <div className="flex justify-between items-center mb-4 pl-1">

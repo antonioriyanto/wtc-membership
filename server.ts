@@ -265,9 +265,13 @@ async function startServer() {
       const storeName = req.body?.storeName || req.query?.storeName;
       const cashierName = req.body?.cashierName || req.query?.cashierName;
       const passedConfig = req.body?.loyaltyConfig;
+      const passedMemberTier = req.body?.memberTier || req.query?.memberTier;
+      const passedMemberName = req.body?.memberName || req.query?.memberName;
+      const passedMemberPhone = req.body?.memberPhone || req.query?.memberPhone;
+      const passedCurrentPoints = Number(req.body?.currentPoints || req.query?.currentPoints || 0);
 
       if (!memberId || !amount || !receiptNo) {
-        return res.status(400).json({ error: 'Missing required fields' });
+        return res.status(400).json({ success: false, error: 'Missing required fields' });
       }
 
       const numericAmount = Number(amount) || 0;
@@ -319,19 +323,24 @@ async function startServer() {
         try {
           const result = await db.runTransaction(async (t: any) => {
             // 1. Get Member
-            const memberRef = db.collection('members').doc(memberId);
-            const memberDoc = await t.get(memberRef);
+            let memberRef = db.collection('members').doc(memberId);
+            let memberDoc = await t.get(memberRef);
 
             if (!memberDoc.exists) {
-              throw new Error('Member not found');
+              const snap = await db.collection('members').where('membershipId', '==', memberId).limit(1).get();
+              if (!snap.empty) {
+                memberRef = snap.docs[0].ref;
+                memberDoc = snap.docs[0];
+              }
             }
 
-            const memberData = memberDoc.data();
+            const memberData = memberDoc.exists ? memberDoc.data() : null;
+            const effectiveTier = passedMemberTier || memberData?.tier || 'BLUE';
 
             // 2. Calculate points according to HO Admin loyalty settings
-            const calculatedPoints = calcPointsForTier(numericAmount, memberData?.tier || 'BLUE');
+            const calculatedPoints = calcPointsForTier(numericAmount, effectiveTier);
             
-            const currentPoints = typeof memberData?.points === 'number' ? memberData.points : 0;
+            const currentPoints = typeof memberData?.points === 'number' ? memberData.points : passedCurrentPoints;
             const currentLifetime = typeof memberData?.lifetimePoints === 'number' ? memberData.lifetimePoints : 0;
             const currentTotalSpend = typeof memberData?.totalSpend === 'number' ? memberData.totalSpend : 0;
 
@@ -347,8 +356,8 @@ async function startServer() {
               id: transactionId,
               receiptNo: receiptNo.trim(),
               memberId: memberData?.id || memberId,
-              memberName: memberData?.name || 'Unknown',
-              memberPhone: memberData?.phone || '',
+              memberName: memberData?.name || passedMemberName || 'Member',
+              memberPhone: memberData?.phone || passedMemberPhone || '',
               storeId: storeId || 'PUR',
               storeName: storeName || 'Puri Jakarta',
               cashierName: cashierName || 'Kasir',
@@ -367,21 +376,23 @@ async function startServer() {
               actorName: cashierName || 'Kasir',
               actorRole: 'STORE_CASHIER',
               action: 'POINTS_EARNED',
-              details: `Kasir menambahkan +${calculatedPoints} poin untuk ${memberData?.name} (Struk: ${receiptNo})`,
+              details: `Kasir menambahkan +${calculatedPoints} poin untuk ${transactionData.memberName} (Struk: ${receiptNo})`,
               module: 'LOYALTY_PROGRAM'
             };
 
             // 5. Execute Writes
             t.set(transactionRef, transactionData);
             t.set(auditRef, auditData);
-            t.update(memberRef, {
-              points: newPoints,
-              lifetimePoints: newLifetime,
-              totalSpend: newTotalSpend,
-              tier: newTier,
-              lastStoreVisited: storeName || memberData?.lastStoreVisited,
-              lastVisitDate: new Date().toISOString()
-            });
+            if (memberDoc.exists) {
+              t.update(memberRef, {
+                points: newPoints,
+                lifetimePoints: newLifetime,
+                totalSpend: newTotalSpend,
+                tier: newTier,
+                lastStoreVisited: storeName || memberData?.lastStoreVisited,
+                lastVisitDate: new Date().toISOString()
+              });
+            }
 
             return {
               calculatedPoints,
@@ -398,14 +409,18 @@ async function startServer() {
       }
 
       // Resilient computation fallback when Admin SDK is unavailable or skipped:
-      const calculatedPoints = calcPointsForTier(numericAmount, 'BLUE');
+      const effectiveTier = passedMemberTier || 'BLUE';
+      const calculatedPoints = calcPointsForTier(numericAmount, effectiveTier);
+      const newPoints = passedCurrentPoints + calculatedPoints;
+      const newTier = calculateTierWithConfig(newPoints, activeConfig);
+
       const transactionId = 'tx_' + Date.now();
       const transactionData = {
         id: transactionId,
         receiptNo: receiptNo.trim(),
         memberId,
-        memberName: 'Member',
-        memberPhone: '',
+        memberName: passedMemberName || 'Member',
+        memberPhone: passedMemberPhone || '',
         storeId: storeId || 'PUR',
         storeName: storeName || 'Puri Jakarta',
         cashierName: cashierName || 'Kasir',
@@ -420,8 +435,8 @@ async function startServer() {
         isFallback: true,
         data: {
           calculatedPoints,
-          newPoints: calculatedPoints,
-          newTier: calculateTierWithConfig(calculatedPoints, activeConfig),
+          newPoints,
+          newTier,
           transactionData
         }
       });

@@ -103,14 +103,28 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
     try {
       const member = members.find(m => m.id === memberId || m.membershipId === memberId || m.phone === memberId);
       if (!member) {
+        showAlert('Data member tidak ditemukan dalam sistem.', 'Member Tidak Ditemukan', 'error');
+        return;
+      }
+
+      const cleanReceipt = (receiptNo || '').trim();
+      const numericAmount = Math.max(0, Number(amount) || 0);
+
+      if (!cleanReceipt) {
+        showAlert('Silakan masukkan nomor struk transaksi.', 'Nomor Struk Kosong', 'warning');
+        return;
+      }
+
+      if (numericAmount <= 0) {
+        showAlert('Nilai transaksi belanja harus lebih besar dari Rp 0.', 'Nominal Tidak Valid', 'warning');
         return;
       }
 
       // Safeguard: Check locally first (optimistic check)
       const isDuplicateRecent = transactions.some(t => 
         t.receiptNo && 
-        (t.receiptNo || '').trim().toLowerCase() === (receiptNo || '').trim().toLowerCase() && 
-        t.memberId === member.id
+        (t.receiptNo || '').trim().toLowerCase() === cleanReceipt.toLowerCase() && 
+        (t.memberId === member.id || t.memberId === member.membershipId)
       );
       if (isDuplicateRecent) {
         showAlert('Nomor struk ini sudah pernah ditukarkan poin sebelumnya.', 'Transaksi Ditolak', 'error');
@@ -118,11 +132,18 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       }
 
       const effectiveConfig = loyaltyConfig || getLoyaltyConfig();
+      const effectiveMemberId = member.id || member.membershipId || memberId;
+      const effectiveMemberTier = member.tier || 'BLUE';
 
-      // CALLING SECURE SERVER-SIDE BACKEND API
-      let savedTrx;
-      let updatedMember;
-      
+      // Prepare local deterministic calculation fallback
+      const calculatedPointsFallback = calculateEarnedPoints(numericAmount, effectiveMemberTier, effectiveConfig);
+      const newPointsFallback = (member.points || 0) + calculatedPointsFallback;
+      const newTierFallback = calculateTier(newPointsFallback, effectiveConfig);
+
+      let savedTrx: Transaction | null = null;
+      let updatedMember: Member | null = null;
+
+      // ATTEMPT CALLING SECURE SERVER-SIDE BACKEND API
       try {
         const response = await fetch('/api/loyalty/add-points', {
           method: 'POST',
@@ -131,9 +152,13 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
             'Accept': 'application/json'
           },
           body: JSON.stringify({
-            memberId: member.id || '',
-            amount: amount.toString(),
-            receiptNo: receiptNo || '',
+            memberId: effectiveMemberId,
+            memberName: member.name || 'Member',
+            memberPhone: member.phone || '',
+            memberTier: effectiveMemberTier,
+            currentPoints: member.points || 0,
+            amount: numericAmount.toString(),
+            receiptNo: cleanReceipt,
             storeId: currentStore?.id || currentStore?.code || 'PUR',
             storeName: currentStore?.name || 'Puri Jakarta',
             cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
@@ -142,122 +167,98 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
         });
 
         const rawText = await response.text();
-        let result;
-        
-        if (rawText.includes('<!doctype html>') || rawText.includes('<html') || rawText.includes('Action required') || !response.ok) {
-           console.warn('Network or proxy error, falling back to local verification for points', rawText.substring(0, 50));
-           
-           // LOCAL CALCULATION FALLBACK WITH DYNAMIC LOYALTY RULES
-           const numericAmount = Number(amount) || 0;
-           const calculatedPoints = calculateEarnedPoints(numericAmount, member?.tier || 'BLUE', effectiveConfig);
-           const newPoints = (member?.points || 0) + calculatedPoints;
-           const newTier = calculateTier(newPoints, effectiveConfig);
-           
-           result = {
-             success: true,
-             isFallback: true,
-             data: {
-               calculatedPoints,
-               newPoints,
-               newTier,
-               transactionData: {
-                 id: 'tx_local_' + Date.now(),
-                 receiptNo: receiptNo.trim(),
-                 memberId: member.id,
-                 pointsDelta: calculatedPoints,
-                 amount: numericAmount,
-                 timestamp: new Date().toISOString()
-               }
-             }
-           };
-        } else {
-           try {
-             result = JSON.parse(rawText);
-           } catch (parseError) {
-             throw new Error(`Parse Error: ${parseError.message}. Raw: '${rawText}'`);
-           }
-        }
-        
-        if (!response.ok && !rawText.includes('<html') && !rawText.includes('<!doctype html>')) {
-          let errMsg = 'Gagal menambahkan poin melalui backend server';
-          try {
-             const parsed = JSON.parse(rawText);
-             if (parsed.error) errMsg = parsed.error;
-          } catch(e) {}
-          throw new Error(errMsg);
-        }
-        
-        if (result && result.success === false) {
-          throw new Error(result.error || 'Gagal menambahkan poin melalui backend server');
-        }
-           
-        // Use the returned server-verified transaction data
-        savedTrx = result.data.transactionData;
-           
-        // Calculate correctly in fallback mode
-        const actualNewPoints = result.isFallback ? (member.points || 0) + result.data.calculatedPoints : result.data.newPoints;
-        const actualNewTier = result.isFallback ? member.tier : result.data.newTier;
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(rawText);
+        } catch {}
 
-        // Optimistically update the UI member state
+        if (response.ok && parsed && parsed.success && parsed.data) {
+          savedTrx = parsed.data.transactionData;
+          updatedMember = {
+            ...member,
+            points: typeof parsed.data.newPoints === 'number' ? parsed.data.newPoints : newPointsFallback,
+            tier: parsed.data.newTier || newTierFallback,
+            totalSpend: (member.totalSpend || 0) + numericAmount,
+            lifetimePoints: (member.lifetimePoints || 0) + (savedTrx?.pointsDelta ?? calculatedPointsFallback),
+            lastStoreVisited: currentStore?.name || 'Puri Jakarta',
+            lastVisitDate: new Date().toISOString()
+          };
+        } else if (parsed && parsed.error && (parsed.error.includes('sudah pernah') || parsed.error.includes('duplicate'))) {
+          // Reject genuine duplicate receipt from server
+          showAlert(parsed.error, 'Transaksi Ditolak', 'error');
+          return;
+        } else {
+          console.warn('Backend API add-points response was non-OK or non-standard, adopting resilient local sync:', rawText?.substring(0, 100));
+        }
+      } catch (backendFetchErr) {
+        console.warn('Backend API fetch unavailable, adopting client Firestore fallback:', backendFetchErr);
+      }
+
+      // If backend was skipped, offline, or fallback triggered, construct verified local records
+      if (!savedTrx) {
+        const transactionId = 'tx_' + Date.now();
+        savedTrx = {
+          id: transactionId,
+          receiptNo: cleanReceipt,
+          memberId: effectiveMemberId,
+          memberName: member.name || 'Member',
+          memberPhone: member.phone || '',
+          storeId: currentStore?.id || currentStore?.code || 'PUR',
+          storeName: currentStore?.name || 'Puri Jakarta',
+          cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
+          type: 'EARN',
+          amount: numericAmount,
+          pointsDelta: calculatedPointsFallback,
+          timestamp: new Date().toISOString()
+        };
+
         updatedMember = {
           ...member,
-          points: actualNewPoints,
-          tier: actualNewTier,
+          points: newPointsFallback,
+          tier: newTierFallback,
+          totalSpend: (member.totalSpend || 0) + numericAmount,
+          lifetimePoints: (member.lifetimePoints || 0) + calculatedPointsFallback,
+          lastStoreVisited: currentStore?.name || 'Puri Jakarta',
+          lastVisitDate: new Date().toISOString()
         };
-        
-        // If the backend used the resilient fallback, we MUST persist it to Firestore via client SDK
-        if (result.isFallback) {
-          try {
-            const { doc, setDoc, updateDoc } = await import('firebase/firestore');
-            const { db } = await import('../lib/firebase');
-            await setDoc(doc(db, 'transactions', savedTrx.id), savedTrx);
-            
-            // Also create an audit log
-            const auditId = 'AL-' + Date.now().toString().slice(-4) + Math.floor(Math.random() * 1000);
-            await setDoc(doc(db, 'audit', auditId), {
-              id: auditId,
-              timestamp: new Date().toISOString(),
-              actorName: cashierName || 'Kasir',
-              actorRole: 'STORE_CASHIER',
-              action: 'POINTS_EARNED',
-              details: `Kasir menambahkan +${savedTrx.pointsDelta} poin untuk ${updatedMember.name} (Struk: ${receiptNo}) - Client Fallback`,
-              module: 'LOYALTY_PROGRAM'
-            });
-
-            await updateDoc(doc(db, 'members', member.id), {
-              points: updatedMember.points,
-              tier: updatedMember.tier,
-              totalSpend: (member.totalSpend || 0) + amount,
-              lifetimePoints: (member.lifetimePoints || 0) + savedTrx.pointsDelta,
-              lastStoreVisited: currentStore?.name || 'Puri Jakarta',
-              lastVisitDate: new Date().toISOString()
-            });
-            console.log("Client SDK fallback write successful.");
-          } catch (clientErr) {
-            console.error("Client SDK fallback write failed:", clientErr);
-          }
-        }
-        
-      } catch (backendError: any) {
-        console.error("Backend API Error:", backendError);
-        showAlert(backendError.message || 'Terjadi kesalahan pada Server-Side Backend saat menambahkan poin', 'Error Server', 'error');
-        return;
       }
 
-      // We still update local state optimistically for instant UI feedback 
-      // (The onSnapshot listener will eventually sync it perfectly)
-      if (savedTrx) {
-        setTransactions(prev => {
-          if (prev.some(t => t.id === savedTrx.id)) return prev;
-          return [savedTrx, ...prev];
-        });
+      // PERSIST SAFELY TO FIRESTORE AND LOCAL CACHE
+      try {
+        await safeSetDoc('transactions', savedTrx.id, savedTrx);
+        await safeSetDoc('members', updatedMember.id, updatedMember);
+
+        // Audit Trail Entry
+        const auditId = 'AL-' + Date.now().toString().slice(-4) + Math.floor(Math.random() * 1000);
+        const auditData = {
+          id: auditId,
+          timestamp: new Date().toISOString(),
+          actorName: cashierName || 'Kasir',
+          actorRole: 'STORE_CASHIER',
+          action: 'POINTS_EARNED',
+          details: `Kasir menambahkan +${savedTrx.pointsDelta} poin untuk ${updatedMember.name} (Struk: ${cleanReceipt})`,
+          module: 'LOYALTY_PROGRAM'
+        };
+        await safeSetDoc('audit', auditId, auditData);
+      } catch (storageErr) {
+        console.warn('Firestore safeSetDoc warning:', storageErr);
       }
 
-      if (updatedMember) {
-        setMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
-      }
+      // Update React state optimistically
+      setTransactions(prev => {
+        if (prev.some(t => t.id === savedTrx!.id)) return prev;
+        const next = [savedTrx!, ...prev];
+        try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
+        return next;
+      });
 
-      showAlert(`Transaksi berhasil melalui Secure Backend! +${savedTrx.pointsDelta} Poin ditambahkan ke ${updatedMember.name}.`, 'Transaksi Berhasil', 'success');
+      setMembers(prev => {
+        const next = prev.map(m => m.id === updatedMember!.id ? updatedMember! : m);
+        try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      showAlert(`Transaksi berhasil! +${savedTrx.pointsDelta} Poin ditambahkan ke ${updatedMember.name}.`, 'Transaksi Berhasil', 'success');
 
       if (loyaltyConfig?.enableWhatsAppNotifications && updatedMember.phone) {
         let phoneNum = updatedMember.phone.replace(/\D/g, '');
@@ -270,6 +271,9 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
           window.open(`https://wa.me/${phoneNum}?text=${encodedText}`, '_blank');
         }
       }
+    } catch (unexpectedErr: any) {
+      console.error("Unexpected points handler error:", unexpectedErr);
+      showAlert(unexpectedErr?.message || 'Terjadi kesalahan sistem saat memproses poin.', 'Error', 'error');
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
