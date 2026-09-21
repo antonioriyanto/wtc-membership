@@ -1,6 +1,7 @@
 import React from 'react';
 import { StoreBranch } from '../types';
-import { Building, MapPin, MessageCircle, ExternalLink, Navigation } from 'lucide-react';
+import { Building, MapPin, ExternalLink, Navigation } from 'lucide-react';
+import { WhatsAppLogo } from './WhatsAppLogo';
 
 interface StoreCardProps {
   store: StoreBranch;
@@ -37,9 +38,9 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, index }) => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent"></div>
 
-        {/* Glassmorphism Badge Overlay */}
-        <div className="absolute top-3 right-3 flex items-center gap-2">
-          {store.distance !== undefined ? (
+        {/* Glassmorphism Distance Badge Overlay (Only if distance is known, no Boutique Resmi) */}
+        {store.distance !== undefined && (
+          <div className="absolute top-3 right-3 flex items-center gap-2">
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-white bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/15 shadow-sm">
               <Navigation className="w-3 h-3 stroke-[1.5] text-white/90" />
               <span>
@@ -48,13 +49,8 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, index }) => {
                   : `${store.distance.toFixed(1)} km`}
               </span>
             </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-white bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/15 shadow-sm">
-              <MapPin className="w-3 h-3 stroke-[1.5] text-white/90" />
-              <span>Boutique Resmi</span>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* 2. Card Content & Generous Spacing */}
@@ -111,7 +107,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, index }) => {
           </div>
         </div>
 
-        {/* WhatsApp Action Button - Monochromatic Premium Design */}
+        {/* WhatsApp Action Button with Official WhatsApp Logo */}
         <a 
           href={`https://wa.me/${waNumber}`}
           target="_blank"
@@ -120,7 +116,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, index }) => {
           className="mt-1 w-full h-11 px-4 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-100 dark:text-neutral-950 flex items-center justify-between transition-all duration-200 cursor-pointer shadow-xs group/wa"
         >
           <div className="flex items-center gap-2.5">
-            <MessageCircle className="w-4 h-4 stroke-[1.5]" />
+            <WhatsAppLogo className="w-4 h-4 text-[#25D366] shrink-0" />
             <span className="text-[13px] font-medium tracking-tight">
               Hubungi WhatsApp
             </span>

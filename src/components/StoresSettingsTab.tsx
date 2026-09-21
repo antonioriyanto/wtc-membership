@@ -9,6 +9,7 @@ import {
   ArrowLeft, Save, Receipt, RefreshCw, Building, Compass,
   MoreVertical, X, ExternalLink, Users, Copy, Check, Filter, ChevronRight
 } from 'lucide-react';
+import { WhatsAppLogo } from './WhatsAppLogo';
 import { db } from '../lib/firebase';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
@@ -927,7 +928,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
                   rel="noopener noreferrer"
                   className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
                 >
-                  <Phone className="w-3.5 h-3.5" />
+                  <WhatsAppLogo className="w-3.5 h-3.5 text-[#25D366] shrink-0" />
                   <span>Hubungi WhatsApp</span>
                   <ExternalLink className="w-3 h-3 ml-0.5 opacity-60" />
                 </a>
