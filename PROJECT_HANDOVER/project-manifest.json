@@ -1,0 +1,51 @@
+{
+  "project": {
+    "name": "Watch Club - Head Office Admin Portal & Omnichannel Loyalty System",
+    "description": "Enterprise Omnichannel Loyalty & POS System for Watch Club Indonesia (42+ Retail Boutiques)",
+    "version": "1.0.0",
+    "status": "PRODUCTION_READY",
+    "containerPort": 3000
+  },
+  "stack": {
+    "frontend": "React 19 + TypeScript + Vite 6 + Tailwind CSS v4",
+    "backend": "Node.js + Express 5 + Multer + Firebase Admin",
+    "realtimeDatabase": "Google Cloud Firestore (watch-club-membership)",
+    "relationalDatabase": "PostgreSQL via Drizzle ORM (schema in src/db/schema.ts)",
+    "localPersistence": "Server-side JSON (data/members.json, data/stores.json)"
+  },
+  "portals": [
+    {
+      "name": "Customer Member PWA",
+      "route": "/member",
+      "features": ["Digital Tier Card", "Dynamic QR", "Voucher Wallet", "42-Store Locator with GPS", "Profile Photo Upload"]
+    },
+    {
+      "name": "Cashier POS Terminal",
+      "route": "/cashier",
+      "features": ["Webcam QR Scanner", "Member Search", "Instant Point Issuance", "Duplicate Receipt Check", "PIN Recovery"]
+    },
+    {
+      "name": "Head Office Admin Portal",
+      "route": "/admin",
+      "features": ["Executive KPI Charts", "Member Directory & Export", "Store Management", "Loyalty Rules", "Audit Trail"]
+    }
+  ],
+  "entryPoints": {
+    "server": "server.ts",
+    "frontend": "src/App.tsx",
+    "html": "index.html",
+    "rules": "firestore.rules"
+  },
+  "criticalInvariants": [
+    "INV-001: Ledger and Audit entries must be append-only and immutable.",
+    "INV-002: Point calculations must follow strict tier multipliers (Platinum 1.75x, Gold 1.25x).",
+    "INV-003: Store receipt numbers must be unique and rejected if claimed twice.",
+    "INV-004: Dual-sync resilience must preserve local disk data if Firestore disconnects.",
+    "INV-005: Tombstone preservation must permanently prevent deleted members from ghost logging in."
+  ],
+  "verification": {
+    "typecheck": "PASS (0 errors)",
+    "lint": "PASS",
+    "build": "PASS"
+  }
+}
