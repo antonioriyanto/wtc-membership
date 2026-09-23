@@ -15,12 +15,13 @@ import {
   Eye
 } from 'lucide-react';
 import { compressImage } from '../utils/imageCompression';
+import { uploadImageToStorage } from '../lib/imageStorage';
 
 interface CreateVoucherModalProps {
   isOpen: boolean;
   onClose: () => void;
   stores: StoreBranch[];
-  onCreateVoucher: (newVoucher: Omit<Voucher, 'id' | 'totalClaimed' | 'totalUsed'>) => void;
+  onCreateVoucher: (newVoucher: Omit<Voucher, 'id' | 'totalClaimed' | 'totalUsed'>) => Promise<void>;
   existingVoucher?: Voucher | null;
 }
 
@@ -77,6 +78,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [customUrl, setCustomUrl] = useState('');
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -132,31 +134,11 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
       const origSizeMb = (compressed.originalSize / (1024 * 1024)).toFixed(1);
       const compSizeKb = Math.round(compressed.compressedSize / 1024);
 
-      // 2. Try uploading the compressed blob to the server /api/upload
-      const formData = new FormData();
-      formData.append('image', compressed.blob, file.name.replace(/\.[^/.]+$/, "") + ".jpg");
-
-      let uploadedUrl: string | null = null;
-
-      try {
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.url) {
-            uploadedUrl = data.url;
-          }
-        }
-      } catch (uploadErr) {
-        console.warn('Server upload endpoint not responding, using compressed DataURL fallback:', uploadErr);
-      }
-
-      // 3. Resilient fallback: If server upload did not return URL, use compressed Data URL directly
-      const finalImage = uploadedUrl || compressed.dataUrl;
-      setImagePath(finalImage);
+      const imageType = compressed.blob.type || file.type;
+      const extension = imageType === 'image/png' ? 'png' : imageType === 'image/webp' ? 'webp' : 'jpg';
+      const imageFile = new File([compressed.blob], file.name.replace(/\.[^/.]+$/, '') + '.' + extension, { type: imageType });
+      const uploaded = await uploadImageToStorage(imageFile, 'vouchers');
+      setImagePath(uploaded.url);
 
       const sizeLabel = compressed.originalSize > 1024 * 1024 
         ? `${origSizeMb} MB → ${compSizeKb} KB` 
@@ -216,7 +198,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
     setUploadSuccessInfo(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) {
       setError('Kode voucher wajib diisi.');
@@ -233,7 +215,11 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
 
     const termsArray = termsText.split('\n').filter(t => t.trim().length > 0);
 
-    onCreateVoucher({
+    if (isSaving || isProcessingImage) return;
+    setIsSaving(true);
+    setError('');
+    try {
+      await onCreateVoucher({
       code: code.trim().toUpperCase(),
       title: title.trim(),
       subtitle: subtitle.trim() || 'Exclusive Member Reward Voucher',
@@ -248,9 +234,13 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
       status: 'ACTIVE',
       imagePath: imagePath || '',
       terms: termsArray.length > 0 ? termsArray : ['Valid at Watch Club stores throughout Indonesia.']
-    });
-
-    onClose();
+      });
+      onClose();
+    } catch (err: any) {
+      setError(`Voucher gagal disimpan: ${err?.message || 'coba lagi.'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleStoreToggle = (storeId: string) => {
@@ -279,6 +269,7 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            disabled={isSaving}
             className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -673,17 +664,17 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
           <button
             type="submit"
             form="voucherForm"
-            disabled={isProcessingImage}
+            disabled={isProcessingImage || isSaving}
             className={`px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all flex items-center gap-2 ${
-              isProcessingImage 
+              isProcessingImage || isSaving
                 ? 'bg-slate-400 cursor-not-allowed' 
                 : 'bg-slate-900 hover:bg-slate-800'
             }`}
           >
-            {isProcessingImage ? (
+            {isProcessingImage || isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Memproses Gambar...</span>
+                <span>{isSaving ? 'Menyimpan Voucher...' : 'Memproses Gambar...'}</span>
               </>
             ) : (
               <>
