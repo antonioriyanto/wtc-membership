@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { User, KeyRound, ShieldCheck, Eye, EyeOff, Lock, ChevronDown, LogIn } from 'lucide-react';
 import { WatchClubLogo } from './WatchClubLogo';
 import { hashStringSHA256, STORE_PIN_HASHES, setOfflineMode } from '../lib/authHelper';
+import { auth } from '../lib/firebase';
+import { signInWithCustomToken } from 'firebase/auth';
 
 export const STORE_ACCOUNTS = [
   { name: '23 Paskal Bandung', username: '23PSC' },
@@ -136,6 +138,14 @@ export const AdminLogin: React.FC<LoginWallProps> = ({
       if (result.success) {
         setOfflineMode(false);
         
+        if (result.token) {
+          try {
+            await signInWithCustomToken(auth, result.token);
+          } catch (tokErr: any) {
+            console.warn('Firebase custom token sign in notice:', tokErr?.message);
+          }
+        }
+
         let finalStoreId = currentStoreId;
         if (!isHOUser && showStoreQuickSelect) {
            const foundStore = STORE_ACCOUNTS.find(s => s.username.toUpperCase() === u);

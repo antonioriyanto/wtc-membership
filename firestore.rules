@@ -2,16 +2,40 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Default deny all undefined paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // Helper functions for Authentication & Role Checking
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isStaffOrAdmin() {
+    // Head Office (HO) Superadmin authorization
+    function isHoAdmin() {
       return isAuthenticated() && (
-        request.auth.token.role == 'ADMIN' || 
+        request.auth.token.role == 'HO_ADMIN' || 
+        request.auth.token.role == 'ADMIN' ||
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'perkedelsayappp@gmail.com'
+      );
+    }
+
+    // Cashier role authorization (tied to retail stores)
+    function isCashier() {
+      return isAuthenticated() && (
         request.auth.token.role == 'CASHIER' ||
-        request.auth.token.admin == true
+        isHoAdmin()
+      );
+    }
+
+    // Member ownership verification
+    function isMemberOwner(memberId) {
+      return isAuthenticated() && (
+        request.auth.uid == memberId ||
+        (resource != null && resource.data.googleUid == request.auth.uid) ||
+        (resource != null && resource.data.linkedGoogleEmail == request.auth.token.email)
       );
     }
 
@@ -32,74 +56,99 @@ service cloud.firestore {
       ]);
     }
 
-    // Master Stores Directory (Read for all, write for Staff/Admin)
+    // 1. Master Stores Directory (Read for all, write restricted to HO Admin)
     match /stores/{storeId} {
       allow read: if true;
-      allow write: if true; // Managed by HO & POS system
+      allow create, update, delete: if isHoAdmin();
     }
 
-    // Sequential Membership ID Counters
+    // 2. Sequential Membership ID Counters (Cashiers & HO only)
     match /store_counters/{storeCode} {
-      allow read, write: if true;
+      allow read, write: if isCashier() || isHoAdmin();
     }
 
-    // Members Loyalty Profiles & Balances
+    // 3. Members Loyalty Profiles & Balances
     match /members/{memberId} {
-      // Document read is permitted for authenticated members or retail lookup
-      allow read: if true;
+      // Direct document read: Member owner, Cashier, or HO Admin
+      allow get: if isMemberOwner(memberId) || isCashier() || isHoAdmin();
 
-      // New member creation: client cannot inject pre-hashed credentials directly
-      allow create: if true;
+      // List query: Only Cashiers and HO Admin can query member lists
+      allow list: if isCashier() || isHoAdmin();
 
-      // Member profile updates:
-      // Deny client modifications to pinHash, pinSalt, lockedUntil, and failedPinAttempts
-      // unless authenticated or handled by trusted backend routines.
-      allow update: if true;
+      // New member creation: Cashier, HO Admin, or self-registration without pre-hashed credentials
+      allow create: if isCashier() || isHoAdmin() || (isAuthenticated() && request.auth.uid == memberId && noCredentialCreation());
 
-      // Member deletion: strictly prohibited from standard client
-      allow delete: if isStaffOrAdmin();
+      // Profile updates:
+      // HO Admin has full management access.
+      // Members can only update their non-ledger profile fields (name, email, address) and cannot modify points, tier, or credentials.
+      allow update: if isHoAdmin() || (
+        isMemberOwner(memberId) &&
+        noCredentialMutation() &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'points',
+          'lifetimePoints',
+          'tier',
+          'status',
+          'membershipId'
+        ])
+      );
+
+      // Deletion strictly restricted to HO Admin
+      allow delete: if isHoAdmin();
     }
 
-    // Vouchers & Promotional Discounts
+    // 4. Vouchers & Promotional Discounts (Read for all, managed by HO)
     match /vouchers/{voucherId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isHoAdmin();
     }
 
-    // POS & Loyalty Transaction Ledger
+    // 5. POS & Loyalty Transaction Ledger (STRICTLY IMMUTABLE)
     match /transactions/{transactionId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if false; // Immutable ledger
+      // Read access: HO Admin can read all; Cashier can read store transactions; Member can only read own transactions
+      allow get: if isHoAdmin() || isCashier() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      allow list: if isHoAdmin() || 
+        (isCashier() && resource.data.storeId == request.auth.token.storeId) ||
+        (isAuthenticated() && resource.data.memberId == request.auth.uid);
+
+      // Creation allowed by authorized Cashiers and HO Admin
+      allow create: if isCashier() || isHoAdmin();
+
+      // Ledger is strictly immutable: no updates or deletes permitted
+      allow update, delete: if false;
     }
 
-    // Customer Care Support Tickets
+    // 6. Customer Care Support Tickets
     match /support/{ticketId} {
-      allow read, write: if true;
+      allow get, list: if isHoAdmin() || isCashier() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isHoAdmin() || isCashier();
+      allow delete: if isHoAdmin();
     }
 
-    // Marketing Campaigns & Announcements
+    // 7. Marketing Campaigns & Announcements (Read for all, managed by HO)
     match /campaigns/{campaignId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isHoAdmin();
     }
 
-    // System Audit Trail
+    // 8. System Audit Trail (STRICTLY IMMUTABLE)
     match /audit/{auditId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if false; // Immutable audit trail
+      allow read: if isHoAdmin();
+      allow create: if isHoAdmin() || isCashier();
+      allow update, delete: if false;
     }
 
-    // Loyalty System Configurations
+    match /audit_logs/{auditId} {
+      allow read: if isHoAdmin();
+      allow create: if isHoAdmin() || isCashier();
+      allow update, delete: if false;
+    }
+
+    // 9. Loyalty System Configurations (Read for all, managed by HO)
     match /config/{configId} {
       allow read: if true;
-      allow write: if true;
-    }
-
-    // Global Fallback for nested subcollections
-    match /{document=**} {
-      allow read, write: if true;
+      allow write: if isHoAdmin();
     }
   }
 }

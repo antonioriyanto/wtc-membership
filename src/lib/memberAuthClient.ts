@@ -263,6 +263,21 @@ export async function linkGoogleAccountClient(params: {
     throw new Error('Member ID dan Google UID wajib disertakan.');
   }
 
+  // 1. Anti-hijacking check: Check if googleUid is already linked to another member
+  try {
+    const existingGoogleSnap = await getDocs(query(collection(db, 'members'), where('googleUid', '==', googleUid)));
+    for (const d of existingGoogleSnap.docs) {
+      if (d.id !== memberId) {
+        throw new Error('Akun Google ini sudah terhubung dengan akun member Watch Club yang lain. Satu akun Google hanya dapat terhubung ke satu kartu member.');
+      }
+    }
+  } catch (err: any) {
+    if (err?.message?.includes('Akun Google ini sudah terhubung')) {
+      throw err;
+    }
+    // Continue if index/rules prevent query
+  }
+
   const memberRef = doc(db, 'members', memberId);
   const nowIso = new Date().toISOString();
   const normalizedGoogleEmail = (googleEmail || '').trim().toLowerCase();
@@ -274,13 +289,26 @@ export async function linkGoogleAccountClient(params: {
     }
 
     const currentData = docSnap.data() as CanonicalMemberDocument;
+
+    // 2. Anti-hijacking check: prevent overriding an already linked Google account
+    if (currentData.googleUid && currentData.googleUid !== googleUid) {
+      throw new Error('Akun member ini sudah ditautkan ke akun Google lain. Silakan hubungi Customer Care untuk perubahan.');
+    }
+
     const existingEmail = (currentData.email || '').trim();
     const finalEmail = existingEmail ? existingEmail : normalizedGoogleEmail;
 
     const existingLinkedUids: string[] = Array.isArray(currentData.linkedAuthUids) ? currentData.linkedAuthUids : [];
     const updatedLinkedUids = Array.from(new Set([...existingLinkedUids, googleUid]));
 
+    // Canonical identity enforcement
+    const phoneE164 = currentData.phoneE164 || toE164(currentData.phone || '');
+    const membershipId = currentData.membershipId || currentData.id;
+
     const mutation: Record<string, any> = {
+      memberId: currentData.id,
+      membershipId,
+      phoneE164,
       googleUid,
       linkedGoogleEmail: normalizedGoogleEmail,
       linkedAt: nowIso,

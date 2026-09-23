@@ -32,8 +32,7 @@ interface NationalTransactionsTabProps {
   members: Member[];
   initialSelectedStore?: StoreBranch | null;
   onSelectStore?: (store: StoreBranch | null) => void;
-  onUpdateTransaction?: (updatedTrx: Transaction) => void;
-  onDeleteTransaction?: (trxId: string) => void;
+  onReverseTransaction?: (originalTrx: Transaction, reason: string) => Promise<void>;
   isSkeletonLoading?: boolean;
 }
 
@@ -43,8 +42,7 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
   members,
   initialSelectedStore = null,
   onSelectStore,
-  onUpdateTransaction,
-  onDeleteTransaction,
+  onReverseTransaction,
   isSkeletonLoading = false
 }) => {
   if (isSkeletonLoading) {
@@ -72,7 +70,9 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
   const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
   const [selectedReceiptDetail, setSelectedReceiptDetail] = useState<Transaction | null>(null);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [reversalTargetTrx, setReversalTargetTrx] = useState<Transaction | null>(null);
+  const [reversalReason, setReversalReason] = useState<string>('');
+  const [isSubmittingReversal, setIsSubmittingReversal] = useState<boolean>(false);
 
   // Kebab Menu state
   const [activeMenuTrxId, setActiveMenuTrxId] = useState<string | null>(null);
@@ -623,45 +623,54 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
                               Lihat Detail Struk
                             </button>
 
-                            {onUpdateTransaction && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuTrxId(null);
-                                  setEditingTransaction(trx);
-                                }}
-                                className="w-full px-3.5 py-2 text-xs text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60 flex items-center gap-2 font-medium cursor-pointer"
-                              >
-                                <Edit2 className="w-3.5 h-3.5 text-neutral-500" />
-                                Edit Transaksi
-                              </button>
-                            )}
+                            {(() => {
+                              const isReversal = trx.type === 'REVERSAL' || (trx.receiptNo && trx.receiptNo.startsWith('REV-'));
+                              const isAlreadyReversed = transactions.some(t => 
+                                t.originalTransactionId === trx.id || 
+                                (t.reversedReceiptNo && t.reversedReceiptNo === trx.receiptNo) ||
+                                (t.type === 'REVERSAL' && t.receiptNo === 'REV-' + trx.receiptNo)
+                              );
 
-                            {onDeleteTransaction && (
-                              <>
-                                <div className="my-1 border-t border-neutral-100 dark:border-neutral-700" />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuTrxId(null);
-                                    showConfirm(
-                                      `Apakah Anda yakin ingin membatalkan/menghapus transaksi ${trx.receiptNo}? Tindakan ini akan dicatat dalam Audit Log HO.`,
-                                      'Void / Delete Transaction',
-                                      () => {
-                                        onDeleteTransaction(trx.id);
-                                        showAlert(`Transaksi ${trx.receiptNo} berhasil dihapus (Audit Log tercatat).`, 'Berhasil', 'success');
-                                      },
-                                      'Hapus Transaksi',
-                                      'Batal'
-                                    );
-                                  }}
-                                  className="w-full px-3.5 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2 font-semibold cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                  Void / Delete Transaction
-                                </button>
-                              </>
-                            )}
+                              if (isReversal) {
+                                return (
+                                  <div className="px-3.5 py-2 text-[11px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1.5 font-medium border-t border-neutral-100 dark:border-neutral-750">
+                                    <RotateCcw className="w-3.5 h-3.5 text-neutral-400" />
+                                    Transaksi Reversal
+                                  </div>
+                                );
+                              }
+
+                              if (isAlreadyReversed) {
+                                return (
+                                  <div className="px-3.5 py-2 text-[11px] text-rose-500 dark:text-rose-400 flex items-center gap-1.5 font-medium border-t border-neutral-100 dark:border-neutral-750">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
+                                    Sudah Dibatalkan (Reversed)
+                                  </div>
+                                );
+                              }
+
+                              if (onReverseTransaction) {
+                                return (
+                                  <>
+                                    <div className="my-1 border-t border-neutral-100 dark:border-neutral-700" />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuTrxId(null);
+                                        setReversalTargetTrx(trx);
+                                        setReversalReason('');
+                                      }}
+                                      className="w-full px-3.5 py-2 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 font-semibold cursor-pointer"
+                                    >
+                                      <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
+                                      Koreksi / Void (Reversal)
+                                    </button>
+                                  </>
+                                );
+                              }
+
+                              return null;
+                            })()}
                           </div>
                         )}
                       </td>
@@ -798,11 +807,13 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
         </div>
       )}
 
-      {/* EDIT TRANSACTION MODAL */}
-      {editingTransaction && (
+      {/* VOID / REVERSAL TRANSACTION MODAL */}
+      {reversalTargetTrx && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn"
-          onClick={() => setEditingTransaction(null)}
+          onClick={() => {
+            if (!isSubmittingReversal) setReversalTargetTrx(null);
+          }}
         >
           <div 
             className="bg-white dark:bg-neutral-900 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-neutral-200 dark:border-neutral-800 relative animate-scaleUp"
@@ -810,71 +821,110 @@ export const NationalTransactionsTab: React.FC<NationalTransactionsTabProps> = (
           >
             <div className="px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-850/40">
               <h3 className="font-bold text-neutral-900 dark:text-white flex items-center gap-2 text-sm">
-                <Edit2 className="w-4 h-4 text-neutral-600 dark:text-neutral-300" />
-                Edit Transaksi (Admin HO)
+                <RotateCcw className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                Koreksi Ledger (Reversal Struk)
               </h3>
               <button 
-                onClick={() => setEditingTransaction(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors text-neutral-500 cursor-pointer"
+                disabled={isSubmittingReversal}
+                onClick={() => setReversalTargetTrx(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors text-neutral-500 cursor-pointer disabled:opacity-40"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">No. Struk</label>
-                <input 
-                  type="text" 
-                  value={editingTransaction.receiptNo || ""}
-                  onChange={(e) => setEditingTransaction({...editingTransaction, receiptNo: e.target.value})}
-                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-900 dark:text-white focus:outline-hidden focus:border-neutral-900"
-                />
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!reversalReason.trim()) {
+                showAlert('Mohon isi alasan koreksi / pembatalan struk transaksi.', 'Validasi', 'warning');
+                return;
+              }
+              if (!onReverseTransaction) return;
+
+              setIsSubmittingReversal(true);
+              try {
+                await onReverseTransaction(reversalTargetTrx, reversalReason.trim());
+                showAlert(`Transaksi ${reversalTargetTrx.receiptNo} berhasil dibatalkan. Transaksi reversal telah dicatat di ledger secara permanen.`, 'Reversal Berhasil', 'success');
+                setReversalTargetTrx(null);
+                setReversalReason('');
+              } catch (err: any) {
+                console.error('Reversal error:', err);
+                showAlert(err?.message || 'Gagal memproses reversal transaksi.', 'Reversal Gagal', 'error');
+              } finally {
+                setIsSubmittingReversal(false);
+              }
+            }}>
+              <div className="p-6 space-y-4">
+                <div className="p-3.5 bg-neutral-50 dark:bg-neutral-800/60 rounded-2xl border border-neutral-200/70 dark:border-neutral-700/60 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">No. Struk:</span>
+                    <span className="font-mono font-bold text-neutral-800 dark:text-neutral-200">{reversalTargetTrx.receiptNo}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Pelanggan:</span>
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-200">{reversalTargetTrx.memberName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Nilai:</span>
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-200">Rp {(reversalTargetTrx.amount || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Mutasi Poin Semula:</span>
+                    <span className={`font-bold ${reversalTargetTrx.pointsDelta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {reversalTargetTrx.pointsDelta >= 0 ? `+${reversalTargetTrx.pointsDelta}` : reversalTargetTrx.pointsDelta} Pts
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                    Alasan Pembatalan / Koreksi <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea 
+                    rows={3}
+                    required
+                    value={reversalReason}
+                    onChange={(e) => setReversalReason(e.target.value)}
+                    placeholder="Contoh: Customer retur produk jam tangan / koreksi salah input kasir"
+                    className="w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all resize-none"
+                  />
+                </div>
+
+                <div className="p-3 bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-800/50 rounded-xl">
+                  <p className="text-[11px] text-rose-800 dark:text-rose-300 leading-relaxed font-medium">
+                    <strong>Prinsip Immutability Ledger:</strong> Struk asli tidak akan dihapus atau diubah. Sistem akan menerbitkan entri <em>Reversal</em> baru bertanda negatif (-), menyesuaikan saldo poin member secara otomatis, dan merekam jejak audit HO.
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Nominal Transaksi (Rp)</label>
-                <input 
-                  type="number" 
-                  value={editingTransaction.amount || ""}
-                  onChange={(e) => setEditingTransaction({...editingTransaction, amount: parseInt(e.target.value) || 0})}
-                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-900 dark:text-white focus:outline-hidden focus:border-neutral-900"
-                />
+
+              <div className="px-6 py-4 bg-neutral-50 dark:bg-neutral-850/40 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={isSubmittingReversal}
+                  onClick={() => setReversalTargetTrx(null)}
+                  className="px-4 py-2 bg-white hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-750 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReversal || !reversalReason.trim()}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                >
+                  {isSubmittingReversal ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Memproses...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Konfirmasi Reversal</span>
+                    </>
+                  )}
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Catatan Tambahan</label>
-                <input 
-                  type="text" 
-                  value={editingTransaction.notes || ''}
-                  onChange={(e) => setEditingTransaction({...editingTransaction, notes: e.target.value})}
-                  placeholder="Opsional"
-                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-neutral-900"
-                />
-              </div>
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl mt-4">
-                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
-                  <strong>Peringatan Audit:</strong> Perubahan ini tidak akan secara otomatis menghitung ulang tier/poin milik member terkait. Perubahan hanya berlaku untuk pelaporan HO.
-                </p>
-              </div>
-            </div>
-            <div className="px-6 py-4 bg-neutral-50 dark:bg-neutral-850/40 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2">
-              <button
-                onClick={() => setEditingTransaction(null)}
-                className="px-4 py-2 bg-white hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-750 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                onClick={() => {
-                  if (onUpdateTransaction) {
-                    onUpdateTransaction(editingTransaction);
-                    showAlert('Transaksi berhasil diperbarui.', 'Berhasil', 'success');
-                  }
-                  setEditingTransaction(null);
-                }}
-                className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Simpan (Audit Log)
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

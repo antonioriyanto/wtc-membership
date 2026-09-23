@@ -28,21 +28,35 @@ export function cleanAndEnrichStore(rawStore: any): StoreBranch {
 
   const rawCode = (rawStore.code || rawStore.id || '').toString().trim().toUpperCase();
   const rawName = (rawStore.name || '').toString().trim().toLowerCase();
-  const rawMall = (rawStore.mallName || '').toString().trim().toLowerCase();
 
   // Match against official initialStores (all 42 Watch Club branches)
-  const fallback = initialStores.find(is => {
-    const isCode = (is.code || is.id || '').toUpperCase();
-    const isName = (is.name || '').toLowerCase();
-    const isMall = (is.mallName || '').toLowerCase();
-    
-    if (rawCode && isCode === rawCode) return true;
-    if (rawName && isName === rawName) return true;
-    if (rawMall && isMall === rawMall) return true;
-    if (rawName && (isName.includes(rawName) || rawName.includes(isName))) return true;
-    if (rawMall && (isMall.includes(rawMall) || rawMall.includes(isMall))) return true;
-    return false;
-  }) || initialStores.find(is => is.city?.toLowerCase() === rawStore.city?.toLowerCase()) || initialStores[0];
+  const officialMatch = initialStores.find(is => 
+    (rawStore.id && is.id === rawStore.id) || 
+    (rawCode && (is.code || is.id || '').toUpperCase() === rawCode) ||
+    (rawName && is.name.trim().toLowerCase() === rawName)
+  );
+
+  const fallback = officialMatch || {
+    id: rawStore.id || 'store_' + Date.now(),
+    code: rawStore.code || 'WTC-CUSTOM',
+    name: rawStore.name || 'Cabang Baru',
+    mallName: rawStore.mallName || rawStore.name || 'Pusat Belanja',
+    city: rawStore.city || 'Jakarta',
+    region: rawStore.region || 'Jabodetabek',
+    floorUnit: rawStore.floorUnit || '-',
+    address: rawStore.address || '',
+    fullAddress: rawStore.fullAddress || rawStore.address || '',
+    phone: rawStore.phone || '',
+    whatsapp: rawStore.whatsapp || rawStore.phone || '',
+    waNumber: '',
+    email: rawStore.email || 'contact@watchclub.co.id',
+    imageUrl: rawStore.imageUrl || 'https://images.unsplash.com/photo-1547996160-71dfa63582b8?auto=format&fit=crop&q=80&w=800',
+    latitude: undefined,
+    longitude: undefined,
+    location: '',
+    type: 'STORE',
+    isActive: true
+  };
 
   const isValidPhone = (p: any): boolean => {
     if (!p || typeof p !== 'string') return false;
@@ -64,69 +78,63 @@ export function cleanAndEnrichStore(rawStore: any): StoreBranch {
     return (
       trimmed.startsWith('http://') || 
       trimmed.startsWith('https://') || 
-      trimmed.startsWith('data:image/') || 
       trimmed.startsWith('/uploads/') || 
       trimmed.startsWith('./uploads/') ||
       trimmed.startsWith('/')
     ) && trimmed.length >= 3;
   };
 
-  // If this store belongs to the official 42 Watch Club branches, strictly enforce the master Nama Cabang and metadata!
-  const isOfficialBranch = false; // ALLOW DB EDITS TO OVERRIDE MOCK DATA
+  // ENRICHMENT PRINCIPLE: User/database inputs take absolute priority.
+  // Enrichment ONLY fills in undefined, null, or empty fields.
+  const name = rawStore.name && rawStore.name.trim().length > 0 ? rawStore.name.trim() : fallback.name;
+  const mallName = rawStore.mallName && rawStore.mallName.trim().length > 0 ? rawStore.mallName.trim() : (fallback.mallName || name);
+  const city = rawStore.city && rawStore.city.trim().length > 0 ? rawStore.city.trim() : fallback.city;
+  const region = rawStore.region && rawStore.region.trim().length > 0 ? rawStore.region.trim() : fallback.region;
+  const code = rawStore.code && rawStore.code.trim().length > 0 ? rawStore.code.trim() : fallback.code;
 
-  const name = isOfficialBranch ? fallback.name : (rawStore.name || fallback.name);
-  const mallName = isOfficialBranch ? (fallback.mallName || fallback.name) : (rawStore.mallName || name);
-  const city = isOfficialBranch ? fallback.city : (rawStore.city || fallback.city);
-  const region = isOfficialBranch ? fallback.region : (rawStore.region || fallback.region);
+  const phone = isValidPhone(rawStore.phone) 
+    ? rawStore.phone.trim() 
+    : (isValidPhone(rawStore.whatsapp) ? rawStore.whatsapp.trim() : fallback.phone);
 
-  const phone = isOfficialBranch ? fallback.phone : (isValidPhone(rawStore.phone) 
-    ? rawStore.phone 
-    : (isValidPhone(rawStore.whatsapp) ? rawStore.whatsapp : fallback.phone));
-
-  const whatsapp = isOfficialBranch ? fallback.whatsapp : (isValidPhone(rawStore.whatsapp) 
-    ? rawStore.whatsapp 
-    : (isValidPhone(rawStore.phone) ? rawStore.phone : fallback.whatsapp || fallback.phone));
+  const whatsapp = isValidPhone(rawStore.whatsapp) 
+    ? rawStore.whatsapp.trim() 
+    : (isValidPhone(rawStore.phone) ? rawStore.phone.trim() : fallback.whatsapp || fallback.phone);
 
   const rawDigits = (whatsapp || phone || fallback.phone || '').replace(/[^0-9]/g, '');
-  const waNumber = isOfficialBranch && fallback.waNumber ? fallback.waNumber : (rawDigits.startsWith('0') ? '62' + rawDigits.slice(1) : (rawDigits.startsWith('62') ? rawDigits : '62' + rawDigits));
+  const waNumber = rawStore.waNumber || (rawDigits.startsWith('0') ? '62' + rawDigits.slice(1) : (rawDigits.startsWith('62') ? rawDigits : '62' + rawDigits));
 
-  const floorUnit = (rawStore.floorUnit && rawStore.floorUnit.trim() !== '-' && rawStore.floorUnit.trim().length > 1) 
-    ? rawStore.floorUnit 
+  const floorUnit = (rawStore.floorUnit && rawStore.floorUnit.trim() !== '-' && rawStore.floorUnit.trim().length > 0) 
+    ? rawStore.floorUnit.trim() 
     : fallback.floorUnit;
 
-  const address = isOfficialBranch ? fallback.address : (isValidAddress(rawStore.address, name) 
-    ? rawStore.address 
-    : fallback.address);
+  const address = rawStore.address && rawStore.address.trim().length > 0 
+    ? rawStore.address.trim() 
+    : fallback.address;
 
-  const fullAddress = isOfficialBranch ? fallback.fullAddress : (isValidAddress(rawStore.fullAddress, name) 
-    ? rawStore.fullAddress 
-    : (fallback.fullAddress || `${mallName} ${floorUnit} ${address}`));
+  const fullAddress = rawStore.fullAddress && rawStore.fullAddress.trim().length > 0 
+    ? rawStore.fullAddress.trim() 
+    : (fallback.fullAddress || `${mallName} ${floorUnit} ${address}`.trim());
 
   const imageUrl = isValidImage(rawStore.imageUrl) 
-    ? rawStore.imageUrl 
+    ? rawStore.imageUrl.trim() 
     : fallback.imageUrl;
 
-  const email = isOfficialBranch && fallback.email ? fallback.email : (rawStore.email || fallback.email);
+  const email = rawStore.email && rawStore.email.trim().length > 0 ? rawStore.email.trim() : fallback.email;
 
-  // For official branches, ALWAYS enforce verified real GPS coordinates from initialStores!
-  // This prevents corrupted Firestore or localStorage coordinates from misplacing stores (e.g. Semarang vs Jakarta Barat).
-  const latitude = (fallback.latitude !== undefined && fallback.latitude !== null && !isNaN(fallback.latitude))
-    ? fallback.latitude
-    : ((rawStore.latitude !== undefined && rawStore.latitude !== null && !isNaN(Number(rawStore.latitude)))
-      ? Number(rawStore.latitude)
-      : undefined);
+  // Preserve custom GPS coordinates if entered or stored in database
+  const latitude = (rawStore.latitude !== undefined && rawStore.latitude !== null && !isNaN(Number(rawStore.latitude)))
+    ? Number(rawStore.latitude)
+    : (fallback.latitude !== undefined && fallback.latitude !== null && !isNaN(Number(fallback.latitude)) ? Number(fallback.latitude) : undefined);
 
-  const longitude = (fallback.longitude !== undefined && fallback.longitude !== null && !isNaN(fallback.longitude))
-    ? fallback.longitude
-    : ((rawStore.longitude !== undefined && rawStore.longitude !== null && !isNaN(Number(rawStore.longitude)))
-      ? Number(rawStore.longitude)
-      : undefined);
+  const longitude = (rawStore.longitude !== undefined && rawStore.longitude !== null && !isNaN(Number(rawStore.longitude)))
+    ? Number(rawStore.longitude)
+    : (fallback.longitude !== undefined && fallback.longitude !== null && !isNaN(Number(fallback.longitude)) ? Number(fallback.longitude) : undefined);
 
   return {
     ...fallback,
     ...rawStore,
     id: rawStore.id || fallback.id,
-    code: fallback.code || rawStore.code,
+    code,
     name,
     mallName,
     city,
@@ -142,34 +150,27 @@ export function cleanAndEnrichStore(rawStore: any): StoreBranch {
     latitude,
     longitude,
     location: `${name}, ${city}`,
-    type: fallback.type || rawStore.type || 'STORE',
+    type: rawStore.type || fallback.type || 'STORE',
     isActive: rawStore.isActive !== false,
   };
 }
 
 /**
- * Synchronizes and updates all 42 official Watch Club store branches to Firestore
- * so that any legacy documents with outdated branch name, missing phone, broken image, or incomplete address
- * are updated to the official database.
+ * Synchronizes official Watch Club store branches to Firestore
+ * while strictly PRESERVING any custom store branches created by the user/admin.
  */
 export async function syncOfficialStoresToFirestore(force = false) {
   try {
     const snap = await getDocs(collection(db, 'stores'));
+    const existingDocs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+
     let needUpdate = force || snap.empty;
 
     if (!needUpdate) {
       for (const d of snap.docs) {
         const dat = d.data();
-        const p = dat.phone || '';
-        const digits = p.replace(/[^0-9]/g, '');
         const official = initialStores.find(s => s.id === d.id || s.code === dat.code);
-        if (
-          digits.length < 7 || 
-          p.trim() === '-' || 
-          !dat.imageUrl || 
-          !dat.fullAddress ||
-          (official && (dat.name !== official.name || dat.mallName !== official.mallName))
-        ) {
+        if (official && (!dat.imageUrl || !dat.fullAddress)) {
           needUpdate = true;
           break;
         }
@@ -177,38 +178,42 @@ export async function syncOfficialStoresToFirestore(force = false) {
     }
 
     if (needUpdate) {
-      console.log('[Firestore] Syncing official 42 Watch Club branches to Firestore with canonical Nama Cabang...');
+      console.log('[Firestore] Syncing official 42 Watch Club branches to Firestore while preserving custom branches...');
       const batch = writeBatch(db);
+
+      // 1. Update official 42 stores
       initialStores.forEach(s => {
         let storeToSync = { ...s };
-        // 1. Check if Firestore already has a customized image
-        const existingDoc = snap.docs.find(d => d.id === s.id || d.data()?.code === s.code);
+        // Preserve any custom image or edits already made to this official store
+        const existingDoc = existingDocs.find(d => d.id === s.id || d.code === s.code);
         if (existingDoc) {
-          const docData = existingDoc.data();
-          if (docData?.imageUrl && docData.imageUrl !== s.imageUrl) {
-            storeToSync.imageUrl = docData.imageUrl;
+          if (existingDoc.imageUrl && existingDoc.imageUrl !== s.imageUrl) {
+            storeToSync.imageUrl = existingDoc.imageUrl;
+          }
+          if (existingDoc.latitude !== undefined && existingDoc.latitude !== null) {
+            storeToSync.latitude = existingDoc.latitude;
+          }
+          if (existingDoc.longitude !== undefined && existingDoc.longitude !== null) {
+            storeToSync.longitude = existingDoc.longitude;
           }
         }
-        // 2. Check if localStorage has a customized image
-        try {
-          const raw = localStorage.getItem('wtc_stores');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              const existing = parsed.find((item: any) => item.id === s.id || item.code === s.code);
-              if (existing && existing.imageUrl && existing.imageUrl !== s.imageUrl) {
-                storeToSync.imageUrl = existing.imageUrl;
-              }
-            }
-          }
-        } catch {}
-        batch.set(doc(db, 'stores', s.id), cleanForFirestore(storeToSync), { merge: true });
+        batch.set(doc(db, 'stores', s.id), cleanForFirestore(cleanAndEnrichStore(storeToSync)), { merge: true });
       });
+
+      // 2. DO NOT delete custom stores! Re-commit existing custom branches to guarantee they remain
+      existingDocs.forEach(d => {
+        const isOfficial = initialStores.some(s => s.id === d.id || s.code === d.code);
+        if (!isOfficial && d.id) {
+          batch.set(doc(db, 'stores', d.id), cleanForFirestore(cleanAndEnrichStore(d)), { merge: true });
+        }
+      });
+
       await batch.commit();
-      console.log('[Firestore] Successfully updated official 42 stores.');
+      console.log('[Firestore] Successfully updated official 42 stores without wiping custom branches.');
     }
   } catch (err: any) {
-    console.warn('[Firestore] Store sync check:', err?.message || err);
+    console.error('[Firestore] Store sync error:', err?.message || err);
+    throw err;
   }
 }
 
@@ -380,8 +385,31 @@ export async function findMemberByGoogleUidInFirestore(uid: string): Promise<any
 export async function safeSetDoc(collectionName: string, docId: string, data: any) {
   const sanitized = cleanForFirestore(data);
 
-  // Synchronously update local cache so any changes (e.g. uploaded store photo, edited member info)
-  // are guaranteed to persist instantly and stay across views / refreshes
+  // 1. Primary write to Firestore: MUST NOT SWALLOW ERRORS
+  try {
+    await setDoc(doc(db, collectionName, String(docId)), sanitized, { merge: true });
+  } catch (firestoreErr: any) {
+    console.error(`[safeSetDoc] Failed to persist document ${collectionName}/${docId}:`, firestoreErr);
+    // Rethrow to allow caller UI to handle error, show alert, and rollback optimistic state
+    throw firestoreErr;
+  }
+
+  // 2. Server API sync for server-backed persistence
+  if (collectionName === 'members') {
+    fetch('/api/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sanitized)
+    }).catch(err => console.warn('[Server Sync] Notice syncing member to /api/members:', err));
+  } else if (collectionName === 'stores') {
+    fetch(`/api/stores/${encodeURIComponent(docId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sanitized)
+    }).catch(err => console.warn('[Server Sync] Notice syncing store to /api/stores:', err));
+  }
+
+  // 3. Update local backup cache ONLY AFTER cloud write succeeds
   try {
     const storageKey = collectionName === 'stores' ? 'wtc_stores' 
       : collectionName === 'members' ? 'wtc_members' 
@@ -407,25 +435,6 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
     console.warn("safeSetDoc local sync notice:", localErr);
   }
 
-  // Server API backup sync (guarantees cross-device & incognito persistence)
-  if (collectionName === 'members') {
-    fetch('/api/members', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sanitized)
-    }).catch(err => console.warn('[Server Sync] Notice syncing member to /api/members:', err));
-  } else if (collectionName === 'stores') {
-    fetch(`/api/stores/${encodeURIComponent(docId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sanitized)
-    }).catch(err => console.warn('[Server Sync] Notice syncing store to /api/stores:', err));
-  }
-
-  // Attempt Firestore persistence with catch to prevent unhandled rejections
-  await setDoc(doc(db, collectionName, String(docId)), sanitized, { merge: true }).catch(e => {
-    console.warn(`safeSetDoc (${collectionName}/${docId}) Firestore sync notice:`, e.message);
-  });
   return sanitized;
 }
 
@@ -539,58 +548,13 @@ export function setupFirestoreListeners(callbacks: any) {
   });
   unsubscribes.push(unsubConfig);
 
-  // Sync any offline/locally stored members to Firestore so they are never lost
-  // and guarantee 42 official stores in Firestore have valid phone and address
-  setTimeout(async () => {
-    try {
-      await syncOfficialStoresToFirestore();
-
-      const localMembersRaw = localStorage.getItem('wtc_members');
-      if (localMembersRaw) {
-        const localMembers = JSON.parse(localMembersRaw);
-        if (Array.isArray(localMembers) && localMembers.length > 0) {
-          const remoteSnap = await getDocs(collection(db, 'members'));
-          const remoteIds = new Set(remoteSnap.docs.map(d => d.id));
-          const remotePhones = new Set(remoteSnap.docs.map(d => (d.data().phone || '').replace(/[^0-9]/g, '')));
-
-          for (const m of localMembers) {
-            const cleanPhone = (m.phone || '').replace(/[^0-9]/g, '');
-            if (m.id && !remoteIds.has(m.id) && (!cleanPhone || !remotePhones.has(cleanPhone))) {
-              await safeSetDoc('members', m.id, m);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Local-to-cloud sync check completed with note:', e);
-    }
-  }, 1500);
-
+  // No auto-sync or auto-seed on mount to protect production Firestore from overwrite
   return () => {
     unsubscribes.forEach(unsub => unsub());
   };
 }
 
 export async function seedFirestoreIfEmpty() {
-  try {
-    const storesSnap = await getDocs(collection(db, 'stores'));
-    if (storesSnap.empty) {
-      const batch = writeBatch(db);
-      initialStores.forEach(s => batch.set(doc(db, 'stores', s.id), s));
-      initialMembers.forEach(m => batch.set(doc(db, 'members', String(m.id)), cleanForFirestore(m)));
-      initialVouchers.forEach(v => batch.set(doc(db, 'vouchers', String(v.id)), cleanForFirestore(v)));
-      initialTransactions.forEach(t => batch.set(doc(db, 'transactions', String(t.id)), cleanForFirestore(t)));
-      initialSupportTickets.forEach(t => batch.set(doc(db, 'support', String(t.id)), cleanForFirestore(t)));
-      initialCampaigns.forEach(c => batch.set(doc(db, 'campaigns', String(c.id)), cleanForFirestore(c)));
-      initialAuditLogs.forEach(a => batch.set(doc(db, 'audit', String(a.id)), cleanForFirestore(a)));
-      batch.set(doc(db, 'config', 'loyalty'), cleanForFirestore(initialLoyaltyConfig));
-      await batch.commit();
-      console.log('Seeded Firestore with initial data');
-    } else {
-      // Ensure official stores have full phones & addresses
-      await syncOfficialStoresToFirestore();
-    }
-  } catch (err: any) {
-    console.warn('[Firestore] Seed check skipped or restricted by security rules:', err?.message || err);
-  }
+  // Disabled by default to protect production data from accidental overwrite
+  return;
 }

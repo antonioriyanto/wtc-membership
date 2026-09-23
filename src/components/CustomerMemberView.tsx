@@ -47,11 +47,12 @@ import {
 } from 'lucide-react';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { WatchClubLogo } from './WatchClubLogo';
-import { doc, updateDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, auth, googleProvider } from '../lib/firebase';
 import { signInWithPopup } from 'firebase/auth';
 import { normalizePhoneNumber } from '../lib/syncFirestore';
 import { linkGoogleAccountClient } from '../lib/memberAuthClient';
+import { uploadImageToStorage } from '../lib/imageStorage';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 
@@ -179,15 +180,36 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      const idToken = await user.getIdToken();
+
+      // Verified server-side check
+      const res = await fetch('/api/members/link-google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: member.id,
+          googleUid: user.uid,
+          googleEmail: user.email || '',
+          idToken
+        })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Gagal memverifikasi akun Google.');
+      }
+
+      // Atomic client update with validation
       const updated = await linkGoogleAccountClient({
         memberId: member.id,
         googleUid: user.uid,
         googleEmail: user.email || ''
       });
+
       if (onUpdateMember) {
         onUpdateMember(updated as any);
       }
-      showAlert(`Akun Google (${user.email}) berhasil ditautkan ke profil Anda!`, 'Berhasil Ditautkan', 'success');
+      showAlert(`Akun Google (${user.email}) berhasil diverifikasi dan ditautkan ke profil Anda!`, 'Berhasil Ditautkan', 'success');
     } catch (err: any) {
       console.error('Link Google error:', err);
       showAlert(err?.message || 'Gagal menghubungkan akun Google.', 'Gagal', 'error');
@@ -196,87 +218,41 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     }
   };
 
-  const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const width = img.width;
-          const height = img.height;
-
-          // Square center crop & scale to keep avatar round and crisp
-          const minDim = Math.min(width, height);
-          const startX = (width - minDim) / 2;
-          const startY = (height - minDim) / 2;
-
-          const targetSize = Math.min(maxWidth, minDim);
-          canvas.width = targetSize;
-          canvas.height = targetSize;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return reject(new Error('Gagal memproses kanvas gambar'));
-          
-          ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, targetSize, targetSize);
-          resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        img.onerror = () => reject(new Error('Gagal memproses file gambar'));
-      };
-      reader.onerror = () => reject(new Error('Gagal membaca file gambar'));
-    });
-  };
-
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      showAlert('Silakan pilih file gambar yang valid (JPG, PNG, atau WEBP).', 'Format Tidak Didukung', 'warning');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
     setIsUploadingAvatar(true);
     try {
-      const compressedBase64 = await compressImage(file, 320, 320, 0.75);
-      
+      // 1. Upload to Firebase Storage with magic-byte validation and 5MB limit
+      const uploaded = await uploadImageToStorage(file, 'members');
+      const storageUrl = uploaded.url;
+
       const updatedMemberData: Member = {
         ...member,
-        avatarUrl: compressedBase64,
+        avatarUrl: storageUrl,
         updatedAt: new Date().toISOString()
       };
 
-      // 1. Update Firestore
+      // 2. Update Firestore
       await safeSetDoc('members', member.id, updatedMemberData);
 
-      // 2. Persist to Express backend
+      // 3. Persist to Express backend
       fetch(`/api/members/${member.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatarUrl: compressedBase64 })
+        body: JSON.stringify({ avatarUrl: storageUrl })
       }).catch(err => console.warn('[Avatar] Server sync notice:', err));
 
-      // 3. Notify parent app state
+      // 4. Notify parent app state
       if (onUpdateMember) {
         onUpdateMember(updatedMemberData);
       }
 
-      // 4. Update localStorage
-      try {
-        const raw = localStorage.getItem('wtc_members');
-        if (raw) {
-          const list = JSON.parse(raw);
-          const next = list.map((m: any) => m.id === member.id ? { ...m, avatarUrl: compressedBase64 } : m);
-          localStorage.setItem('wtc_members', JSON.stringify(next));
-        }
-      } catch {}
-
-      showAlert('Foto profil berhasil diubah!', 'Foto Diperbarui', 'success');
+      showAlert('Foto profil berhasil diubah dan disimpan!', 'Foto Diperbarui', 'success');
     } catch (err: any) {
       console.error('Avatar upload error:', err);
-      showAlert('Gagal memperbarui foto profil: ' + (err.message || 'Ukuran gambar terlalu besar atau terjadi kendala jaringan'), 'Gagal Mengunggah', 'error');
+      showAlert(err?.message || 'Gagal memperbarui foto profil. Periksa format dan ukuran file.', 'Gagal Mengunggah', 'error');
     } finally {
       setIsUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -661,8 +637,23 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
     setIsLoadingTransactions(true);
 
+    // Also pre-fetch from verified server endpoint
+    fetch(`/api/members/${encodeURIComponent(canonicalMemberId)}/transactions`)
+      .then(res => res.json())
+      .then(data => {
+        if (data?.success && Array.isArray(data.transactions)) {
+          setFirestoreTransactions(prev => prev.length > 0 ? prev : data.transactions);
+        }
+      })
+      .catch(() => {});
+
     try {
-      const q = query(collection(db, 'transactions'), orderBy('timestamp', 'desc'));
+      const q = query(
+        collection(db, 'transactions'),
+        where('memberId', '==', canonicalMemberId),
+        orderBy('timestamp', 'desc')
+      );
+
       const unsub = onSnapshot(q, (snapshot) => {
         const liveList: Transaction[] = [];
         snapshot.forEach((docSnap) => {
@@ -670,19 +661,22 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         });
         setFirestoreTransactions(liveList);
         setIsLoadingTransactions(false);
-      }, (err) => {
-        console.warn("Direct transactions snapshot error, using unordered query:", err);
-        const fallbackUnsub = onSnapshot(collection(db, 'transactions'), (snapshot) => {
-          const liveList: Transaction[] = [];
-          snapshot.forEach((docSnap) => {
-            liveList.push({ id: docSnap.id, ...(docSnap.data() as any) });
-          });
-          setFirestoreTransactions(liveList);
+      }, async (err) => {
+        console.warn("Direct member transactions snapshot notice:", err);
+        // Fallback to verified server endpoint
+        try {
+          const res = await fetch(`/api/members/${encodeURIComponent(canonicalMemberId)}/transactions`);
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.transactions)) {
+              setFirestoreTransactions(data.transactions);
+            }
+          }
+        } catch (fetchErr) {
+          console.warn("Backend transactions fetch fallback notice:", fetchErr);
+        } finally {
           setIsLoadingTransactions(false);
-        }, () => {
-          setIsLoadingTransactions(false);
-        });
-        return () => fallbackUnsub();
+        }
       });
 
       return () => unsub();

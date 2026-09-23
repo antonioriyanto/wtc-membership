@@ -158,6 +158,8 @@ export interface StoreBranch {
 export interface Transaction {
   id: string;
   receiptNo: string;
+  originalTransactionId?: string;
+  reversedReceiptNo?: string;
   memberId: string;
   membershipId?: string;
   memberName: string;
@@ -167,7 +169,7 @@ export interface Transaction {
   storeId: string;
   storeName: string;
   cashierName: string;
-  type: 'EARN' | 'REDEEM' | 'MANUAL_ADJUSTMENT' | 'VOUCHER_DISCOUNT';
+  type: 'EARN' | 'REDEEM' | 'MANUAL_ADJUSTMENT' | 'VOUCHER_DISCOUNT' | 'REVERSAL';
   amount: number;
   pointsDelta: number;
   voucherCode?: string;

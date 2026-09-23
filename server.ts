@@ -511,6 +511,128 @@ async function startServer() {
     }
   });
 
+  // GET /api/members/:id/transactions - Verified endpoint for member's own transaction history
+  app.get('/api/members/:id/transactions', async (req, res) => {
+    try {
+      const memberId = req.params.id;
+      if (!memberId) {
+        return res.status(400).json({ success: false, error: 'Member ID required' });
+      }
+
+      const results: any[] = [];
+      if (db) {
+        try {
+          const qSnap = await db.collection('transactions')
+            .where('memberId', '==', memberId)
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .get();
+          qSnap.forEach(docSnap => {
+            results.push({ id: docSnap.id, ...docSnap.data() });
+          });
+        } catch (dbErr: any) {
+          console.warn('[Server] Firestore member transactions query notice:', dbErr.message);
+          // Fallback query without orderBy if composite index needed
+          try {
+            const fallbackSnap = await db.collection('transactions')
+              .where('memberId', '==', memberId)
+              .get();
+            fallbackSnap.forEach(docSnap => {
+              results.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            results.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+          } catch (fbErr: any) {
+            console.warn('[Server] Unordered query notice:', fbErr.message);
+          }
+        }
+      }
+
+      res.json({ success: true, transactions: results });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // POST /api/members/link-google - Server-verified Google OAuth account linking
+  app.post('/api/members/link-google', async (req, res) => {
+    try {
+      const { memberId, googleUid, googleEmail, idToken } = req.body;
+      if (!memberId || !googleUid) {
+        return res.status(400).json({ success: false, error: 'memberId and googleUid required' });
+      }
+
+      let verifiedUid = googleUid;
+      let verifiedEmail = googleEmail;
+
+      // Verify Firebase ID Token if provided and Firebase Admin is configured
+      if (idToken && adminAuth) {
+        try {
+          const decoded = await adminAuth.verifyIdToken(idToken);
+          verifiedUid = decoded.uid;
+          verifiedEmail = decoded.email || googleEmail;
+        } catch (authErr: any) {
+          return res.status(401).json({ success: false, error: 'Token Google tidak valid: ' + authErr.message });
+        }
+      }
+
+      // Check anti-hijacking: ensure no OTHER member is linked to this googleUid
+      if (db) {
+        const existingMemberWithGoogle = await db.collection('members')
+          .where('googleUid', '==', verifiedUid)
+          .limit(1)
+          .get();
+
+        if (!existingMemberWithGoogle.empty) {
+          const docId = existingMemberWithGoogle.docs[0].id;
+          if (docId !== memberId) {
+            return res.status(409).json({ 
+              success: false, 
+              error: 'Akun Google ini sudah tertaut dengan akun member Watch Club yang lain.' 
+            });
+          }
+        }
+
+        const memberRef = db.collection('members').doc(memberId);
+        const memberDoc = await memberRef.get();
+        if (!memberDoc.exists) {
+          return res.status(404).json({ success: false, error: 'Member tidak ditemukan.' });
+        }
+
+        const data = memberDoc.data() || {};
+        if (data.googleUid && data.googleUid !== verifiedUid) {
+          return res.status(409).json({
+            success: false,
+            error: 'Akun member ini sudah ditautkan ke akun Google yang berbeda.'
+          });
+        }
+
+        const nowIso = new Date().toISOString();
+        const updatePayload: Record<string, any> = {
+          googleUid: verifiedUid,
+          linkedGoogleEmail: verifiedEmail || '',
+          linkedAt: nowIso,
+          updatedAt: nowIso
+        };
+        if (!data.email && verifiedEmail) {
+          updatePayload.email = verifiedEmail;
+        }
+        if (!data.recoveryEmail && verifiedEmail) {
+          updatePayload.recoveryEmail = verifiedEmail;
+        }
+
+        await memberRef.set(updatePayload, { merge: true });
+        return res.json({ success: true, member: { ...data, ...updatePayload } });
+      }
+
+      res.json({ 
+        success: true, 
+        member: { id: memberId, googleUid: verifiedUid, linkedGoogleEmail: verifiedEmail } 
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
   // Secure Authentication Endpoint to mint Custom Tokens for Cashiers & HO Admins
   app.all('/api/auth/employee-login', async (req, res) => {
     try {

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StoreBranch } from '../types';
 import { initialStores } from '../data/mockData';
 import { cleanAndEnrichStore, syncOfficialStoresToFirestore, safeSetDoc } from '../lib/syncFirestore';
+import { uploadImageToStorage } from '../lib/imageStorage';
 import { useCustomDialog } from './CustomDialogProvider';
-import { compressImage } from '../lib/image-compressor';
 import { 
   Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, 
   ArrowLeft, Save, Receipt, RefreshCw, Building, Compass,
@@ -69,10 +69,16 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
     setIsSyncingStores(true);
     try {
       await syncOfficialStoresToFirestore(true);
-      setStores(initialStores.map(cleanAndEnrichStore));
-      showAlert('Berhasil menyinkronkan seluruh 42 cabang resmi Watch Club ke database Firestore.', 'Sinkronisasi Berhasil');
+      // Preserve custom branches from existing state
+      const officialIds = new Set(initialStores.map(s => s.id));
+      const officialCodes = new Set(initialStores.map(s => s.code));
+      const customBranches = stores.filter(s => !officialIds.has(s.id) && !officialCodes.has(s.code)).map(cleanAndEnrichStore);
+      const updatedOfficial = initialStores.map(cleanAndEnrichStore);
+      const merged = [...updatedOfficial, ...customBranches].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setStores(merged);
+      showAlert(`Berhasil menyinkronkan seluruh 42 cabang resmi Watch Club ke database Firestore. ${customBranches.length} cabang kustom tetap dipertahankan.`, 'Sinkronisasi Berhasil', 'success');
     } catch (err: any) {
-      showAlert('Gagal menyinkronkan data toko: ' + (err?.message || err), 'Gagal');
+      showAlert('Gagal menyinkronkan data toko: ' + (err?.message || err), 'Gagal', 'error');
     } finally {
       setIsSyncingStores(false);
     }
@@ -164,13 +170,13 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
     if (!file) return;
     setIsUploading(true);
     try {
-      // Compress to optimal dimensions (<60KB) to ensure rapid loading and avoid 1MB document limit
-      const compressedBase64 = await compressImage(file, 800, 600, 0.75);
-      setFormData(prev => ({ ...prev, imageUrl: compressedBase64 }));
-      showAlert('Gambar cabang berhasil diunggah dan dikompres.', 'Sukses', 'success');
-    } catch (err) {
-      console.error('Error compressing image:', err);
-      showAlert('Gagal mengupload dan mengkompres gambar.', 'Gagal', 'error');
+      // Validate and upload to Storage (URL only, no Base64 in Firestore or state)
+      const uploaded = await uploadImageToStorage(file, 'stores');
+      setFormData(prev => ({ ...prev, imageUrl: uploaded.url }));
+      showAlert('Gambar cabang berhasil divalidasi dan diunggah ke Cloud Storage.', 'Upload Berhasil', 'success');
+    } catch (err: any) {
+      console.error('Error uploading image to storage:', err);
+      showAlert(err?.message || 'Gagal mengupload gambar cabang.', 'Upload Gagal', 'error');
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -216,7 +222,10 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
         try {
           localStorage.setItem('wtc_stores', JSON.stringify(newStores));
         } catch {}
-        showAlert('Cabang baru berhasil disimpan.', 'Sukses', 'success');
+        showAlert('Cabang baru berhasil disimpan ke database.', 'Sukses', 'success');
+        setMode('list');
+        setEditingStoreId(null);
+        scrollToTop();
       } else if (mode === 'edit' && editingStoreId) {
         const existingStore = stores.find(s => s.id === editingStoreId);
         const updatedData: StoreBranch = cleanAndEnrichStore({
@@ -232,15 +241,16 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
           localStorage.setItem('wtc_stores', JSON.stringify(newStores));
         } catch {}
         showAlert(`Perubahan cabang ${updatedData.name} berhasil disimpan.`, 'Sukses', 'success');
+        setMode('list');
+        setEditingStoreId(null);
+        scrollToTop();
       }
     } catch (err: any) {
       console.error('Failed to save store in Firestore/Storage', err);
-      showAlert('Gagal menyimpan perubahan cabang: ' + (err?.message || err), 'Peringatan', 'warning');
+      showAlert('Gagal menyimpan perubahan cabang ke database: ' + (err?.message || err), 'Penyimpanan Gagal', 'error');
+      // DO NOT reset mode to 'list' on failure: let user retry without losing form edits
     } finally {
       setIsSaving(false);
-      setMode('list');
-      setEditingStoreId(null);
-      scrollToTop();
     }
   };
 

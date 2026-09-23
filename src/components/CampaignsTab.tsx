@@ -17,7 +17,7 @@ import {
   AlertCircle,
   BellRing
 } from 'lucide-react';
-import { compressImage } from '../lib/image-compressor';
+import { uploadImageToStorage } from '../lib/imageStorage';
 import { Campaign, Voucher } from '../types';
 import { useCustomDialog } from './CustomDialogProvider';
 
@@ -88,25 +88,27 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
     if (!file) return;
     setIsUploading(true);
     try {
-      // Compress to max 1200px width/height for good quality, 90% quality jpeg
-      const compressedBase64 = await compressImage(file, 1200, 1200, 0.9);
+      // Validate MIME, magic bytes, dimensions, and upload to Storage
+      const uploaded = await uploadImageToStorage(file, 'campaigns');
       if (type === 'banner') {
-        setBannerImage(compressedBase64);
+        setBannerImage(uploaded.url);
       } else {
-        setPopupImage(compressedBase64);
+        setPopupImage(uploaded.url);
       }
-    } catch (err) {
-      console.error('Error compressing image:', err);
-      alert('Gagal mengupload dan mengkompres gambar.');
+      showAlert(`Gambar ${type === 'banner' ? 'Banner' : 'Popup'} berhasil diunggah ke Storage.`, 'Upload Berhasil', 'success');
+    } catch (err: any) {
+      console.error('Error uploading campaign image:', err);
+      showAlert(err?.message || 'Gagal mengupload gambar kampanye.', 'Upload Gagal', 'error');
     } finally {
       setIsUploading(false);
+      e.target.value = '';
     }
   };
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !bannerImage || (showAsPopupOnApp && !popupImage)) {
-      alert('Mohon lengkapi gambar yang dibutuhkan.');
+      showAlert('Mohon lengkapi seluruh foto banner & popup yang dibutuhkan.', 'Data Belum Lengkap', 'warning');
       return;
     }
 
@@ -125,15 +127,20 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
       sentCount: 0,
     };
 
-    onAddCampaign(newCamp);
-    setIsCreateModalOpen(false);
+    try {
+      onAddCampaign(newCamp);
+      setIsCreateModalOpen(false);
 
-    // Reset form
-    setName('');
-    setBannerImage('');
-    setPopupImage('');
-    setStartAt('');
-    setEndAt('');
+      // Reset form
+      setName('');
+      setBannerImage('');
+      setPopupImage('');
+      setStartAt('');
+      setEndAt('');
+      showAlert('Kampanye promo baru berhasil diterbitkan.', 'Berhasil', 'success');
+    } catch (err: any) {
+      showAlert('Gagal menambahkan kampanye: ' + (err?.message || err), 'Gagal', 'error');
+    }
   };
 
   return (

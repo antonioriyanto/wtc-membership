@@ -631,65 +631,88 @@ export default function App() {
     handleUpdateMember(updatedMember);
   };
 
-  const handleUpdateTransaction = async (updatedTrx: Transaction) => {
-    setTransactions(prev => {
-      const next = prev.map(t => t.id === updatedTrx.id ? updatedTrx : t);
-      try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
-      return next;
-    });
+  const handleReverseTransaction = async (originalTrx: Transaction, reason: string) => {
+    // 1. Check idempotency: ensure this transaction hasn't already been reversed
+    const isAlreadyReversed = transactions.some(t => 
+      t.originalTransactionId === originalTrx.id || 
+      (t.reversedReceiptNo && t.reversedReceiptNo === originalTrx.receiptNo) ||
+      (t.type === 'REVERSAL' && t.receiptNo === 'REV-' + originalTrx.receiptNo)
+    );
 
-    try {
-      await safeSetDoc('transactions', updatedTrx.id, updatedTrx);
-
-      const auditSaved = localStorage.getItem('wtc_audit_logs');
-      const auditList = auditSaved ? JSON.parse(auditSaved) : [];
-      const newLog = {
-        id: 'AL-' + Date.now().toString().slice(-4),
-        timestamp: new Date().toISOString(),
-        actorName: 'HO Admin',
-        actorRole: 'ADMIN',
-        action: 'TRANSACTION_EDITED',
-        details: `Mengedit transaksi dengan No Struk: ${updatedTrx.receiptNo} (ID: ${updatedTrx.id})`,
-        module: 'TRANSACTIONS'
-      };
-      auditList.unshift(newLog);
-      localStorage.setItem('wtc_audit_logs', JSON.stringify(auditList));
-      setAuditLogs(auditList);
-      safeSetDoc('audit_logs', newLog.id, newLog).catch(() => {});
-    } catch (err) {
-      console.warn("Could not sync transaction update to Firestore:", err);
+    if (isAlreadyReversed || originalTrx.type === 'REVERSAL') {
+      throw new Error('Transaksi ini sudah pernah dibatalkan / direversal sebelumnya.');
     }
-  };
 
-  const handleDeleteTransaction = async (trxId: string) => {
-    const trx = transactions.find(t => t.id === trxId);
-    setTransactions(prev => {
-      const next = prev.filter(t => t.id !== trxId);
-      try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
-      return next;
-    });
+    // 2. Prepare reversal transaction with inverted points and amount
+    const reversalTrxId = 'TRX-REV-' + Date.now().toString().slice(-6);
+    const reversalReceiptNo = 'REV-' + (originalTrx.receiptNo || originalTrx.id);
+    const invertedPoints = -originalTrx.pointsDelta;
+    const invertedAmount = -(originalTrx.amount || 0);
 
-    try {
-      await deleteDoc(doc(db, 'transactions', trxId));
-      
-      const auditSaved = localStorage.getItem('wtc_audit_logs');
-      const auditList = auditSaved ? JSON.parse(auditSaved) : [];
-      const newLog = {
-        id: 'AL-' + Date.now().toString().slice(-4),
-        timestamp: new Date().toISOString(),
-        actorName: 'HO Admin',
-        actorRole: 'ADMIN',
-        action: 'TRANSACTION_DELETED',
-        details: `Menghapus transaksi dengan No Struk: ${trx?.receiptNo || 'Unknown'} (ID: ${trxId})`,
-        module: 'TRANSACTIONS'
+    const reversalTrx: Transaction = {
+      id: reversalTrxId,
+      receiptNo: reversalReceiptNo,
+      originalTransactionId: originalTrx.id,
+      reversedReceiptNo: originalTrx.receiptNo,
+      memberId: originalTrx.memberId,
+      membershipId: originalTrx.membershipId || '',
+      memberName: originalTrx.memberName,
+      memberPhone: originalTrx.memberPhone,
+      memberPhoneNormalized: originalTrx.memberPhoneNormalized,
+      storeId: originalTrx.storeId,
+      storeName: originalTrx.storeName,
+      cashierName: 'Admin HO (Reversal)',
+      type: 'REVERSAL',
+      amount: invertedAmount,
+      pointsDelta: invertedPoints,
+      timestamp: new Date().toISOString(),
+      notes: `Reversal dari ${originalTrx.receiptNo}: ${reason}`
+    };
+
+    // 3. Atomically adjust member points
+    const memberTarget = members.find(m => m.id === originalTrx.memberId);
+    let updatedMember: Member | null = null;
+    if (memberTarget) {
+      const newPoints = Math.max(0, (memberTarget.points || 0) + invertedPoints);
+      updatedMember = {
+        ...memberTarget,
+        points: newPoints,
+        updatedAt: new Date().toISOString()
       };
-      auditList.unshift(newLog);
-      localStorage.setItem('wtc_audit_logs', JSON.stringify(auditList));
-      setAuditLogs(auditList);
-      safeSetDoc('audit_logs', newLog.id, newLog).catch(() => {});
-    } catch (err) {
-      console.warn("Could not sync transaction delete to Firestore:", err);
     }
+
+    // 4. Create immutable audit log
+    const auditLogId = 'AL-REV-' + Date.now().toString().slice(-6);
+    const auditEntry = {
+      id: auditLogId,
+      timestamp: new Date().toISOString(),
+      actorName: 'HO Superadmin',
+      actorRole: 'HO_ADMIN',
+      action: 'TRANSACTION_REVERSED',
+      details: `Reversal Ledger: Struk ${originalTrx.receiptNo} (${originalTrx.pointsDelta} Pts) dibatalkan. Struk Reversal: ${reversalReceiptNo} (${invertedPoints} Pts). Alasan: ${reason}`,
+      module: 'LEDGER',
+      metadata: {
+        originalTransactionId: originalTrx.id,
+        reversalTransactionId: reversalTrxId,
+        reversedReceiptNo: originalTrx.receiptNo
+      }
+    };
+
+    // 5. Commit batch write to Firestore (original document remains untouched)
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'transactions', reversalTrxId), cleanForFirestore(reversalTrx));
+    if (updatedMember) {
+      batch.set(doc(db, 'members', updatedMember.id), cleanForFirestore(updatedMember), { merge: true });
+    }
+    batch.set(doc(db, 'audit', auditLogId), cleanForFirestore(auditEntry));
+    await batch.commit();
+
+    // 6. Update local state
+    setTransactions(prev => [reversalTrx, ...prev]);
+    if (updatedMember) {
+      setMembers(prev => prev.map(m => m.id === updatedMember!.id ? updatedMember! : m));
+    }
+    setAuditLogs(prev => [auditEntry as any, ...prev]);
   };
 
   // Synchronize loyalty config changes to Firestore
@@ -704,7 +727,6 @@ export default function App() {
     let unsubscribe = () => {};
     async function initFirestore() {
       try {
-        await seedFirestoreIfEmpty();
         unsubscribe = setupFirestoreListeners({
           setStores,
           setMembers,
@@ -1237,8 +1259,7 @@ export default function App() {
                     members={members}
                     initialSelectedStore={selectedStoreForTrx}
                     onSelectStore={(store) => setSelectedStoreForTrx(store)}
-                    onUpdateTransaction={handleUpdateTransaction}
-                    onDeleteTransaction={handleDeleteTransaction}
+                    onReverseTransaction={handleReverseTransaction}
                     isSkeletonLoading={isRefreshingData}
                   />
                 )}
