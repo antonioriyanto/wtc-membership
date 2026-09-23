@@ -125,13 +125,10 @@ export const AdminLogin: React.FC<LoginWallProps> = ({
       });
       
       if (result.success) {
-        if (result.token) {
-          try {
-            await signInWithCustomToken(auth, result.token);
-          } catch (tokErr: any) {
-            console.warn('Firebase custom token sign in notice:', tokErr?.message);
-          }
+        if (!result.token) {
+          throw new Error('Server tidak mengirim sesi Firebase. Hubungi admin.');
         }
+        await signInWithCustomToken(auth, result.token);
 
         let finalStoreId = currentStoreId;
         if (!isHOUser && showStoreQuickSelect) {
