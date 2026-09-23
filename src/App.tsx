@@ -1189,8 +1189,10 @@ export default function App() {
                       const updated = { ...target, status: nextStatus as any };
                       try {
                         await setDoc(doc(db, 'vouchers', voucherId), updated);
+                        setVouchers(prev => prev.map(v => v.id === voucherId ? updated : v));
                       } catch (err) {
-                        console.warn('API error updating voucher status:', err);
+                        console.error('Failed updating voucher status:', err);
+                        alert('Gagal mengubah status voucher. Periksa akses admin dan koneksi Firestore.');
                       }
                     }}
                     isSkeletonLoading={isRefreshingData}
@@ -1313,7 +1315,11 @@ export default function App() {
 
                   try {
                     await setDoc(doc(db, 'vouchers', updated.id), updated);
-                  } catch (err) {}
+                    setVouchers(prev => prev.map(v => v.id === updated.id ? updated : v));
+                  } catch (err) {
+                    console.error('Failed updating voucher:', err);
+                    throw err;
+                  }
                   setEditingVoucher(null);
                   setIsCreateVoucherOpen(false);
                 } else {
@@ -1328,7 +1334,11 @@ export default function App() {
 
                   try {
                     await setDoc(doc(db, 'vouchers', created.id), created);
-                  } catch (err) {}
+                    setVouchers(prev => [created, ...prev.filter(v => v.id !== created.id)]);
+                  } catch (err) {
+                    console.error('Failed creating voucher:', err);
+                    throw err;
+                  }
                   setIsCreateVoucherOpen(false);
                 }
               }}
