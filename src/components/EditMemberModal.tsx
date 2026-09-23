@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Member, MemberTier, StoreBranch } from '../types';
 import { 
   X, 
@@ -49,12 +49,41 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
   const [activeSection, setActiveSection] = useState<'PERSONAL' | 'MEMBERSHIP' | 'SECURITY' | 'DANGER'>('PERSONAL');
   
   // Form state
-  const [formData, setFormData] = useState<Member>({ ...member });
-  const [passwordInput, setPasswordInput] = useState(member.pin || '123456');
+  const [formData, setFormData] = useState<Member>(() => ({
+    ...(member || {} as Member),
+    name: member?.name || '',
+    phone: member?.phone || '',
+    email: member?.email || '',
+    address: member?.address || '',
+    gender: member?.gender || 'Pria',
+    registeredStore: member?.registeredStore || '',
+    membershipId: member?.membershipId || '',
+    birthDate: member?.birthDate || '',
+    joinDate: member?.joinDate || '',
+  }));
+  const [passwordInput, setPasswordInput] = useState(member?.pin || '123456');
   const [showPassword, setShowPassword] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [saveSuccessNotice, setSaveSuccessNotice] = useState(false);
+
+  useEffect(() => {
+    if (member) {
+      setFormData({
+        ...member,
+        name: member.name || '',
+        phone: member.phone || '',
+        email: member.email || '',
+        address: member.address || '',
+        gender: member.gender || 'Pria',
+        registeredStore: member.registeredStore || '',
+        membershipId: member.membershipId || '',
+        birthDate: member.birthDate || '',
+        joinDate: member.joinDate || '',
+      });
+      setPasswordInput(member.pin || '123456');
+    }
+  }, [member]);
 
   const generateRandomPassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -445,7 +474,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                 <div className="relative max-w-md">
                   <input
                     type={showPassword ? 'text' : 'text'} maxLength={6} pattern="[0-9]*" inputMode="numeric"
-                    value={passwordInput}
+                    value={passwordInput || ''}
                     onChange={(e) => setPasswordInput(e.target.value)}
                     className="w-full pl-3.5 pr-20 py-2.5 text-xs font-mono font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     placeholder="Masukkan PIN baru (6 digit angka)..."
@@ -548,7 +577,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     </p>
                     <input
                       type="text"
-                      value={deleteConfirmationText}
+                      value={deleteConfirmationText || ''}
                       onChange={(e) => setDeleteConfirmationText(e.target.value)}
                       placeholder="Ketik HAPUS"
                       className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl font-mono focus:ring-2 focus:ring-rose-500 focus:outline-none"

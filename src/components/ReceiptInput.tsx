@@ -74,7 +74,7 @@ export const ReceiptInput: React.FC<ReceiptInputProps> = ({ branchName, posType,
         {/* Segmen 4: Running Number (Input Interaktif) */}
         <input
           type="text"
-          value={runningNumber}
+          value={runningNumber || ''}
           onChange={handleNumberChange}
           onBlur={handleNumberBlur}
           placeholder="00000"

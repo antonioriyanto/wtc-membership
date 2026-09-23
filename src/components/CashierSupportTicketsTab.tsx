@@ -142,7 +142,7 @@ export const CashierSupportTicketsTab: React.FC<CashierSupportTicketsTabProps> =
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase block mb-1.5">Kategori Kendala *</label>
                   <select 
-                    value={ticketCategory}
+                    value={ticketCategory || 'MISSING_POINTS'}
                     onChange={(e) => setTicketCategory(e.target.value as any)}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:bg-white focus:border-emerald-500 transition-colors"
                   >
@@ -158,7 +158,7 @@ export const CashierSupportTicketsTab: React.FC<CashierSupportTicketsTabProps> =
                   <label className="text-xs font-bold text-slate-600 uppercase block mb-1.5">No. Struk (Opsional)</label>
                   <input
                     type="text"
-                    value={ticketReceipt}
+                    value={ticketReceipt || ''}
                     onChange={(e) => setTicketReceipt(e.target.value)}
                     placeholder="Contoh: INV-2026-001"
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
@@ -171,7 +171,7 @@ export const CashierSupportTicketsTab: React.FC<CashierSupportTicketsTabProps> =
                 <input
                   type="text"
                   required
-                  value={ticketSubject}
+                  value={ticketSubject || ''}
                   onChange={(e) => setTicketSubject(e.target.value)}
                   placeholder="Contoh: Salah scan voucher diskon tapi poin sudah terpotong"
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
@@ -183,7 +183,7 @@ export const CashierSupportTicketsTab: React.FC<CashierSupportTicketsTabProps> =
                 <textarea
                   required
                   rows={4}
-                  value={ticketMessage}
+                  value={ticketMessage || ''}
                   onChange={(e) => setTicketMessage(e.target.value)}
                   placeholder="Jelaskan detail kendala Anda, nama member yang terkait, atau error yang muncul di layar..."
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors resize-y"

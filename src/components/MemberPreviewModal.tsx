@@ -372,7 +372,7 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
                     </p>
                     <input
                       type="text"
-                      value={deleteConfirmationText}
+                      value={deleteConfirmationText || ''}
                       onChange={(e) => setDeleteConfirmationText(e.target.value)}
                       placeholder="Ketik HAPUS"
                       className="w-full px-3 py-2 text-xs border border-rose-200 rounded-xl font-mono focus:ring-2 focus:ring-rose-500 focus:outline-none bg-white"

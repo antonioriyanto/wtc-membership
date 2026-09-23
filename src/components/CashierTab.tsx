@@ -482,7 +482,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
             <div className="flex justify-between items-center mb-2">
               <label className="block text-slate-700 dark:text-slate-300 font-semibold text-[0.85rem]">Nomor Struk (Receipt No)</label>
               <select 
-                value={posType} 
+                value={posType || 'A'} 
                 onChange={(e) => setPosType(e.target.value as PosType)}
                 disabled={!activeMember || isSubmitting}
                 className="text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 outline-none text-slate-700 dark:text-slate-300"

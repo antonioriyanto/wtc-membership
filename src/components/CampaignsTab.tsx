@@ -252,7 +252,15 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                       <td className="py-4 px-5">
                         <div className="flex items-center gap-3">
                           {c.bannerImage && (
-                            <img src={c.bannerImage} alt={c.name} className="w-16 h-9 object-cover rounded-md border border-slate-200" />
+                            <img 
+                              src={c.bannerImage} 
+                              alt={c.name} 
+                              className="w-16 h-9 object-cover rounded-md border border-slate-200" 
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+                              }}
+                            />
                           )}
                           <div>
                             <div className="font-bold text-slate-900 text-sm">{c.name}</div>
@@ -425,7 +433,15 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                 </div>
                 {bannerImage && (
                   <div className="mt-3 relative rounded-xl overflow-hidden border border-slate-200 w-full aspect-[20/7]">
-                    <img src={bannerImage} alt="Preview Banner" className="w-full h-full object-cover" />
+                    <img 
+                      src={bannerImage} 
+                      alt="Preview Banner" 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -481,7 +497,15 @@ export const CampaignsTab: React.FC<CampaignsTabProps> = ({
                     </div>
                     {popupImage && (
                       <div className="mt-3 relative rounded-xl overflow-hidden border border-slate-200 max-w-[150px] aspect-[3/4]">
-                        <img src={popupImage} alt="Preview Pop-up" className="w-full h-full object-cover" />
+                        <img 
+                          src={popupImage} 
+                          alt="Preview Pop-up" 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+                          }}
+                        />
                       </div>
                     )}
                   </div>

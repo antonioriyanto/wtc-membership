@@ -346,7 +346,7 @@ export const LoyaltyRulesTab: React.FC<LoyaltyRulesTabProps> = ({
                   <input
                     type="number"
                     step="100000"
-                    value={testSpend}
+                    value={testSpend ?? 0}
                     onChange={(e) => setTestSpend(parseInt(e.target.value) || 0)}
                     className="w-full pl-10 pr-4 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-sm font-bold text-amber-300 focus:outline-none"
                   />

@@ -88,7 +88,18 @@ export const CashierMembersTab: React.FC<MembersTabProps> = ({ members, setMembe
     setEditName(member.name || '');
     setEditPhone(member.phone || '');
     setEditEmail(member.email || '');
-    setEditBirthDate(member.birthDate ? new Date(member.birthDate).toISOString().slice(0, 10) : '');
+    let formattedBirthDate = '';
+    if (member.birthDate) {
+      try {
+        const d = new Date(member.birthDate);
+        if (!isNaN(d.getTime())) {
+          formattedBirthDate = d.toISOString().slice(0, 10);
+        }
+      } catch {
+        formattedBirthDate = '';
+      }
+    }
+    setEditBirthDate(formattedBirthDate);
     setEditGender((member.gender as any) || 'Pria');
     setEditAddress(member.address || '');
     setEditSuccessMsg('');

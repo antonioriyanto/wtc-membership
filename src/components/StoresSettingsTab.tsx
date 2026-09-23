@@ -696,7 +696,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <input
             type="text"
-            value={searchTerm}
+            value={searchTerm || ''}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Cari cabang, mall, kota, kode..."
             className="w-full pl-9 pr-8 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-hidden focus:border-neutral-900 font-medium"
@@ -717,7 +717,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
           <div className="relative flex items-center">
             <Filter className="absolute left-3 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
             <select
-              value={selectedRegion}
+              value={selectedRegion || 'ALL'}
               onChange={(e) => setSelectedRegion(e.target.value)}
               className="pl-8 pr-7 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-700 dark:text-neutral-200 focus:outline-hidden focus:border-neutral-900 cursor-pointer appearance-none"
             >
@@ -735,7 +735,7 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
 
           {/* Status Dropdown */}
           <select
-            value={selectedStatus}
+            value={selectedStatus || 'ALL'}
             onChange={(e) => setSelectedStatus(e.target.value)}
             className="px-3 py-2 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-700 dark:text-neutral-200 focus:outline-hidden focus:border-neutral-900 cursor-pointer"
           >

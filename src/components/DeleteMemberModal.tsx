@@ -64,7 +64,7 @@ export const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({
               </p>
               <input
                 type="text"
-                value={deleteConfirmationText}
+                value={deleteConfirmationText || ''}
                 onChange={(e) => setDeleteConfirmationText(e.target.value)}
                 placeholder="Ketik HAPUS"
                 className="w-full px-4 py-3 text-sm border-2 border-rose-200 rounded-xl font-mono focus:border-rose-500 focus:ring-4 focus:ring-rose-500/20 focus:outline-none transition-all placeholder:text-slate-400"

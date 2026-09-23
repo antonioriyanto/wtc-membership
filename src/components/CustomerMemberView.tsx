@@ -746,6 +746,10 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         src={camp.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'} 
                         alt={camp.name}
                         className="w-full h-full object-cover object-center"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+                        }}
                       />
                     </div>
                   ))}
@@ -996,7 +1000,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 <Search className="absolute left-[18px] top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 w-4 h-4" />
                 <input 
                   type="text" 
-                  value={storeSearch}
+                  value={storeSearch || ''}
                   onChange={e => setStoreSearch(e.target.value)}
                   placeholder="Cari nama mall, kota, atau cabang..." 
                   className="w-full py-3 pr-5 pl-11 rounded-full border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-[0.95rem] text-neutral-900 dark:text-white shadow-sm dark:shadow-none transition-all focus:outline-none focus:border-amber-500 focus:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
@@ -1154,12 +1158,12 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 <form className="w-full max-w-[400px] space-y-4 text-left" onSubmit={handleSaveProfile}>
                   <div>
                     <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Nama Lengkap</label>
-                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-100 dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member.name} readOnly disabled />
+                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-100 dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member?.name || ''} readOnly disabled />
                   </div>
                   
                   <div>
                     <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Nomor WhatsApp / HP</label>
-                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-100 dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member.phone} readOnly disabled />
+                    <input type="text" className="w-full px-3.5 py-2.5 rounded-xl border border-black/5 dark:border-white/10 bg-neutral-100 dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 text-sm font-medium" value={member?.phone || ''} readOnly disabled />
                   </div>
 
                   <div>
@@ -1173,7 +1177,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     </div>
                     <input 
                       type="email" 
-                      value={profileEmail}
+                      value={profileEmail || ''}
                       onChange={e => {
                         setProfileEmail(e.target.value);
                         setProfileSaveSuccess(false);
@@ -1192,7 +1196,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   <div>
                     <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Alamat Pengiriman (Delivery Address)</label>
                     <textarea 
-                      value={profileAddress}
+                      value={profileAddress || ''}
                       onChange={e => {
                         setProfileAddress(e.target.value);
                         setProfileSaveSuccess(false);
@@ -1457,6 +1461,10 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   src={activeCampaignModal.popupImage || activeCampaignModal.bannerImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'} 
                   alt={activeCampaignModal.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 block"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+                  }}
                 />
               </div>
             </div>
@@ -1540,7 +1548,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         Kategori Masalah *
                       </label>
                       <select 
-                        value={ticketCategory}
+                        value={ticketCategory || 'MISSING_POINTS'}
                         onChange={(e) => setTicketCategory(e.target.value as any)}
                         className="w-full px-3 py-2 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white font-semibold focus:outline-none"
                       >
@@ -1556,7 +1564,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                         Toko Tempat Transaksi
                       </label>
                       <select
-                        value={ticketStore}
+                        value={ticketStore || ''}
                         onChange={(e) => setTicketStore(e.target.value)}
                         className="w-full px-3 py-2 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white font-medium focus:outline-none"
                       >
