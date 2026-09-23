@@ -52,6 +52,7 @@ import { db, auth, googleProvider } from '../lib/firebase';
 import { signInWithPopup } from 'firebase/auth';
 import { normalizePhoneNumber } from '../lib/syncFirestore';
 import { linkGoogleAccountClient } from '../lib/memberAuthClient';
+import { apiFetch } from '../lib/apiClient';
 import { uploadImageToStorage } from '../lib/imageStorage';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -182,28 +183,12 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
       const user = result.user;
       const idToken = await user.getIdToken();
 
-      // Verified server-side check
-      const res = await fetch('/api/members/link-google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberId: member.id,
-          googleUid: user.uid,
-          googleEmail: user.email || '',
-          idToken
-        })
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Gagal memverifikasi akun Google.');
-      }
-
-      // Atomic client update with validation
+      // Server-authoritative linking
       const updated = await linkGoogleAccountClient({
         memberId: member.id,
         googleUid: user.uid,
-        googleEmail: user.email || ''
+        googleEmail: user.email || '',
+        idToken
       });
 
       if (onUpdateMember) {
@@ -636,53 +621,18 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     }
 
     setIsLoadingTransactions(true);
-
-    // Also pre-fetch from verified server endpoint
-    fetch(`/api/members/${encodeURIComponent(canonicalMemberId)}/transactions`)
-      .then(res => res.json())
-      .then(data => {
+    apiFetch('/v1/member/transactions')
+      .then((data) => {
         if (data?.success && Array.isArray(data.transactions)) {
-          setFirestoreTransactions(prev => prev.length > 0 ? prev : data.transactions);
+          setFirestoreTransactions(data.transactions);
         }
       })
-      .catch(() => {});
-
-    try {
-      const q = query(
-        collection(db, 'transactions'),
-        where('memberId', '==', canonicalMemberId),
-        orderBy('timestamp', 'desc')
-      );
-
-      const unsub = onSnapshot(q, (snapshot) => {
-        const liveList: Transaction[] = [];
-        snapshot.forEach((docSnap) => {
-          liveList.push({ id: docSnap.id, ...(docSnap.data() as any) });
-        });
-        setFirestoreTransactions(liveList);
+      .catch((err) => {
+        console.warn('Member transactions fetch notice:', err);
+      })
+      .finally(() => {
         setIsLoadingTransactions(false);
-      }, async (err) => {
-        console.warn("Direct member transactions snapshot notice:", err);
-        // Fallback to verified server endpoint
-        try {
-          const res = await fetch(`/api/members/${encodeURIComponent(canonicalMemberId)}/transactions`);
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data.transactions)) {
-              setFirestoreTransactions(data.transactions);
-            }
-          }
-        } catch (fetchErr) {
-          console.warn("Backend transactions fetch fallback notice:", fetchErr);
-        } finally {
-          setIsLoadingTransactions(false);
-        }
       });
-
-      return () => unsub();
-    } catch {
-      setIsLoadingTransactions(false);
-    }
   }, [canonicalMemberId, canonicalMemberPhone]);
 
   // Strict transaction filtering according to requirement 3:

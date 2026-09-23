@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny all undefined paths
+    // Default deny-by-default for any unmapped paths
     match /{document=**} {
       allow read, write: if false;
     }
@@ -12,54 +12,28 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Head Office (HO) Superadmin authorization
+    // Head Office (HO) Superadmin authorization (strictly via verified custom claim, no email literals)
     function isHoAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.role == 'HO_ADMIN' || 
-        request.auth.token.role == 'ADMIN' ||
-        request.auth.token.admin == true ||
-        request.auth.token.email == 'perkedelsayappp@gmail.com'
-      );
+      return isAuthenticated() && request.auth.token.role == 'HO_ADMIN';
     }
 
-    // Cashier role authorization (tied to retail stores)
+    // Cashier role authorization (strictly via verified custom claim)
     function isCashier() {
-      return isAuthenticated() && (
-        request.auth.token.role == 'CASHIER' ||
-        isHoAdmin()
-      );
+      return isAuthenticated() && request.auth.token.role == 'CASHIER';
     }
 
-    // Member ownership verification
+    // Member ownership verification: matches verified memberId claim or Firebase UID
     function isMemberOwner(memberId) {
       return isAuthenticated() && (
-        request.auth.uid == memberId ||
-        (resource != null && resource.data.googleUid == request.auth.uid) ||
-        (resource != null && resource.data.linkedGoogleEmail == request.auth.token.email)
+        (request.auth.token.memberId != null && request.auth.token.memberId == memberId) ||
+        request.auth.uid == memberId
       );
     }
 
-    // Helper: Client SDK cannot directly modify cryptographic credential attributes
-    function noCredentialMutation() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-        'pinHash', 
-        'pinSalt', 
-        'failedPinAttempts', 
-        'lockedUntil'
-      ]);
-    }
-
-    function noCredentialCreation() {
-      return !request.resource.data.keys().hasAny([
-        'pinHash', 
-        'pinSalt'
-      ]);
-    }
-
-    // 1. Master Stores Directory (Read for all, write restricted to HO Admin)
+    // 1. Master Stores Directory (Read for all, managed by HO Admin or server)
     match /stores/{storeId} {
       allow read: if true;
-      allow create, update, delete: if isHoAdmin();
+      allow write: if isHoAdmin();
     }
 
     // 2. Sequential Membership ID Counters (Cashiers & HO only)
@@ -72,24 +46,31 @@ service cloud.firestore {
       // Direct document read: Member owner, Cashier, or HO Admin
       allow get: if isMemberOwner(memberId) || isCashier() || isHoAdmin();
 
-      // List query: Only Cashiers and HO Admin can query member lists
+      // List query: Strictly restricted to Cashiers and HO Admin. Member CANNOT list directory
       allow list: if isCashier() || isHoAdmin();
 
-      // New member creation: Cashier, HO Admin, or self-registration without pre-hashed credentials
-      allow create: if isCashier() || isHoAdmin() || (isAuthenticated() && request.auth.uid == memberId && noCredentialCreation());
+      // New member creation: Allowed by Cashier or HO Admin (initial onboarding at store)
+      allow create: if isCashier() || isHoAdmin();
 
       // Profile updates:
       // HO Admin has full management access.
-      // Members can only update their non-ledger profile fields (name, email, address) and cannot modify points, tier, or credentials.
+      // Members can only update personal contact/profile info, never points, tier, status, or credentials.
       allow update: if isHoAdmin() || (
         isMemberOwner(memberId) &&
-        noCredentialMutation() &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'points',
           'lifetimePoints',
           'tier',
           'status',
-          'membershipId'
+          'membershipId',
+          'pinHash',
+          'pinSalt',
+          'isPinSet',
+          'failedPinAttempts',
+          'lockedUntil',
+          'googleUid',
+          'linkedGoogleEmail',
+          'linkedAt'
         ])
       );
 
@@ -97,30 +78,32 @@ service cloud.firestore {
       allow delete: if isHoAdmin();
     }
 
-    // 4. Vouchers & Promotional Discounts (Read for all, managed by HO)
+    // 4. Vouchers & Promotional Discounts (Read for all, managed by HO Admin)
     match /vouchers/{voucherId} {
       allow read: if true;
       allow write: if isHoAdmin();
     }
 
-    // 5. POS & Loyalty Transaction Ledger (STRICTLY IMMUTABLE)
+    // 5. POS & Loyalty Transaction Ledger (STRICTLY IMMUTABLE, WRITTEN ONLY VIA BACKEND ADMIN SDK)
     match /transactions/{transactionId} {
-      // Read access: HO Admin can read all; Cashier can read store transactions; Member can only read own transactions
-      allow get: if isHoAdmin() || isCashier() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
-      allow list: if isHoAdmin() || 
+      // Single transaction read: HO Admin, Cashier of matching store, or owner member
+      allow get: if isHoAdmin() || 
         (isCashier() && resource.data.storeId == request.auth.token.storeId) ||
-        (isAuthenticated() && resource.data.memberId == request.auth.uid);
+        (isAuthenticated() && request.auth.token.memberId != null && resource.data.memberId == request.auth.token.memberId);
 
-      // Creation allowed by authorized Cashiers and HO Admin
-      allow create: if isCashier() || isHoAdmin();
+      // List query: ONLY HO Admin and Cashier (for own store).
+      // Member CANNOT list transactions collection directly from client! (Must use GET /v1/member/transactions)
+      allow list: if isHoAdmin() || 
+        (isCashier() && resource.data.storeId == request.auth.token.storeId);
 
-      // Ledger is strictly immutable: no updates or deletes permitted
-      allow update, delete: if false;
+      // Client writes are completely disabled. Transactions are written strictly via Cloud Run Firebase Admin SDK.
+      allow write: if false;
     }
 
     // 6. Customer Care Support Tickets
     match /support/{ticketId} {
-      allow get, list: if isHoAdmin() || isCashier() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      allow get, list: if isHoAdmin() || isCashier() || 
+        (isAuthenticated() && request.auth.token.memberId != null && resource.data.memberId == request.auth.token.memberId);
       allow create: if isAuthenticated();
       allow update: if isHoAdmin() || isCashier();
       allow delete: if isHoAdmin();
@@ -132,17 +115,15 @@ service cloud.firestore {
       allow write: if isHoAdmin();
     }
 
-    // 8. System Audit Trail (STRICTLY IMMUTABLE)
+    // 8. System Audit Trail (STRICTLY IMMUTABLE, WRITTEN ONLY VIA BACKEND ADMIN SDK)
     match /audit/{auditId} {
       allow read: if isHoAdmin();
-      allow create: if isHoAdmin() || isCashier();
-      allow update, delete: if false;
+      allow write: if false;
     }
 
     match /audit_logs/{auditId} {
       allow read: if isHoAdmin();
-      allow create: if isHoAdmin() || isCashier();
-      allow update, delete: if false;
+      allow write: if false;
     }
 
     // 9. Loyalty System Configurations (Read for all, managed by HO)

@@ -1,47 +1,48 @@
 /**
- * Production Data Repair & Migration Script for Watch Club Loyalty
+ * Production Data Repair & Audit Script for Watch Club Loyalty
  * 
- * Safely normalizes member identities, backfills canonical linkedGoogleEmail,
- * standardizes phone numbers to E.164, and repairs historical transactions
- * with membershipId, memberPhoneNormalized, and canonical memberId.
+ * Built strictly using Firebase Admin SDK.
  * 
- * SAFETY RULES:
- * 1. Default mode is DRY RUN (no writes occur unless --apply flag is provided).
- * 2. Absolutely non-destructive: NEVER deletes any document or field.
- * 3. Commits in chunks of max 400 operations (under Firestore's 500-op limit).
- * 4. Prints full audit summary.
+ * SAFETY PRINCIPLES:
+ * 1. Default mode is DRY RUN (no writes occur unless --apply flag is explicitly provided).
+ * 2. Does NOT read or write local files.
+ * 3. Never deletes any documents or data.
+ * 4. Duplicate phone numbers / identities are detected, SKIPPED, and reported (NO last-wins).
+ * 5. Commits in chunks under Firestore's 500-op limit (400 per batch).
  * 
  * Usage:
- *   npx tsx scripts/repair-member-data.ts           # Dry run simulation
- *   npx tsx scripts/repair-member-data.ts --apply   # Apply changes
+ *   npx tsx scripts/repair-member-data.ts           # Dry run simulation (Safe)
+ *   npx tsx scripts/repair-member-data.ts --apply   # Apply repairs
  */
 
-import fs from 'fs';
-import path from 'path';
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  getDocs, 
-  writeBatch, 
-  doc 
-} from 'firebase/firestore';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import * as dotenv from 'dotenv';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCvjoZ65IQDF1j8Dz6W9XLcM-at5ixc39k",
-  authDomain: "watch-club-membership.firebaseapp.com",
-  projectId: "watch-club-membership",
-  storageBucket: "watch-club-membership.firebasestorage.app",
-  messagingSenderId: "713398971541",
-  appId: "1:713398971541:web:89abf18794ddbe4a9bff9c"
-};
+dotenv.config();
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Initialize Firebase Admin SDK
+if (getApps().length === 0) {
+  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      }),
+    });
+  } else {
+    initializeApp({
+      projectId: process.env.FIREBASE_PROJECT_ID || 'watch-club-membership',
+    });
+  }
+}
 
-function normalizePhone(raw: string | undefined | null): string {
+const db = getFirestore();
+
+export function normalizePhone(raw: string | undefined | null): string {
   if (!raw) return '';
-  let digits = raw.replace(/\D/g, '');
+  let digits = String(raw).replace(/\D/g, '');
   if (!digits) return '';
   if (digits.startsWith('62')) {
     digits = digits.slice(2);
@@ -51,80 +52,91 @@ function normalizePhone(raw: string | undefined | null): string {
   return '+62' + digits;
 }
 
-function isValidEmail(email: string | undefined | null): boolean {
+export function isValidEmail(email: string | undefined | null): boolean {
   if (!email) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-async function runRepair() {
-  const isApply = process.argv.includes('--apply') || process.env.DRY_RUN === 'false';
+export interface RepairAuditReport {
+  isDryRun: boolean;
+  totalMembers: number;
+  duplicatePhonesCount: number;
+  skippedDuplicateMembers: string[];
+  membersToRepairCount: number;
+  transactionsToRepairCount: number;
+}
+
+export async function runRepair(): Promise<RepairAuditReport> {
+  const isApply = process.argv.includes('--apply');
   const isDryRun = !isApply;
 
-  console.log('='.repeat(70));
-  console.log(`WATCH CLUB LOYALTY - DATA REPAIR & AUDIT`);
-  console.log(`Mode: ${isDryRun ? '🔍 DRY RUN (Simulasi, data tidak disentuh)' : '⚡ LIVE APPLY (Menerapkan perubahan)'}`);
-  console.log('='.repeat(70));
+  console.log('='.repeat(75));
+  console.log(`WATCH CLUB LOYALTY - PRODUCTION DATA REPAIR & AUDIT`);
+  console.log(`SDK: Firebase Admin SDK (Server Authoritative)`);
+  console.log(`Mode: ${isDryRun ? '🔍 DRY RUN (Simulasi, data Firestore tidak disentuh)' : '⚡ LIVE APPLY (Menerapkan perbaikan ke Firestore)'}`);
+  console.log('='.repeat(75));
 
-  let firestoreMembers: Array<{ id: string; data: Record<string, any> }> = [];
-  let firestoreTransactions: Array<{ id: string; data: Record<string, any> }> = [];
-  let isFirestoreAccessible = false;
+  // 1. Load Members
+  console.log('\n[1/3] Mengambil data Member dari Firestore...');
+  const membersSnap = await db.collection('members').get();
+  const allMembers = membersSnap.docs.map(d => ({ id: d.id, data: d.data() }));
+  console.log(`Total dokumen member ditemukan: ${allMembers.length}`);
 
-  try {
-    const mSnap = await getDocs(collection(db, 'members'));
-    firestoreMembers = mSnap.docs.map(d => ({ id: d.id, data: d.data() }));
-    const tSnap = await getDocs(collection(db, 'transactions'));
-    firestoreTransactions = tSnap.docs.map(d => ({ id: d.id, data: d.data() }));
-    isFirestoreAccessible = true;
-  } catch {
-    console.log('ℹ️ Firestore direct unauthenticated read restricted. Checking server data store...');
+  // 2. Identify Duplicate Phones (NO LAST-WINS: MUST SKIP AND REPORT)
+  const phoneToMemberDocs = new Map<string, string[]>();
+  for (const m of allMembers) {
+    const norm = normalizePhone(m.data.phone || m.data.phoneNumber);
+    if (norm) {
+      const list = phoneToMemberDocs.get(norm) || [];
+      list.push(m.id);
+      phoneToMemberDocs.set(norm, list);
+    }
   }
 
-  // Also read server persistence store (data/members.json)
-  const localMembersPath = path.join(process.cwd(), 'data', 'members.json');
-  let localMembers: any[] = [];
-  if (fs.existsSync(localMembersPath)) {
-    try {
-      const raw = fs.readFileSync(localMembersPath, 'utf-8');
-      localMembers = JSON.parse(raw);
-    } catch {}
+  const duplicatePhones = new Set<string>();
+  const duplicateMemberDocIds = new Set<string>();
+  for (const [phone, docIds] of phoneToMemberDocs.entries()) {
+    if (docIds.length > 1) {
+      duplicatePhones.add(phone);
+      docIds.forEach(id => duplicateMemberDocIds.add(id));
+      console.warn(`⚠️ KONFLIK DUPLIKAT TERDETEKSI: Nomor ${phone} digunakan oleh ${docIds.length} dokumen: [${docIds.join(', ')}]. DITANGGUHKAN (SKIP) demi keamanan.`);
+    }
   }
 
-  // Combine datasets for comprehensive audit
-  const membersToAudit = isFirestoreAccessible && firestoreMembers.length > 0 
-    ? firestoreMembers 
-    : localMembers.map(m => ({ id: m.id || m.membershipId, data: m }));
+  const memberUpdates: Array<{ id: string; patch: Record<string, any>; reason: string }> = [];
+  const uniqueMemberByPhone = new Map<string, { id: string; membershipId: string; name: string }>();
+  const memberById = new Map<string, { id: string; membershipId: string; name: string }>();
 
-  console.log(`\n[1/3] Memeriksa data Member (Total Dokumen: ${membersToAudit.length})...`);
+  let membersSkippedValid = 0;
 
-  const memberUpdates: Array<{ id: string; patch: Record<string, any>; reason: string; source: 'firestore' | 'file' }> = [];
-  const memberByPhone = new Map<string, { id: string; membershipId: string; phone: string; name: string }>();
-  const memberById = new Map<string, { id: string; membershipId: string; phone: string; name: string }>();
-
-  let membersSkipped = 0;
-
-  for (const item of membersToAudit) {
-    const data = item.data;
+  for (const item of allMembers) {
     const docId = item.id;
-    const patch: Record<string, any> = {};
-    const reasons: string[] = [];
+    const data = item.data;
+
+    // Skip if part of duplicate conflict
+    if (duplicateMemberDocIds.has(docId)) {
+      continue;
+    }
 
     const normPhone = normalizePhone(data.phone || data.phoneNumber);
     const membershipId = data.membershipId || docId;
 
     if (normPhone) {
-      memberByPhone.set(normPhone, {
+      uniqueMemberByPhone.set(normPhone, {
         id: docId,
         membershipId,
-        phone: normPhone,
         name: data.name || ''
       });
     }
+
     memberById.set(docId, {
       id: docId,
       membershipId,
-      phone: normPhone,
       name: data.name || ''
     });
+
+    const patch: Record<string, any> = {};
+    const reasons: string[] = [];
 
     // A. Backfill linkedGoogleEmail from recoveryEmail or email
     if (!data.linkedGoogleEmail) {
@@ -133,175 +145,158 @@ async function runRepair() {
         reasons.push(`Backfill linkedGoogleEmail dari recoveryEmail (${data.recoveryEmail})`);
       } else if (data.googleUid && isValidEmail(data.email)) {
         patch.linkedGoogleEmail = data.email.trim();
-        reasons.push(`Backfill linkedGoogleEmail dari email terhubung googleUid (${data.email})`);
+        reasons.push(`Backfill linkedGoogleEmail dari email Google (${data.email})`);
       }
     }
 
-    // B. Normalisasi phone
+    // B. Standardize phone to E.164
     if (data.phone && normPhone && data.phone !== normPhone) {
       patch.phone = normPhone;
-      reasons.push(`Normalisasi phone: ${data.phone} -> ${normPhone}`);
+      reasons.push(`Standarisasi phone ke E.164: ${data.phone} -> ${normPhone}`);
     }
 
-    // C. Pastikan membershipId terisi
+    // C. Standardize membershipId
     if (!data.membershipId) {
       patch.membershipId = docId;
       reasons.push(`Isi membershipId default: ${docId}`);
     }
 
     if (Object.keys(patch).length > 0) {
-      memberUpdates.push({
-        id: docId,
-        patch,
-        reason: reasons.join('; '),
-        source: isFirestoreAccessible ? 'firestore' : 'file'
-      });
+      memberUpdates.push({ id: docId, patch, reason: reasons.join('; ') });
     } else {
-      membersSkipped++;
+      membersSkippedValid++;
     }
   }
 
-  console.log(`- Member valid / siap (skip): ${membersSkipped}`);
-  console.log(`- Member membutuhkan perbaikan: ${memberUpdates.length}`);
+  console.log(`- Member valid / tidak memerlukan perubahan: ${membersSkippedValid}`);
+  console.log(`- Member konflik duplikat (ditangguhkan / tidak diubah): ${duplicateMemberDocIds.size}`);
+  console.log(`- Member yang memerlukan perbaikan format: ${memberUpdates.length}`);
 
-  // 2. Fetch and check transactions
-  console.log(`\n[2/3] Memeriksa data Transaksi (Total Dokumen: ${firestoreTransactions.length})...`);
+  // 3. Load Transactions
+  console.log('\n[2/3] Mengambil data Transaksi dari Firestore...');
+  const trxSnap = await db.collection('transactions').get();
+  const allTrx = trxSnap.docs.map(d => ({ id: d.id, data: d.data() }));
+  console.log(`Total dokumen transaksi ditemukan: ${allTrx.length}`);
+
   const trxUpdates: Array<{ id: string; patch: Record<string, any>; reason: string }> = [];
-  let trxSkipped = 0;
+  let trxSkippedValid = 0;
 
-  for (const item of firestoreTransactions) {
-    const data = item.data;
+  for (const item of allTrx) {
     const docId = item.id;
+    const data = item.data;
     const patch: Record<string, any> = {};
     const reasons: string[] = [];
 
     const rawPhone = data.memberPhone || data.customerPhone || '';
     const normPhone = normalizePhone(rawPhone);
 
-    // Find matching canonical member
+    // Link canonical memberId if missing or mismatched, provided phone is unique
     let canonical = data.memberId ? memberById.get(data.memberId) : undefined;
-    if (!canonical && normPhone) {
-      canonical = memberByPhone.get(normPhone);
+    if (!canonical && normPhone && uniqueMemberByPhone.has(normPhone)) {
+      canonical = uniqueMemberByPhone.get(normPhone);
       if (canonical) {
         patch.memberId = canonical.id;
-        reasons.push(`Pasangkan memberId yang kosong/salah ke ${canonical.id} (${canonical.name})`);
+        reasons.push(`Tautkan memberId ke canonical ${canonical.id} (${canonical.name})`);
       }
     }
 
-    // Standardize memberPhoneNormalized
-    if (!data.memberPhoneNormalized && normPhone) {
+    // Normalize memberPhoneNormalized
+    if (normPhone && data.memberPhoneNormalized !== normPhone) {
       patch.memberPhoneNormalized = normPhone;
-      reasons.push(`Set memberPhoneNormalized = ${normPhone}`);
-    } else if (data.memberPhoneNormalized && normPhone && data.memberPhoneNormalized !== normPhone) {
-      patch.memberPhoneNormalized = normPhone;
-      reasons.push(`Koreksi memberPhoneNormalized: ${data.memberPhoneNormalized} -> ${normPhone}`);
+      reasons.push(`Standarisasi memberPhoneNormalized -> ${normPhone}`);
     }
 
     // Standardize membershipId
     const targetMembershipId = canonical?.membershipId || data.membershipId;
     if (!data.membershipId && targetMembershipId) {
       patch.membershipId = targetMembershipId;
-      reasons.push(`Set membershipId = ${targetMembershipId}`);
+      reasons.push(`Set membershipId -> ${targetMembershipId}`);
     }
 
     if (Object.keys(patch).length > 0) {
-      trxUpdates.push({
-        id: docId,
-        patch,
-        reason: reasons.join('; ')
-      });
+      trxUpdates.push({ id: docId, patch, reason: reasons.join('; ') });
     } else {
-      trxSkipped++;
+      trxSkippedValid++;
     }
   }
 
-  console.log(`- Transaksi valid / terindeks baik (skip): ${trxSkipped}`);
-  console.log(`- Transaksi membutuhkan perbaikan: ${trxUpdates.length}`);
+  console.log(`- Transaksi valid (tidak memerlukan perbaikan): ${trxSkippedValid}`);
+  console.log(`- Transaksi yang memerlukan perbaikan tautan/format: ${trxUpdates.length}`);
 
-  // 3. Execution / Dry Run Summary
-  console.log('\n[3/3] Detail Rencana Perbaikan:');
-
+  // 4. Audit Summary & Execution
+  console.log('\n[3/3] Rangkuman Audit & Rencana Aksi:');
   if (memberUpdates.length > 0) {
-    console.log(`\nSample Member Updates:`);
-    memberUpdates.slice(0, 5).forEach((u, i) => {
-      console.log(`  ${i + 1}. Member ${u.id}: ${u.reason}`);
-    });
+    console.log('\nContoh perbaikan member:');
+    memberUpdates.slice(0, 5).forEach((u, i) => console.log(`  ${i + 1}. [Member ${u.id}] ${u.reason}`));
   }
 
   if (trxUpdates.length > 0) {
-    console.log(`\nSample Transaction Updates:`);
-    trxUpdates.slice(0, 5).forEach((u, i) => {
-      console.log(`  ${i + 1}. TRX ${u.id}: ${u.reason}`);
-    });
+    console.log('\nContoh perbaikan transaksi:');
+    trxUpdates.slice(0, 5).forEach((u, i) => console.log(`  ${i + 1}. [TRX ${u.id}] ${u.reason}`));
   }
 
   if (isDryRun) {
-    console.log('\n' + '='.repeat(70));
-    console.log('✅ DRY RUN SELESAI. Tidak ada data yang diubah.');
-    console.log(`Total perbaikan teridentifikasi: ${memberUpdates.length} member, ${trxUpdates.length} transaksi.`);
-    console.log('Jalankan dengan flag "--apply" untuk mengeksekusi perbaikan.');
-    console.log('Contoh: npx tsx scripts/repair-member-data.ts --apply');
-    console.log('='.repeat(70));
-    process.exit(0);
+    console.log('\n' + '='.repeat(75));
+    console.log('✅ DRY RUN SELESAI. Tidak ada data yang disentuh atau diubah di Firestore.');
+    console.log(`Rencana perbaikan: ${memberUpdates.length} member, ${trxUpdates.length} transaksi.`);
+    console.log(`Total konflik duplikat diabaikan dengan aman: ${duplicateMemberDocIds.size} member.`);
+    console.log('Untuk menerapkan perbaikan ke Firestore, jalankan dengan: --apply');
+    console.log('='.repeat(75));
+    return {
+      isDryRun: true,
+      totalMembers: allMembers.length,
+      duplicatePhonesCount: duplicatePhones.size,
+      skippedDuplicateMembers: Array.from(duplicateMemberDocIds),
+      membersToRepairCount: memberUpdates.length,
+      transactionsToRepairCount: trxUpdates.length
+    };
   }
 
-  // Live Apply
-  console.log('\n⚡ Menerapkan pembaruan data...');
+  // Live Apply in Batches of 400
+  console.log('\n⚡ Menerapkan pembaruan atomik ke Firestore...');
+  const allOps: Array<{ collection: string; id: string; patch: Record<string, any> }> = [
+    ...memberUpdates.map(u => ({ collection: 'members', id: u.id, patch: u.patch })),
+    ...trxUpdates.map(u => ({ collection: 'transactions', id: u.id, patch: u.patch }))
+  ];
 
-  if (isFirestoreAccessible) {
-    const allUpdates = [
-      ...memberUpdates.filter(u => u.source === 'firestore').map(u => ({ collection: 'members', id: u.id, patch: u.patch })),
-      ...trxUpdates.map(u => ({ collection: 'transactions', id: u.id, patch: u.patch }))
-    ];
+  const BATCH_SIZE = 400;
+  let committed = 0;
+  for (let i = 0; i < allOps.length; i += BATCH_SIZE) {
+    const chunk = allOps.slice(i, i + BATCH_SIZE);
+    const batch = db.batch();
+    const nowIso = new Date().toISOString();
 
-    const CHUNK_SIZE = 400;
-    let committedCount = 0;
-
-    for (let i = 0; i < allUpdates.length; i += CHUNK_SIZE) {
-      const chunk = allUpdates.slice(i, i + CHUNK_SIZE);
-      const batch = writeBatch(db);
-
-      for (const item of chunk) {
-        const ref = doc(db, item.collection, item.id);
-        batch.update(ref, {
-          ...item.patch,
-          repairedAt: new Date().toISOString()
-        });
-      }
-
-      await batch.commit();
-      committedCount += chunk.length;
-      console.log(`  -> Berhasil commit ${committedCount}/${allUpdates.length} pembaruan ke Firestore...`);
+    for (const op of chunk) {
+      const docRef = db.collection(op.collection).doc(op.id);
+      batch.update(docRef, {
+        ...op.patch,
+        repairedAt: nowIso
+      });
     }
+
+    await batch.commit();
+    committed += chunk.length;
+    console.log(`  -> Berhasil menerapkan ${committed}/${allOps.length} perubahan...`);
   }
 
-  // Update local file store if applicable
-  if (localMembers.length > 0) {
-    let fileUpdated = false;
-    const nextMembers = localMembers.map(m => {
-      const update = memberUpdates.find(u => u.id === m.id || u.id === m.membershipId);
-      if (update) {
-        fileUpdated = true;
-        return { ...m, ...update.patch };
-      }
-      return m;
-    });
+  console.log('\n' + '='.repeat(75));
+  console.log(`🎉 LIVE APPLY SELESAI! Seluruh ${committed} pembaruan berhasil diterapkan.`);
+  console.log('='.repeat(75));
 
-    if (fileUpdated) {
-      fs.writeFileSync(localMembersPath, JSON.stringify(nextMembers, null, 2), 'utf-8');
-      console.log(`  -> Berhasil memperbarui file lokal: ${localMembersPath}`);
-    }
-  }
-
-  console.log('\n' + '='.repeat(70));
-  console.log(`🎉 SUKSES! Perbaikan data selesai diaplikasikan.`);
-  console.log(`- Member diperbaiki: ${memberUpdates.length}`);
-  console.log(`- Transaksi diperbaiki: ${trxUpdates.length}`);
-  console.log('='.repeat(70));
-  process.exit(0);
+  return {
+    isDryRun: false,
+    totalMembers: allMembers.length,
+    duplicatePhonesCount: duplicatePhones.size,
+    skippedDuplicateMembers: Array.from(duplicateMemberDocIds),
+    membersToRepairCount: memberUpdates.length,
+    transactionsToRepairCount: trxUpdates.length
+  };
 }
 
-runRepair().catch((err) => {
-  console.error('\n❌ Terjadi kesalahan saat menjalankan skrip perbaikan:', err);
-  process.exit(1);
-});
+// Auto-run if executed directly via CLI
+if (process.argv[1] && process.argv[1].includes('repair-member-data')) {
+  runRepair().catch(err => {
+    console.error('❌ Terjadi kesalahan fatal:', err);
+    process.exit(1);
+  });
+}

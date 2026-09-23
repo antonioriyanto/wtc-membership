@@ -1,0 +1,57 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isHoAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'HO_ADMIN';
+    }
+
+    function isValidImage() {
+      return request.resource != null &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/jpeg') ||
+         request.resource.contentType.matches('image/png') ||
+         request.resource.contentType.matches('image/webp'));
+    }
+
+    // Member avatar uploads: strictly restricted to the owner of the memberId
+    match /avatars/{memberId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && 
+        (request.auth.token.memberId == memberId || request.auth.uid == memberId || isHoAdmin()) &&
+        isValidImage();
+    }
+
+    match /members/{memberId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && 
+        (request.auth.token.memberId == memberId || request.auth.uid == memberId || isHoAdmin()) &&
+        isValidImage();
+    }
+
+    // Stores, campaigns, and vouchers images: public read, write restricted to HO Admin
+    match /stores/{allPaths=**} {
+      allow read: if true;
+      allow write: if isHoAdmin() && isValidImage();
+    }
+
+    match /campaigns/{allPaths=**} {
+      allow read: if true;
+      allow write: if isHoAdmin() && isValidImage();
+    }
+
+    match /vouchers/{allPaths=**} {
+      allow read: if true;
+      allow write: if isHoAdmin() && isValidImage();
+    }
+
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

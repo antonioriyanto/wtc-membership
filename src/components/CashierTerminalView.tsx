@@ -16,6 +16,7 @@ import { generateSequentialMembershipId } from '../lib/canonicalMember';
 import { CreateMemberModal } from './CreateMemberModal';
 import { CustomerPinPromptModal } from './CustomerPinPromptModal';
 import { useCustomDialog } from './CustomDialogProvider';
+import { apiFetch } from '../lib/apiClient';
 
 interface CashierTerminalViewProps {
   loyaltyConfig?: LoyaltyConfig;
@@ -142,87 +143,41 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       let savedTrx: Transaction | null = null;
       let updatedMember: Member | null = null;
 
-      // ATTEMPT CALLING SECURE SERVER-SIDE BACKEND API
+      // CALL SECURE SERVER-SIDE BACKEND API (FAIL-CLOSED)
       try {
-        const response = await fetch('/api/loyalty/add-points', {
+        const result = await apiFetch('/api/loyalty/add-points', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
           body: JSON.stringify({
             memberId: effectiveMemberId,
             membershipId: member.membershipId || '',
             memberName: member.name || 'Member',
             memberPhone: member.phone || '',
-            memberTier: effectiveMemberTier,
-            currentPoints: member.points || 0,
             amount: numericAmount.toString(),
             receiptNo: cleanReceipt,
             storeId: currentStore?.id || currentStore?.code || 'PUR',
             storeName: currentStore?.name || 'Puri Jakarta',
-            cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
-            loyaltyConfig: effectiveConfig
+            cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`
           })
         });
 
-        const rawText = await response.text();
-        let parsed: any = null;
-        try {
-          parsed = JSON.parse(rawText);
-        } catch {}
-
-        if (response.ok && parsed && parsed.success && parsed.data) {
-          savedTrx = parsed.data.transactionData;
-          updatedMember = {
-            ...member,
-            points: typeof parsed.data.newPoints === 'number' ? parsed.data.newPoints : newPointsFallback,
-            tier: parsed.data.newTier || newTierFallback,
-            totalSpend: (member.totalSpend || 0) + numericAmount,
-            lifetimePoints: (member.lifetimePoints || 0) + (savedTrx?.pointsDelta ?? calculatedPointsFallback),
-            lastStoreVisited: currentStore?.name || 'Puri Jakarta',
-            lastVisitDate: new Date().toISOString()
-          };
-        } else if (parsed && parsed.error && (parsed.error.includes('sudah pernah') || parsed.error.includes('duplicate'))) {
-          // Reject genuine duplicate receipt from server
-          showAlert(parsed.error, 'Transaksi Ditolak', 'error');
-          return false;
-        } else {
-          console.warn('Backend API add-points response was non-OK or non-standard, adopting resilient local sync:', rawText?.substring(0, 100));
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Gagal menambahkan poin.');
         }
-      } catch (backendFetchErr) {
-        console.warn('Backend API fetch unavailable, adopting client Firestore fallback:', backendFetchErr);
-      }
 
-      // If backend was skipped, offline, or fallback triggered, construct verified local records
-      if (!savedTrx) {
-        const transactionId = 'tx_' + Date.now();
-        savedTrx = {
-          id: transactionId,
-          receiptNo: cleanReceipt,
-          memberId: effectiveMemberId,
-          membershipId: member.membershipId || '',
-          memberName: member.name || 'Member',
-          memberPhone: member.phone || '',
-          memberPhoneNormalized: normalizePhoneNumber(member.phone || ''),
-          storeId: currentStore?.id || currentStore?.code || 'PUR',
-          storeName: currentStore?.name || 'Puri Jakarta',
-          cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
-          type: 'EARN',
-          amount: numericAmount,
-          pointsDelta: calculatedPointsFallback,
-          timestamp: new Date().toISOString()
-        };
-
+        savedTrx = result.data.transactionData;
         updatedMember = {
           ...member,
-          points: newPointsFallback,
-          tier: newTierFallback,
+          points: result.data.newPoints,
+          tier: result.data.newTier,
           totalSpend: (member.totalSpend || 0) + numericAmount,
-          lifetimePoints: (member.lifetimePoints || 0) + calculatedPointsFallback,
+          lifetimePoints: (member.lifetimePoints || 0) + (result.data.calculatedPoints || 0),
           lastStoreVisited: currentStore?.name || 'Puri Jakarta',
           lastVisitDate: new Date().toISOString()
         };
+      } catch (err: any) {
+        console.error('Add points error:', err);
+        showAlert(err?.message || 'Gagal memproses transaksi poin pada server.', 'Transaksi Gagal', 'error');
+        return false;
       }
 
       // PERSIST SAFELY TO FIRESTORE AND LOCAL CACHE

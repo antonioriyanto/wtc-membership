@@ -17,6 +17,7 @@ import {
 } from './data/mockData';
 import { setupFirestoreListeners, seedFirestoreIfEmpty, safeSetDoc, cleanForFirestore, findMemberByPhoneInFirestore, findMemberByGoogleUidInFirestore, normalizePhoneNumber, isSamePhoneNumber, cleanAndEnrichStore } from './lib/syncFirestore';
 import { startSyncWorker, runMemberSyncPass, recordDeletedMemberId } from './lib/sync-worker';
+import { apiFetch } from './lib/apiClient';
 
 // HO Components
 import { Sidebar } from './components/Sidebar';
@@ -632,87 +633,30 @@ export default function App() {
   };
 
   const handleReverseTransaction = async (originalTrx: Transaction, reason: string) => {
-    // 1. Check idempotency: ensure this transaction hasn't already been reversed
-    const isAlreadyReversed = transactions.some(t => 
-      t.originalTransactionId === originalTrx.id || 
-      (t.reversedReceiptNo && t.reversedReceiptNo === originalTrx.receiptNo) ||
-      (t.type === 'REVERSAL' && t.receiptNo === 'REV-' + originalTrx.receiptNo)
-    );
-
-    if (isAlreadyReversed || originalTrx.type === 'REVERSAL') {
-      throw new Error('Transaksi ini sudah pernah dibatalkan / direversal sebelumnya.');
-    }
-
-    // 2. Prepare reversal transaction with inverted points and amount
-    const reversalTrxId = 'TRX-REV-' + Date.now().toString().slice(-6);
-    const reversalReceiptNo = 'REV-' + (originalTrx.receiptNo || originalTrx.id);
-    const invertedPoints = -originalTrx.pointsDelta;
-    const invertedAmount = -(originalTrx.amount || 0);
-
-    const reversalTrx: Transaction = {
-      id: reversalTrxId,
-      receiptNo: reversalReceiptNo,
-      originalTransactionId: originalTrx.id,
-      reversedReceiptNo: originalTrx.receiptNo,
-      memberId: originalTrx.memberId,
-      membershipId: originalTrx.membershipId || '',
-      memberName: originalTrx.memberName,
-      memberPhone: originalTrx.memberPhone,
-      memberPhoneNormalized: originalTrx.memberPhoneNormalized,
-      storeId: originalTrx.storeId,
-      storeName: originalTrx.storeName,
-      cashierName: 'Admin HO (Reversal)',
-      type: 'REVERSAL',
-      amount: invertedAmount,
-      pointsDelta: invertedPoints,
-      timestamp: new Date().toISOString(),
-      notes: `Reversal dari ${originalTrx.receiptNo}: ${reason}`
-    };
-
-    // 3. Atomically adjust member points
-    const memberTarget = members.find(m => m.id === originalTrx.memberId);
-    let updatedMember: Member | null = null;
-    if (memberTarget) {
-      const newPoints = Math.max(0, (memberTarget.points || 0) + invertedPoints);
-      updatedMember = {
-        ...memberTarget,
-        points: newPoints,
-        updatedAt: new Date().toISOString()
-      };
-    }
-
-    // 4. Create immutable audit log
-    const auditLogId = 'AL-REV-' + Date.now().toString().slice(-6);
-    const auditEntry = {
-      id: auditLogId,
-      timestamp: new Date().toISOString(),
-      actorName: 'HO Superadmin',
-      actorRole: 'HO_ADMIN',
-      action: 'TRANSACTION_REVERSED',
-      details: `Reversal Ledger: Struk ${originalTrx.receiptNo} (${originalTrx.pointsDelta} Pts) dibatalkan. Struk Reversal: ${reversalReceiptNo} (${invertedPoints} Pts). Alasan: ${reason}`,
-      module: 'LEDGER',
-      metadata: {
+    // Call server-authoritative HO endpoint
+    const response = await apiFetch('/v1/ho/transactions/reversal', {
+      method: 'POST',
+      body: JSON.stringify({
         originalTransactionId: originalTrx.id,
-        reversalTransactionId: reversalTrxId,
-        reversedReceiptNo: originalTrx.receiptNo
-      }
-    };
+        reason: reason.trim()
+      })
+    });
 
-    // 5. Commit batch write to Firestore (original document remains untouched)
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'transactions', reversalTrxId), cleanForFirestore(reversalTrx));
-    if (updatedMember) {
-      batch.set(doc(db, 'members', updatedMember.id), cleanForFirestore(updatedMember), { merge: true });
+    if (!response.success || !response.reversal) {
+      throw new Error(response.error || 'Gagal memproses reversal transaksi.');
     }
-    batch.set(doc(db, 'audit', auditLogId), cleanForFirestore(auditEntry));
-    await batch.commit();
 
-    // 6. Update local state
+    const reversalTrx: Transaction = response.reversal;
     setTransactions(prev => [reversalTrx, ...prev]);
-    if (updatedMember) {
-      setMembers(prev => prev.map(m => m.id === updatedMember!.id ? updatedMember! : m));
-    }
-    setAuditLogs(prev => [auditEntry as any, ...prev]);
+
+    // Refresh member points locally
+    setMembers(prev => prev.map(m => {
+      if (m.id === originalTrx.memberId) {
+        const newPoints = Math.max(0, (m.points || 0) + reversalTrx.pointsDelta);
+        return { ...m, points: newPoints };
+      }
+      return m;
+    }));
   };
 
   // Synchronize loyalty config changes to Firestore

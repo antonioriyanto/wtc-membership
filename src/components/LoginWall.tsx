@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, KeyRound, ShieldCheck, Eye, EyeOff, Lock, ChevronDown, LogIn } from 'lucide-react';
 import { WatchClubLogo } from './WatchClubLogo';
-import { hashStringSHA256, STORE_PIN_HASHES, setOfflineMode } from '../lib/authHelper';
+import { apiFetch } from '../lib/apiClient';
 import { auth } from '../lib/firebase';
 import { signInWithCustomToken } from 'firebase/auth';
 
@@ -118,26 +118,13 @@ export const AdminLogin: React.FC<LoginWallProps> = ({
       const type = isHOUser ? 'HO' : 'CASHIER';
       const currentStoreId = storeId || u;
       
-      const response = await fetch('/api/auth/employee-login', {
+      const result = await apiFetch('/api/auth/employee-login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        skipAuth: true,
         body: JSON.stringify({ username: u, pin: p, type, storeId: currentStoreId })
       });
       
-      const rawText = await response.text();
-      const isIntercepted = rawText.includes('<!doctype html>') || rawText.includes('<html') || rawText.includes('Action required');
-      
-      if (!response.ok || isIntercepted) {
-        throw new Error('Network Issue or Proxy Interception');
-      }
-
-      const result = JSON.parse(rawText);
       if (result.success) {
-        setOfflineMode(false);
-        
         if (result.token) {
           try {
             await signInWithCustomToken(auth, result.token);
@@ -156,34 +143,11 @@ export const AdminLogin: React.FC<LoginWallProps> = ({
         
         loginMock(result.role, finalStoreId);
       } else {
-        setError(result.error || 'Gagal masuk');
+        setError(result.error || 'Gagal masuk. Kredensial tidak sesuai.');
       }
-    } catch (err) {
-      console.warn('Peladen utama tidak dapat dijangkau. Beralih ke verifikasi kriptografi lokal (Secure Offline Mode)...');
-      
-      try {
-        const hashedInputPin = await hashStringSHA256(p);
-        const targetStoreId = isHOUser ? 'HO' : (storeId || u);
-        
-        const validHashForStore = STORE_PIN_HASHES[targetStoreId];
-        
-        if (validHashForStore && validHashForStore === hashedInputPin) {
-          setOfflineMode(true);
-          const role = isHOUser ? 'HO_ADMIN' : 'CASHIER';
-          
-          let finalStoreId = targetStoreId;
-          if (!isHOUser && showStoreQuickSelect) {
-             const foundStore = STORE_ACCOUNTS.find(s => s.username.toUpperCase() === u);
-             if (foundStore) finalStoreId = foundStore.username;
-          }
-          
-          loginMock(role, finalStoreId);
-        } else {
-          setError('Kredensial tidak valid (Verifikasi Luring Gagal)');
-        }
-      } catch (hashErr) {
-        setError('Terjadi kesalahan sistem saat memverifikasi keamanan (Kriptografi Gagal).');
-      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err?.message || 'Koneksi ke backend server gagal. Login diblokir demi keamanan data.');
     } finally {
       setIsLoading(false);
     }

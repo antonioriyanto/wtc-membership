@@ -15,8 +15,6 @@ import {
   X, 
   Coins, 
   ShoppingBag, 
-  Trash2, 
-  Edit2,
   MoreVertical,
   RotateCcw,
   ShieldCheck,
