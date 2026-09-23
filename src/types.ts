@@ -112,6 +112,8 @@ export interface Member {
   lockedUntil?: string | null;
   recoveryEmail?: string;
   googleUid?: string;
+  linkedGoogleEmail?: string;
+  linkedAt?: string;
   linkedAuthUids?: string[];
   forcePinChangeOnNextLogin?: boolean;
   tempPinExpiresAt?: string | null;
@@ -157,8 +159,10 @@ export interface Transaction {
   id: string;
   receiptNo: string;
   memberId: string;
+  membershipId?: string;
   memberName: string;
   memberPhone: string;
+  memberPhoneNormalized?: string;
   memberEmail?: string;
   storeId: string;
   storeName: string;

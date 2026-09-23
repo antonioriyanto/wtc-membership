@@ -41,12 +41,17 @@ import {
   Compass,
   Phone,
   ExternalLink,
-  FileText
+  FileText,
+  Receipt,
+  History
 } from 'lucide-react';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { WatchClubLogo } from './WatchClubLogo';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { doc, updateDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { db, auth, googleProvider } from '../lib/firebase';
+import { signInWithPopup } from 'firebase/auth';
+import { normalizePhoneNumber } from '../lib/syncFirestore';
+import { linkGoogleAccountClient } from '../lib/memberAuthClient';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 
@@ -153,14 +158,43 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [profileEmail, setProfileEmail] = useState(member?.email || '');
+  const [profileEmail, setProfileEmail] = useState(
+    member?.email || member?.linkedGoogleEmail || member?.recoveryEmail || ''
+  );
   const [profileAddress, setProfileAddress] = useState(member?.address || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
+  const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
 
   useEffect(() => {
-    if (member?.email !== undefined) setProfileEmail(member.email || '');
+    const effectiveEmail = member?.email || member?.linkedGoogleEmail || member?.recoveryEmail || '';
+    setProfileEmail(effectiveEmail);
     if (member?.address !== undefined) setProfileAddress(member.address || '');
-  }, [member?.email, member?.address]);
+  }, [member?.email, member?.linkedGoogleEmail, member?.recoveryEmail, member?.address]);
+
+  const handleLinkGoogle = async () => {
+    if (!member?.id) return;
+    setIsLinkingGoogle(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      const updated = await linkGoogleAccountClient({
+        memberId: member.id,
+        googleUid: user.uid,
+        googleEmail: user.email || ''
+      });
+      if (onUpdateMember) {
+        onUpdateMember(updated as any);
+      }
+      showAlert(`Akun Google (${user.email}) berhasil ditautkan ke profil Anda!`, 'Berhasil Ditautkan', 'success');
+    } catch (err: any) {
+      console.error('Link Google error:', err);
+      showAlert(err?.message || 'Gagal menghubungkan akun Google.', 'Gagal', 'error');
+    } finally {
+      setIsLinkingGoogle(false);
+    }
+  };
 
   const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -252,16 +286,28 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!member?.id) return;
-    setIsSavingProfile(true);
-    try {
-      const cleanEmail = profileEmail.trim();
-      const cleanAddress = profileAddress.trim();
 
+    const cleanEmail = profileEmail.trim();
+    const cleanAddress = profileAddress.trim();
+
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      showAlert('Format alamat email tidak valid.', 'Format Tidak Sesuai', 'warning');
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileSaveError(null);
+    setProfileSaveSuccess(false);
+
+    try {
+      const nowIso = new Date().toISOString();
       const updatedMemberData: Member = {
         ...member,
         email: cleanEmail,
+        // Preserve linkedGoogleEmail: never delete or overwrite
+        linkedGoogleEmail: member.linkedGoogleEmail,
         address: cleanAddress,
-        updatedAt: new Date().toISOString()
+        updatedAt: nowIso
       };
 
       // 1. Update Firestore
@@ -289,10 +335,14 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         }
       } catch {}
 
-      showAlert('Alamat pengiriman dan email berhasil disimpan!', 'Berhasil Disimpan', 'success');
+      setProfileSaveSuccess(true);
+      showAlert('Alamat email dan profil berhasil disimpan!', 'Berhasil Disimpan', 'success');
+      setTimeout(() => setProfileSaveSuccess(false), 4000);
     } catch (err: any) {
       console.error('Failed to save profile changes:', err);
-      showAlert('Gagal menyimpan perubahan alamat: ' + (err.message || 'Periksa koneksi internet'), 'Gagal Menyimpan', 'error');
+      const errMsg = err?.message || 'Gagal menyimpan perubahan. Periksa koneksi internet.';
+      setProfileSaveError(errMsg);
+      showAlert('Gagal menyimpan profil: ' + errMsg, 'Gagal Menyimpan', 'error');
     } finally {
       setIsSavingProfile(false);
     }
@@ -595,16 +645,75 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     return result;
   }, [stores, storeSearch, selectedRegionFilter, userLocation]);
 
-  // Map transactions using provided store dataset
-    const memberTransactions = useMemo(() => {
-    if (!transactions || transactions.length === 0) return [];
-    
-    return transactions
-      .filter(t => 
-        (member?.id && t.memberId === member.id) || 
-        (member?.phone && t.memberPhone === member.phone) || 
-        (member?.name && t.memberName === member.name)
-      )
+  // Canonical identifiers
+  const canonicalMemberId = member?.id || '';
+  const canonicalMemberPhone = normalizePhoneNumber(member?.phone || '');
+
+  // Direct Firestore transactions listener (never rely on stale localStorage)
+  const [firestoreTransactions, setFirestoreTransactions] = useState<Transaction[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!canonicalMemberId && !canonicalMemberPhone) {
+      setIsLoadingTransactions(false);
+      return;
+    }
+
+    setIsLoadingTransactions(true);
+
+    try {
+      const q = query(collection(db, 'transactions'), orderBy('timestamp', 'desc'));
+      const unsub = onSnapshot(q, (snapshot) => {
+        const liveList: Transaction[] = [];
+        snapshot.forEach((docSnap) => {
+          liveList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+        });
+        setFirestoreTransactions(liveList);
+        setIsLoadingTransactions(false);
+      }, (err) => {
+        console.warn("Direct transactions snapshot error, using unordered query:", err);
+        const fallbackUnsub = onSnapshot(collection(db, 'transactions'), (snapshot) => {
+          const liveList: Transaction[] = [];
+          snapshot.forEach((docSnap) => {
+            liveList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+          });
+          setFirestoreTransactions(liveList);
+          setIsLoadingTransactions(false);
+        }, () => {
+          setIsLoadingTransactions(false);
+        });
+        return () => fallbackUnsub();
+      });
+
+      return () => unsub();
+    } catch {
+      setIsLoadingTransactions(false);
+    }
+  }, [canonicalMemberId, canonicalMemberPhone]);
+
+  // Strict transaction filtering according to requirement 3:
+  // a. transaction.memberId === canonicalMemberId
+  // b. transaction.memberPhoneNormalized === canonicalMemberPhone
+  // Fallback to memberName is STRICTLY REMOVED
+  // Newest first sorting
+  const memberTransactions = useMemo(() => {
+    const sourceList = firestoreTransactions.length > 0 
+      ? firestoreTransactions 
+      : (transactions || []);
+
+    if (!canonicalMemberId && !canonicalMemberPhone) return [];
+
+    return sourceList
+      .filter(t => {
+        if (!t) return false;
+        // a. transaction.memberId === canonicalMemberId
+        if (canonicalMemberId && t.memberId === canonicalMemberId) return true;
+        // b. transaction.memberPhoneNormalized === canonicalMemberPhone
+        const txPhoneNorm = t.memberPhoneNormalized || normalizePhoneNumber(t.memberPhone || '');
+        if (canonicalMemberPhone && txPhoneNorm && txPhoneNorm === canonicalMemberPhone) return true;
+
+        return false;
+      })
       .map(t => {
         let storeDisplayName = 'Watch Club - Branch';
         if (t.type === 'REDEEM' || t.type === 'VOUCHER_DISCOUNT') {
@@ -616,23 +725,21 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
         }
 
         const txDate = t.timestamp 
-          ? new Date(t.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          ? new Date(t.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
           : '-';
 
         return {
           id: t.receiptNo || t.id,
+          receiptNo: t.receiptNo || t.id,
           date: txDate,
+          rawTimestamp: t.timestamp ? new Date(t.timestamp).getTime() : 0,
           store: storeDisplayName,
-          points: Math.abs(t.pointsDelta),
-          type: t.pointsDelta >= 0 ? 'EARN' : 'REDEEM'
+          points: Math.abs(t.pointsDelta ?? (t as any).points ?? 0),
+          type: (t.pointsDelta !== undefined ? t.pointsDelta >= 0 : (t.type === 'EARN')) ? 'EARN' : 'REDEEM'
         };
       })
-      .sort((a, b) => {
-        // Sort by date descending assuming id/receiptNo gives chronological order or just rely on timestamp if available
-        // To keep it simple, if they come from Firestore they are likely ordered, but let's reverse them to show newest first if they aren't.
-        return 0; // The source array should be sorted.
-      });
-  }, [transactions, member]);
+      .sort((a, b) => b.rawTimestamp - a.rawTimestamp);
+  }, [firestoreTransactions, transactions, canonicalMemberId, canonicalMemberPhone]);
 
   const navItems = [
     { id: 'MEMBERSHIP', label: 'Membership', icon: CreditCard },
@@ -759,30 +866,51 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                 <h2 className="text-base font-bold text-neutral-900 dark:text-white">Recent Transactions</h2>
               </div>
               <div className="bg-white dark:bg-white/5 rounded-[24px] shadow-sm dark:shadow-none mb-4 relative overflow-hidden border border-black/5 dark:border-white/10">
-                <div className="px-5 pt-2.5 pb-0">
-                  {memberTransactions.slice(0, 2).map((trx, idx) => (
-                    <div key={idx} className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
-                      <div className={`w-10 h-10 shrink-0 rounded-xl flex justify-center items-center mr-4 text-base ${trx.type === 'EARN' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
-                        {trx.type === 'EARN' ? <ArrowUp className="w-4 h-4" /> : <Ticket className="w-4 h-4" />}
-                      </div>
-                      <div className="flex-grow min-w-0 pr-2">
-                        <div className="font-semibold text-sm text-neutral-900 dark:text-white truncate">{trx.store}</div>
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 truncate">{trx.date} • {trx.id}</div>
-                      </div>
-                      <div className={`font-bold text-sm shrink-0 whitespace-nowrap ${trx.type === 'EARN' ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {trx.type === 'EARN' ? '+' : '-'}{(trx.points || 0).toLocaleString('id-ID')} Pts
-                      </div>
+                {isLoadingTransactions ? (
+                  <div className="py-8 text-center text-xs text-neutral-400">
+                    <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    Memuat riwayat transaksi...
+                  </div>
+                ) : memberTransactions.length === 0 ? (
+                  <div className="py-8 px-4 text-center">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center mx-auto mb-2 text-neutral-400">
+                      <Receipt className="w-5 h-5" />
                     </div>
-                  ))}
-                </div>
-                <div className="relative -mt-7 pt-10 px-5 pb-5 bg-gradient-to-b from-transparent via-white/95 to-white z-10 rounded-b-[24px]">
-                  <button 
-                    onClick={() => setIsHistoryModalOpen(true)}
-                    className="w-full p-3 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 text-neutral-900 dark:text-white rounded-full font-semibold text-sm cursor-pointer transition-colors hover:bg-slate-200 shadow-sm"
-                  >
-                    Show More History
-                  </button>
-                </div>
+                    <p className="font-semibold text-xs text-neutral-800 dark:text-neutral-200">Belum Ada Riwayat Transaksi</p>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 max-w-[260px] mx-auto">
+                      Transaksi pembelanjaan dan perolehan poin Anda di seluruh gerai Watch Club akan otomatis tercatat di sini.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-5 pt-2.5 pb-0">
+                      {memberTransactions.slice(0, 3).map((trx, idx) => (
+                        <div key={idx} className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0">
+                          <div className={`w-10 h-10 shrink-0 rounded-xl flex justify-center items-center mr-4 text-base ${trx.type === 'EARN' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
+                            {trx.type === 'EARN' ? <ArrowUp className="w-4 h-4" /> : <Ticket className="w-4 h-4" />}
+                          </div>
+                          <div className="flex-grow min-w-0 pr-2">
+                            <div className="font-semibold text-sm text-neutral-900 dark:text-white truncate">{trx.store}</div>
+                            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 truncate">{trx.date} • {trx.id}</div>
+                          </div>
+                          <div className={`font-bold text-sm shrink-0 whitespace-nowrap ${trx.type === 'EARN' ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {trx.type === 'EARN' ? '+' : '-'}{(trx.points || 0).toLocaleString('id-ID')} Pts
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {memberTransactions.length > 2 && (
+                      <div className="relative -mt-7 pt-10 px-5 pb-5 bg-gradient-to-b from-transparent via-white/95 to-white dark:via-neutral-900/95 dark:to-neutral-900 z-10 rounded-b-[24px]">
+                        <button 
+                          onClick={() => setIsHistoryModalOpen(true)}
+                          className="w-full p-3 bg-neutral-50 dark:bg-gradient-to-br dark:from-neutral-900 dark:via-black dark:to-neutral-950 border border-black/5 dark:border-white/10 text-neutral-900 dark:text-white rounded-full font-semibold text-sm cursor-pointer transition-colors hover:bg-slate-200 dark:hover:bg-neutral-800 shadow-sm"
+                        >
+                          Lihat Seluruh Riwayat ({memberTransactions.length})
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </section>
 
@@ -1091,25 +1219,59 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Alamat Email</label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400">Alamat Email</label>
+                      {member.linkedGoogleEmail && (
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Akun Google Terhubung
+                        </span>
+                      )}
+                    </div>
                     <input 
                       type="email" 
                       value={profileEmail}
-                      onChange={e => setProfileEmail(e.target.value)}
+                      onChange={e => {
+                        setProfileEmail(e.target.value);
+                        setProfileSaveSuccess(false);
+                        setProfileSaveError(null);
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm font-medium transition-all" 
                       placeholder="nama@email.com" 
                     />
+                    {member.linkedGoogleEmail && member.email && member.email !== member.linkedGoogleEmail && (
+                      <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-1">
+                        Google Terkait: <span className="font-medium text-neutral-600 dark:text-neutral-300">{member.linkedGoogleEmail}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">Alamat Pengiriman (Delivery Address)</label>
                     <textarea 
                       value={profileAddress}
-                      onChange={e => setProfileAddress(e.target.value)}
+                      onChange={e => {
+                        setProfileAddress(e.target.value);
+                        setProfileSaveSuccess(false);
+                        setProfileSaveError(null);
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm font-medium resize-y min-h-[80px] transition-all" 
                       placeholder="Tuliskan alamat lengkap pengiriman hadiah voucher/merchandise..."
                     ></textarea>
                   </div>
+
+                  {profileSaveSuccess && (
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 rounded-xl text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      <span>Alamat email dan profil berhasil diperbarui!</span>
+                    </div>
+                  )}
+
+                  {profileSaveError && (
+                    <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 rounded-xl text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                      <span>{profileSaveError}</span>
+                    </div>
+                  )}
 
                   <button 
                     type="submit" 
@@ -1126,6 +1288,44 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
                     )}
                   </button>
                 </form>
+
+                {/* GOOGLE LINKAGE STATUS CARD IN PROFILE */}
+                <div className="w-full max-w-[400px] mt-4 p-3.5 bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/10 rounded-2xl text-left">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-white dark:bg-white/10 flex items-center justify-center shadow-xs border border-black/5 dark:border-white/10 shrink-0">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-neutral-900 dark:text-white truncate">
+                          {member.linkedGoogleEmail || member.googleUid ? 'Akun Google Terhubung' : 'Tautkan Akun Google'}
+                        </div>
+                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+                          {member.linkedGoogleEmail || member.recoveryEmail || 'Untuk pemulihan PIN & login instan'}
+                        </div>
+                      </div>
+                    </div>
+                    {member.linkedGoogleEmail || member.googleUid ? (
+                      <span className="px-2 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 rounded-lg text-[10px] font-semibold flex items-center gap-1 shrink-0">
+                        <Check className="w-3 h-3" /> Terverifikasi
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleLinkGoogle}
+                        disabled={isLinkingGoogle}
+                        className="px-3 py-1.5 bg-neutral-900 text-white dark:bg-white dark:text-black rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shrink-0"
+                      >
+                        {isLinkingGoogle ? 'Menghubungkan...' : 'Hubungkan'}
+                      </button>
+                    )}
+                  </div>
+                </div>
 
                 {/* HELP & SUPPORT TICKET SHORTCUT IN PROFILE */}
                 <div className="w-full max-w-[400px] mt-4 pt-4 border-t border-black/5 dark:border-white/10">
@@ -1208,20 +1408,37 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
               </div>
               
               <div className="max-h-[60vh] overflow-y-auto text-left pr-2 mt-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {memberTransactions.map((trx, idx) => (
-                  <div key={idx} className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0 transition-colors">
-                    <div className={`w-10 h-10 shrink-0 rounded-xl flex justify-center items-center mr-4 text-base ${trx.type === 'EARN' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
-                      {trx.type === 'EARN' ? <ArrowUp className="w-4 h-4" /> : <Ticket className="w-4 h-4" />}
-                    </div>
-                    <div className="flex-grow min-w-0 pr-2">
-                      <div className="font-semibold text-[0.9rem] text-neutral-900 dark:text-white truncate">{trx.store}</div>
-                      <div className="text-[0.75rem] text-neutral-500 dark:text-neutral-400 mt-1 truncate">{trx.date} • {trx.id}</div>
-                    </div>
-                    <div className={`font-bold text-[0.95rem] shrink-0 whitespace-nowrap ${trx.type === 'EARN' ? 'text-emerald-500' : 'text-red-500'}`}>
-                      {trx.type === 'EARN' ? '+' : '-'}{(trx.points || 0).toLocaleString('id-ID')} Pts
-                    </div>
+                {isLoadingTransactions ? (
+                  <div className="py-12 text-center text-xs text-neutral-400">
+                    <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    Memuat seluruh riwayat transaksi...
                   </div>
-                ))}
+                ) : memberTransactions.length === 0 ? (
+                  <div className="py-10 px-4 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center mx-auto mb-3 text-neutral-400">
+                      <Receipt className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white mb-1">Belum Ada Riwayat Transaksi</h4>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed max-w-[280px] mx-auto">
+                      Belum ada catatan transaksi untuk akun keanggotaan ini. Saat Anda berbelanja di kasir gerai Watch Club, perolehan poin dan riwayat transaksi akan otomatis tercatat di sini.
+                    </p>
+                  </div>
+                ) : (
+                  memberTransactions.map((trx, idx) => (
+                    <div key={idx} className="flex items-center py-4 border-b border-black/5 dark:border-white/10 last:border-0 transition-colors">
+                      <div className={`w-10 h-10 shrink-0 rounded-xl flex justify-center items-center mr-4 text-base ${trx.type === 'EARN' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
+                        {trx.type === 'EARN' ? <ArrowUp className="w-4 h-4" /> : <Ticket className="w-4 h-4" />}
+                      </div>
+                      <div className="flex-grow min-w-0 pr-2">
+                        <div className="font-semibold text-[0.9rem] text-neutral-900 dark:text-white truncate">{trx.store}</div>
+                        <div className="text-[0.75rem] text-neutral-500 dark:text-neutral-400 mt-1 truncate">{trx.date} • {trx.id}</div>
+                      </div>
+                      <div className={`font-bold text-[0.95rem] shrink-0 whitespace-nowrap ${trx.type === 'EARN' ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {trx.type === 'EARN' ? '+' : '-'}{(trx.points || 0).toLocaleString('id-ID')} Pts
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

@@ -11,7 +11,7 @@ import { CashierSettingsTab } from './CashierSettingsTab';
 import { CashierTabType } from '../types';
 import { doc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { safeSetDoc } from '../lib/syncFirestore';
+import { safeSetDoc, normalizePhoneNumber } from '../lib/syncFirestore';
 import { generateSequentialMembershipId } from '../lib/canonicalMember';
 import { CreateMemberModal } from './CreateMemberModal';
 import { CustomerPinPromptModal } from './CustomerPinPromptModal';
@@ -152,6 +152,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
           },
           body: JSON.stringify({
             memberId: effectiveMemberId,
+            membershipId: member.membershipId || '',
             memberName: member.name || 'Member',
             memberPhone: member.phone || '',
             memberTier: effectiveMemberTier,
@@ -200,8 +201,10 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
           id: transactionId,
           receiptNo: cleanReceipt,
           memberId: effectiveMemberId,
+          membershipId: member.membershipId || '',
           memberName: member.name || 'Member',
           memberPhone: member.phone || '',
+          memberPhoneNormalized: normalizePhoneNumber(member.phone || ''),
           storeId: currentStore?.id || currentStore?.code || 'PUR',
           storeName: currentStore?.name || 'Puri Jakarta',
           cashierName: cashierName || `Kasir ${currentStore?.name || 'Aktif'}`,
@@ -322,8 +325,10 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       id: 'tx_' + Date.now(),
       receiptNo: `VOUCHER-${cleanCode}`,
       memberId: member.id,
+      membershipId: member.membershipId || '',
       memberName: member.name,
       memberPhone: member.phone,
+      memberPhoneNormalized: normalizePhoneNumber(member.phone || ''),
       storeId: currentStore?.id || currentStore?.code || 'PUR',
       storeName: currentStore?.name || 'Puri Jakarta',
       cashierName: cashierName || `Kasir ${currentStore?.name || 'Puri'}`,

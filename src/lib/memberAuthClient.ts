@@ -3,7 +3,7 @@
  * Communicates with Cloud Functions and coordinates cryptographic state in Firestore.
  */
 
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
 import { signInWithCustomToken } from 'firebase/auth';
 import { db, auth } from './firebase';
 import { hashPin, verifyPin } from './pinCrypto';
@@ -167,8 +167,9 @@ export async function setCustomerPinClient(params: {
   pin: string;
   recoveryEmail?: string;
   googleUid?: string;
+  googleEmail?: string;
 }): Promise<CanonicalMemberDocument> {
-  const { rawPhone, pin, recoveryEmail, googleUid } = params;
+  const { rawPhone, pin, recoveryEmail, googleUid, googleEmail } = params;
   if (!rawPhone || !pin || pin.length !== 6) {
     throw new Error('Nomor HP dan 6-digit PIN wajib diisi.');
   }
@@ -187,6 +188,11 @@ export async function setCustomerPinClient(params: {
     existingAuthUids.push(googleUid);
   }
 
+  const nowIso = new Date().toISOString();
+  const effectiveGoogleEmail = (googleEmail || recoveryEmail || '').trim().toLowerCase();
+  const existingEmail = (member.email || '').trim();
+  const resolvedEmail = existingEmail ? existingEmail : effectiveGoogleEmail;
+
   const updatedData: Record<string, any> = {
     ...member,
     phoneE164,
@@ -195,14 +201,17 @@ export async function setCustomerPinClient(params: {
     isPinSet: true,
     failedPinAttempts: 0,
     lockedUntil: null,
-    updatedAt: new Date().toISOString()
+    updatedAt: nowIso
   };
 
-  if (recoveryEmail) {
-    updatedData.recoveryEmail = recoveryEmail;
+  if (effectiveGoogleEmail) {
+    updatedData.recoveryEmail = member.recoveryEmail || effectiveGoogleEmail;
+    updatedData.email = resolvedEmail;
   }
   if (googleUid) {
     updatedData.googleUid = googleUid;
+    updatedData.linkedGoogleEmail = effectiveGoogleEmail;
+    updatedData.linkedAt = nowIso;
     updatedData.linkedAuthUids = existingAuthUids;
   }
 
@@ -233,6 +242,75 @@ export async function setCustomerPinClient(params: {
   }
 
   return updatedData as CanonicalMemberDocument;
+}
+
+/**
+ * Atomic linkage of Google OAuth identity to an existing canonical member document.
+ * Adheres strictly to Canonical Member Identity rules:
+ * - Uses runTransaction for atomic updates
+ * - Saves googleUid, linkedGoogleEmail, linkedAt
+ * - Sets email if member.email is currently empty
+ * - Preserves existing email if already populated
+ * - Never creates a duplicate member document
+ */
+export async function linkGoogleAccountClient(params: {
+  memberId: string;
+  googleUid: string;
+  googleEmail: string;
+}): Promise<CanonicalMemberDocument> {
+  const { memberId, googleUid, googleEmail } = params;
+  if (!memberId || !googleUid) {
+    throw new Error('Member ID dan Google UID wajib disertakan.');
+  }
+
+  const memberRef = doc(db, 'members', memberId);
+  const nowIso = new Date().toISOString();
+  const normalizedGoogleEmail = (googleEmail || '').trim().toLowerCase();
+
+  const updatedMember = await runTransaction(db, async (transaction) => {
+    const docSnap = await transaction.get(memberRef);
+    if (!docSnap.exists()) {
+      throw new Error(`Dokumen member ${memberId} tidak ditemukan di database.`);
+    }
+
+    const currentData = docSnap.data() as CanonicalMemberDocument;
+    const existingEmail = (currentData.email || '').trim();
+    const finalEmail = existingEmail ? existingEmail : normalizedGoogleEmail;
+
+    const existingLinkedUids: string[] = Array.isArray(currentData.linkedAuthUids) ? currentData.linkedAuthUids : [];
+    const updatedLinkedUids = Array.from(new Set([...existingLinkedUids, googleUid]));
+
+    const mutation: Record<string, any> = {
+      googleUid,
+      linkedGoogleEmail: normalizedGoogleEmail,
+      linkedAt: nowIso,
+      recoveryEmail: currentData.recoveryEmail || normalizedGoogleEmail,
+      email: finalEmail,
+      linkedAuthUids: updatedLinkedUids,
+      updatedAt: nowIso
+    };
+
+    transaction.update(memberRef, mutation);
+
+    return {
+      ...currentData,
+      ...mutation
+    };
+  });
+
+  // Synchronize local cache safely
+  try {
+    const raw = localStorage.getItem('wtc_members');
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        const next = list.map(m => m.id === memberId ? { ...m, ...updatedMember } : m);
+        localStorage.setItem('wtc_members', JSON.stringify(next));
+      }
+    }
+  } catch {}
+
+  return updatedMember as CanonicalMemberDocument;
 }
 
 /**
@@ -300,6 +378,9 @@ export async function resetPinViaGoogleAuthClient(params: {
   const { hashHex, saltHex } = await hashPin(newPin);
   const updatedLinkedUids = Array.from(new Set([...linkedUids, googleUid]));
   const nowIso = new Date().toISOString();
+  const effectiveGoogleEmail = (googleEmail || '').trim().toLowerCase();
+  const existingEmail = (member.email || '').trim();
+  const resolvedEmail = existingEmail ? existingEmail : effectiveGoogleEmail;
 
   const updatedData: Record<string, any> = {
     ...member,
@@ -312,8 +393,11 @@ export async function resetPinViaGoogleAuthClient(params: {
     forcePinChangeOnNextLogin: false,
     tempPinExpiresAt: null,
     googleUid: registeredGoogleUid || googleUid,
+    linkedGoogleEmail: member.linkedGoogleEmail || effectiveGoogleEmail,
+    linkedAt: member.linkedAt || nowIso,
     linkedAuthUids: updatedLinkedUids,
-    recoveryEmail: registeredEmail || googleEmail,
+    recoveryEmail: registeredEmail || effectiveGoogleEmail,
+    email: resolvedEmail,
     lastPinResetAt: nowIso,
     updatedAt: nowIso
   };

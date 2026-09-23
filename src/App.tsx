@@ -514,17 +514,22 @@ export default function App() {
     if (!target) return;
     const updatedMember = { ...target, points: Math.max(0, target.points + pointsDelta) };
     
-    const savedTrx: any = {
+    const savedTrx: Transaction = {
       id: 'TRX-' + Date.now().toString().slice(-6),
       receiptNo: 'ADJ-' + ticketId,
-      memberId: memberId,
+      memberId: target.id,
+      membershipId: target.membershipId || '',
+      memberName: target.name || 'Member',
+      memberPhone: target.phone || '',
+      memberPhoneNormalized: normalizePhoneNumber(target.phone || ''),
       storeId: 'SYS',
       storeName: 'Sistem HO',
       cashierName: 'Admin HO',
-      type: pointsDelta > 0 ? 'EARN' : 'REDEEM',
+      type: 'MANUAL_ADJUSTMENT',
       amount: 0,
-      points: Math.abs(pointsDelta),
-      timestamp: new Date().toISOString()
+      pointsDelta: pointsDelta,
+      timestamp: new Date().toISOString(),
+      notes: `${ticketId}: ${note}`
     };
     
     const auditEntry: any = {
@@ -1014,13 +1019,26 @@ export default function App() {
                 if (existingMemberByPhone) {
                   // MERGE / LINK: Member already registered (e.g., at physical store by Cashier)
                   // Link Google UID to the existing member document, preserving the member ID, points, and history!
+                  const googleEmail = (user.email || '').trim().toLowerCase();
+                  const existingEmail = (existingMemberByPhone.email || '').trim();
+                  const resolvedEmail = existingEmail ? existingEmail : googleEmail;
+                  const nowIso = new Date().toISOString();
+
+                  const existingLinkedUids = Array.isArray(existingMemberByPhone.linkedAuthUids) ? existingMemberByPhone.linkedAuthUids : [];
+                  const updatedLinkedUids = Array.from(new Set([...existingLinkedUids, user.uid]));
+
                   const updatedMemberData = cleanForFirestore({
                     ...existingMemberByPhone,
                     googleUid: user.uid,
-                    email: existingMemberByPhone.email || user.email || '',
+                    linkedGoogleEmail: googleEmail,
+                    linkedAt: nowIso,
+                    recoveryEmail: existingMemberByPhone.recoveryEmail || googleEmail,
+                    email: resolvedEmail,
+                    linkedAuthUids: updatedLinkedUids,
                     name: existingMemberByPhone.name || user.displayName || 'Member',
                     phone: normalizePhoneNumber(existingMemberByPhone.phone || targetPhone),
-                    googleMergedAt: new Date().toISOString()
+                    googleMergedAt: nowIso,
+                    updatedAt: nowIso
                   });
 
                   await safeSetDoc('members', existingMemberByPhone.id, updatedMemberData);
@@ -1377,8 +1395,10 @@ export default function App() {
                   id: 'tx_' + Date.now(),
                   receiptNo: 'ADJ-' + Date.now().toString().slice(-6),
                   memberId: member.id,
+                  membershipId: member.membershipId || '',
                   memberName: member.name,
                   memberPhone: member.phone,
+                  memberPhoneNormalized: normalizePhoneNumber(member.phone || ''),
                   storeId: 'S-HQ',
                   storeName: 'Head Office',
                   cashierName: 'Superadmin',

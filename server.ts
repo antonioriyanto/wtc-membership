@@ -656,12 +656,16 @@ async function startServer() {
             // 3. Create Transaction Record
             const transactionId = 'tx_' + Date.now();
             const transactionRef = db.collection('transactions').doc(transactionId);
+            const rawPhone = memberData?.phone || passedMemberPhone || '';
+            const normalizedPhone = normalizePhone(rawPhone);
             const transactionData = {
               id: transactionId,
               receiptNo: receiptNo.trim(),
               memberId: memberData?.id || memberId,
+              membershipId: memberData?.membershipId || req.body?.membershipId || '',
               memberName: memberData?.name || passedMemberName || 'Member',
-              memberPhone: memberData?.phone || passedMemberPhone || '',
+              memberPhone: rawPhone,
+              memberPhoneNormalized: normalizedPhone,
               storeId: storeId || 'PUR',
               storeName: storeName || 'Puri Jakarta',
               cashierName: cashierName || 'Kasir',
@@ -719,12 +723,16 @@ async function startServer() {
       const newTier = calculateTierWithConfig(newPoints, activeConfig);
 
       const transactionId = 'tx_' + Date.now();
+      const rawPhone = passedMemberPhone || '';
+      const normalizedPhone = normalizePhone(rawPhone);
       const transactionData = {
         id: transactionId,
         receiptNo: receiptNo.trim(),
         memberId,
+        membershipId: req.body?.membershipId || '',
         memberName: passedMemberName || 'Member',
-        memberPhone: passedMemberPhone || '',
+        memberPhone: rawPhone,
+        memberPhoneNormalized: normalizedPhone,
         storeId: storeId || 'PUR',
         storeName: storeName || 'Puri Jakarta',
         cashierName: cashierName || 'Kasir',

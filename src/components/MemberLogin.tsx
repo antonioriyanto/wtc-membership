@@ -307,7 +307,8 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
         rawPhone: phone,
         pin: createdPin,
         recoveryEmail: user.email || '',
-        googleUid: user.uid
+        googleUid: user.uid,
+        googleEmail: user.email || ''
       });
 
       setSuccessMsg('PIN berhasil dibuat & Akun Google terhubung sebagai pemulihan!');

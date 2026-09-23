@@ -32,6 +32,8 @@ export interface CanonicalMemberDocument {
   
   // Identity & Auth Links
   googleUid?: string;
+  linkedGoogleEmail?: string;
+  linkedAt?: string;
   linkedAuthUids?: string[];
   
   // Retail Meta
