@@ -15,6 +15,7 @@ import {
   Copy,
   Check,
   Edit3,
+  Trash2,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -25,6 +26,7 @@ interface VouchersTabProps {
   onCreateVoucher: () => void;
   onEditVoucher?: (voucher: Voucher) => void;
   onToggleVoucherStatus: (voucherId: string) => void;
+  onDeleteVoucher?: (voucherId: string) => void;
   isSkeletonLoading?: boolean;
 }
 
@@ -35,6 +37,7 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
   onCreateVoucher,
   onEditVoucher,
   onToggleVoucherStatus,
+  onDeleteVoucher,
   isSkeletonLoading = false
 }) => {
   if (isSkeletonLoading) {
@@ -259,6 +262,20 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Edit & Gambar</span>
                   </button>
+
+                  {onDeleteVoucher && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Hapus voucher "${voucher.title}" (${voucher.code})?`)) {
+                          onDeleteVoucher(voucher.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      title="Hapus Voucher"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 <span className="text-[11px] text-slate-400 font-medium">

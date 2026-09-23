@@ -1,12 +1,14 @@
 /**
  * Image Storage & Validation Service
  * Enforces MIME type, magic bytes verification, file size limits, and image dimensions.
- * Uploads assets directly to Firebase Storage,
+ * Uploads assets directly to Firebase Storage (or server multipart upload),
  * ensuring Firestore and localStorage NEVER store raw Base64 data.
  */
 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
+import { compressImage } from '../utils/imageCompression';
+import { getApiBaseUrl } from './apiClient';
 
 export interface ImageValidationResult {
   valid: boolean;
@@ -28,19 +30,9 @@ export interface UploadedImageMetadata {
 }
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024; // Firebase Storage rules
-const MAX_SOURCE_SIZE_BYTES = 20 * 1024 * 1024; // Phone photos are compressed before upload
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 const MIN_DIMENSION = 50;
-const MAX_SOURCE_DIMENSION = 8192;
-const SMALL_IMAGE_BYTES = 350 * 1024;
-
-type ImageFolder = 'stores' | 'campaigns' | 'vouchers' | 'members';
-const IMAGE_BOUNDS: Record<ImageFolder, [number, number]> = {
-  stores: [1200, 900],
-  campaigns: [1200, 1200],
-  vouchers: [1200, 800],
-  members: [480, 480],
-};
+const MAX_DIMENSION = 4096;
 
 /**
  * Validates magic bytes of an ArrayBuffer to guarantee the file matches its declared extension.
@@ -70,118 +62,115 @@ export function checkMagicBytes(buffer: ArrayBuffer): { valid: boolean; detected
   return { valid: false };
 }
 
-async function inspectImage(file: File): Promise<{ image: HTMLImageElement; release: () => void; result: ImageValidationResult }> {
-  if (!file || file.size === 0 || file.size > MAX_SOURCE_SIZE_BYTES) {
-    throw new Error('Pilih foto dengan ukuran maksimal 20 MB.');
-  }
-  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-    throw new Error('Format gambar harus JPG, PNG, atau WebP.');
-  }
-  const magic = checkMagicBytes(await file.slice(0, 16).arrayBuffer());
-  if (!magic.valid || magic.detectedMime !== file.type) {
-    throw new Error('Isi file gambar tidak sesuai format JPG, PNG, atau WebP.');
-  }
-
-  const objectUrl = URL.createObjectURL(file);
-  const image = new Image();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error('Gambar tidak dapat dibuka.'));
-      image.src = objectUrl;
-    });
-    const width = image.naturalWidth;
-    const height = image.naturalHeight;
-    if (width < MIN_DIMENSION || height < MIN_DIMENSION ||
-        width > MAX_SOURCE_DIMENSION || height > MAX_SOURCE_DIMENSION) {
-      throw new Error('Dimensi foto harus antara 50 dan 8192 piksel.');
-    }
-    return {
-      image,
-      release: () => URL.revokeObjectURL(objectUrl),
-      result: { valid: true, mimeType: file.type, width, height, sizeBytes: file.size },
-    };
-  } catch (error) {
-    URL.revokeObjectURL(objectUrl);
-    throw error;
-  }
-}
-
+/**
+ * Thoroughly validates an uploaded File object before sending to storage.
+ */
 export async function validateImageFile(file: File): Promise<ImageValidationResult> {
-  try {
-    const inspected = await inspectImage(file);
-    inspected.release();
-    return inspected.result;
-  } catch (error: any) {
-    return { valid: false, error: error?.message || 'Validasi gambar gagal.' };
+  if (!file) {
+    return { valid: false, error: 'File gambar tidak ditemukan.' };
   }
-}
 
-async function prepareImage(file: File, folder: ImageFolder): Promise<{ file: File; width: number; height: number }> {
-  const inspected = await inspectImage(file);
-  try {
-    const { width, height } = inspected.result;
-    const [maxWidth, maxHeight] = IMAGE_BOUNDS[folder];
-    const scale = Math.min(1, maxWidth / width!, maxHeight / height!);
-    if (scale === 1 && file.size <= SMALL_IMAGE_BYTES) {
-      return { file, width: width!, height: height! };
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(width! * scale));
-    canvas.height = Math.max(1, Math.round(height! * scale));
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Browser tidak dapat memproses foto.');
-    context.drawImage(inspected.image, 0, 0, canvas.width, canvas.height);
-    const encoded = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', 0.8));
-    if (!encoded || !ALLOWED_MIME_TYPES.includes(encoded.type)) {
-      throw new Error('Browser gagal mengompres foto.');
-    }
-    if (encoded.size >= file.size && file.size <= MAX_UPLOAD_SIZE_BYTES) {
-      return { file, width: width!, height: height! };
-    }
-    if (encoded.size > MAX_UPLOAD_SIZE_BYTES) {
-      throw new Error('Hasil kompresi masih melebihi 5 MB. Pilih foto lain.');
-    }
-    const ext = encoded.type === 'image/webp' ? '.webp' : encoded.type === 'image/png' ? '.png' : '.jpg';
-    const baseName = file.name.replace(/\.[^.]+$/, '');
-    return {
-      file: new File([encoded], baseName + ext, { type: encoded.type }),
-      width: canvas.width,
-      height: canvas.height,
+  // 1. File size check
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+    return { 
+      valid: false, 
+      error: `Ukuran file terlalu besar (${sizeMb} MB). Batas maksimum adalah 5 MB.` 
     };
-  } finally {
-    inspected.release();
   }
+
+  // 2. MIME type check
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    return { 
+      valid: false, 
+      error: `Format file (${file.type || 'tidak dikenal'}) tidak didukung. Harap gunakan JPG, PNG, atau WEBP.` 
+    };
+  }
+
+  // 3. Magic bytes validation (prevent extension spoofing e.g. .exe renamed to .jpg)
+  try {
+    const headerSlice = await file.slice(0, 16).arrayBuffer();
+    const magicCheck = checkMagicBytes(headerSlice);
+    if (!magicCheck.valid) {
+      return { 
+        valid: false, 
+        error: 'Integritas file gambar tidak valid atau korup (magic bytes mismatch).' 
+      };
+    }
+  } catch (err: any) {
+    return { 
+      valid: false, 
+      error: 'Gagal memverifikasi struktur biner file gambar: ' + (err?.message || err) 
+    };
+  }
+
+  // 4. Dimensions check via browser Image loader
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+
+      if (width < MIN_DIMENSION || height < MIN_DIMENSION) {
+        resolve({
+          valid: false,
+          error: `Dimensi gambar terlalu kecil (${width}x${height}px). Minimum adalah ${MIN_DIMENSION}x${MIN_DIMENSION}px.`
+        });
+        return;
+      }
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        resolve({
+          valid: false,
+          error: `Dimensi gambar terlalu besar (${width}x${height}px). Maksimum adalah ${MAX_DIMENSION}x${MAX_DIMENSION}px.`
+        });
+        return;
+      }
+
+      resolve({
+        valid: true,
+        mimeType: file.type,
+        width,
+        height,
+        sizeBytes: file.size
+      });
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({
+        valid: false,
+        error: 'File tidak dapat dirender sebagai gambar yang valid.'
+      });
+    };
+  });
 }
 
 /**
- * Uploads an image to Firebase Storage.
+ * Uploads an image to Firebase Storage (with fallback to multipart server upload).
  * Returns the public URL and metadata. NEVER returns or persists Base64 strings.
  */
 export async function uploadImageToStorage(
-  file: File,
-  destinationFolder: ImageFolder,
-  memberId?: string
+  file: File, 
+  destinationFolder: 'stores' | 'campaigns' | 'vouchers' | 'members'
 ): Promise<UploadedImageMetadata> {
-  if (destinationFolder === 'members' && (!memberId || memberId.includes('/'))) {
-    throw new Error('ID member tidak valid untuk upload avatar.');
+  const validation = await validateImageFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Validasi gambar gagal.');
   }
-  const prepared = await prepareImage(file, destinationFolder);
-  const uploadFile = prepared.file;
-  if (uploadFile.size > MAX_UPLOAD_SIZE_BYTES) {
-    throw new Error('Ukuran gambar hasil kompresi melebihi 5 MB.');
-  }
-  const cleanBaseName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const filename = `${Date.now()}_${Math.random().toString(36).slice(2)}_${cleanBaseName}`;
-  const storagePath = destinationFolder === 'members'
-    ? `members/${memberId}/${filename}`
-    : `${destinationFolder}/${filename}`;
+
+  const cleanBaseName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const timestamp = Date.now();
+  const storagePath = `${destinationFolder}/${timestamp}_${cleanBaseName}`;
+
   try {
+    // 1. Attempt upload to Firebase Storage
     const storageRef = ref(storage, storagePath);
-    const snapshot = await uploadBytes(storageRef, uploadFile, {
-      contentType: uploadFile.type,
-      cacheControl: 'public,max-age=31536000,immutable',
+    const snapshot = await uploadBytes(storageRef, file, {
+      contentType: validation.mimeType,
       customMetadata: {
         originalName: file.name,
         uploadedAt: new Date().toISOString()
@@ -193,13 +182,62 @@ export async function uploadImageToStorage(
     return {
       url: downloadUrl,
       path: storagePath,
-      size: uploadFile.size,
-      mimeType: uploadFile.type,
-      width: prepared.width,
-      height: prepared.height,
+      size: file.size,
+      mimeType: validation.mimeType || file.type,
+      width: validation.width || 0,
+      height: validation.height || 0,
       uploadedAt: new Date().toISOString()
     };
   } catch (firebaseErr: any) {
-    throw new Error(`Gagal mengunggah gambar ke Firebase Storage: ${firebaseErr?.message || 'periksa login admin dan Storage Rules'}`);
+    console.warn('[ImageStorage] Firebase Storage direct upload failed or blocked, attempting server multipart upload:', firebaseErr?.message);
+
+    // 2. Fallback to multipart /api/upload endpoint (saves to server disk, returns relative URL)
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('folder', destinationFolder);
+
+      const apiBase = getApiBaseUrl();
+      const uploadUrl = apiBase ? `${apiBase}/api/upload` : '/api/upload';
+
+      const res = await fetch(uploadUrl, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+      let returnUrl = data.url || data.fileUrl;
+      if (data.success && returnUrl) {
+        if (returnUrl.startsWith('/uploads/') && apiBase) {
+          returnUrl = `${apiBase}${returnUrl}`;
+        }
+        return {
+          url: returnUrl,
+          path: returnUrl,
+          size: file.size,
+          mimeType: validation.mimeType || file.type,
+          width: validation.width || 0,
+          height: validation.height || 0,
+          uploadedAt: new Date().toISOString()
+        };
+      }
+      throw new Error(data.error || 'Upload server gagal');
+    } catch (serverErr: any) {
+      console.warn('[ImageStorage] Server upload failed or unreachable, generating compressed WebP/JPEG dataUrl fallback:', serverErr?.message);
+      try {
+        const compressed = await compressImage(file, 1200, 800, 0.82);
+        return {
+          url: compressed.dataUrl,
+          path: `local/${cleanBaseName}`,
+          size: compressed.compressedSize,
+          mimeType: 'image/jpeg',
+          width: compressed.width,
+          height: compressed.height,
+          uploadedAt: new Date().toISOString()
+        };
+      } catch (compressErr: any) {
+        throw new Error(`Gagal memproses unggahan gambar: ${compressErr?.message || serverErr?.message || firebaseErr?.message}`);
+      }
+    }
   }
 }

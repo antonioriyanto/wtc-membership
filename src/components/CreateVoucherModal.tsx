@@ -14,13 +14,13 @@ import {
   Store,
   Eye
 } from 'lucide-react';
-import { uploadImageToStorage } from '../lib/imageStorage';
+import { compressImage } from '../utils/imageCompression';
 
 interface CreateVoucherModalProps {
   isOpen: boolean;
   onClose: () => void;
   stores: StoreBranch[];
-  onCreateVoucher: (newVoucher: Omit<Voucher, 'id' | 'totalClaimed' | 'totalUsed'>) => Promise<void>;
+  onCreateVoucher: (newVoucher: Omit<Voucher, 'id' | 'totalClaimed' | 'totalUsed'>) => void;
   existingVoucher?: Voucher | null;
 }
 
@@ -77,7 +77,6 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [customUrl, setCustomUrl] = useState('');
   const [error, setError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,9 +96,10 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
       setTermsText(existingVoucher.terms?.join('\n') || '');
       setUploadSuccessInfo(null);
     } else {
-      setCode('');
-      setTitle('');
-      setSubtitle('');
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      setCode(`WC-20-${randomSuffix}`);
+      setTitle('20% Exclusive Watch Club Reward');
+      setSubtitle('Voucher Diskon Pembelian Jam Tangan');
       setDiscountType('PERCENTAGE');
       setDiscountValue(20);
       setMinPurchase(1500000);
@@ -114,11 +114,21 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
     setError('');
   }, [existingVoucher, isOpen]);
 
+  const handleGenerateCode = () => {
+    const prefixes = ['WC', 'VIP', 'PROMO', 'REWARD', 'SPECIAL', 'DEAL'];
+    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const val = discountType === 'PERCENTAGE' ? `${discountValue || 20}` : `${Math.round((discountValue || 100000) / 1000)}K`;
+    const newCode = `${prefix}-${val}-${randomSuffix}`;
+    setCode(newCode);
+    setError('');
+  };
+
   if (!isOpen) return null;
 
   const processAndUploadFile = async (file: File) => {
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setError('Harap pilih file gambar JPG, PNG, atau WebP.');
+    if (!file.type.startsWith('image/')) {
+      setError('Harap pilih file gambar (JPG, PNG, WebP, GIF).');
       return;
     }
 
@@ -127,9 +137,43 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
     setUploadSuccessInfo(null);
 
     try {
-      const uploaded = await uploadImageToStorage(file, 'vouchers');
-      setImagePath(uploaded.url);
-      setUploadSuccessInfo(`Gambar berhasil diunggah (${Math.round(uploaded.size / 1024)} KB)`);
+      // 1. Client-side compress to max 1280px maintaining aspect ratio & high quality
+      const compressed = await compressImage(file, 1280, 720, 0.85);
+      
+      const origSizeMb = (compressed.originalSize / (1024 * 1024)).toFixed(1);
+      const compSizeKb = Math.round(compressed.compressedSize / 1024);
+
+      // 2. Try uploading the compressed blob to the server /api/upload
+      const formData = new FormData();
+      formData.append('image', compressed.blob, file.name.replace(/\.[^/.]+$/, "") + ".jpg");
+
+      let uploadedUrl: string | null = null;
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.url) {
+            uploadedUrl = data.url;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Server upload endpoint not responding, using compressed DataURL fallback:', uploadErr);
+      }
+
+      // 3. Resilient fallback: If server upload did not return URL, use compressed Data URL directly
+      const finalImage = uploadedUrl || compressed.dataUrl;
+      setImagePath(finalImage);
+
+      const sizeLabel = compressed.originalSize > 1024 * 1024 
+        ? `${origSizeMb} MB → ${compSizeKb} KB` 
+        : `${compSizeKb} KB`;
+
+      setUploadSuccessInfo(`Gambar berhasil diproses (${sizeLabel})`);
     } catch (err: any) {
       console.error('Image processing error:', err);
       setError(err?.message || 'Gagal memproses gambar. Pastikan format gambar valid.');
@@ -183,11 +227,13 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
     setUploadSuccessInfo(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim()) {
-      setError('Kode voucher wajib diisi.');
-      return;
+    let finalCode = code.trim().toUpperCase();
+    if (!finalCode) {
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      finalCode = `WC-REWARD-${randomSuffix}`;
+      setCode(finalCode);
     }
     if (!title.trim()) {
       setError('Judul voucher wajib diisi.');
@@ -200,12 +246,8 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
 
     const termsArray = termsText.split('\n').filter(t => t.trim().length > 0);
 
-    if (isSaving || isProcessingImage) return;
-    setIsSaving(true);
-    setError('');
-    try {
-      await onCreateVoucher({
-      code: code.trim().toUpperCase(),
+    onCreateVoucher({
+      code: finalCode,
       title: title.trim(),
       subtitle: subtitle.trim() || 'Exclusive Member Reward Voucher',
       discountType,
@@ -219,13 +261,9 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
       status: 'ACTIVE',
       imagePath: imagePath || '',
       terms: termsArray.length > 0 ? termsArray : ['Valid at Watch Club stores throughout Indonesia.']
-      });
-      onClose();
-    } catch (err: any) {
-      setError(`Voucher gagal disimpan: ${err?.message || 'coba lagi.'}`);
-    } finally {
-      setIsSaving(false);
-    }
+    });
+
+    onClose();
   };
 
   const handleStoreToggle = (storeId: string) => {
@@ -254,7 +292,6 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            disabled={isSaving}
             className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -475,16 +512,37 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
             {/* VOUCHER CODE & DISCOUNT TYPE */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Kode Voucher Promo
-                </label>
-                <input
-                  type="text"
-                  value={code || ''}
-                  onChange={(e) => { setCode(e.target.value); setError(''); }}
-                  placeholder="Contoh: WC-SPECIAL-25"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold font-mono text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs"
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Kode Voucher Promo
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateCode}
+                    className="text-[11px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Generate Otomatis</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={code || ''}
+                    onChange={(e) => { setCode(e.target.value); setError(''); }}
+                    placeholder="Contoh: WC-20-8K2A"
+                    className="w-full pl-3.5 pr-20 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold font-mono text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateCode}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Buat kode unik baru"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-600" />
+                    <span>Acak</span>
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -649,17 +707,17 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
           <button
             type="submit"
             form="voucherForm"
-            disabled={isProcessingImage || isSaving}
+            disabled={isProcessingImage}
             className={`px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all flex items-center gap-2 ${
-              isProcessingImage || isSaving
+              isProcessingImage 
                 ? 'bg-slate-400 cursor-not-allowed' 
                 : 'bg-slate-900 hover:bg-slate-800'
             }`}
           >
-            {isProcessingImage || isSaving ? (
+            {isProcessingImage ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>{isSaving ? 'Menyimpan Voucher...' : 'Memproses Gambar...'}</span>
+                <span>Memproses Gambar...</span>
               </>
             ) : (
               <>

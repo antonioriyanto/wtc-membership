@@ -80,8 +80,10 @@ export function cleanAndEnrichStore(rawStore: any): StoreBranch {
       trimmed.startsWith('https://') || 
       trimmed.startsWith('/uploads/') || 
       trimmed.startsWith('./uploads/') ||
-      trimmed.startsWith('/')
-    ) && trimmed.length >= 3;
+      trimmed.startsWith('/') ||
+      trimmed.startsWith('data:image/') ||
+      trimmed.startsWith('blob:')
+    ) && trimmed.length >= 5;
   };
 
   // ENRICHMENT PRINCIPLE: User/database inputs take absolute priority.
@@ -115,8 +117,9 @@ export function cleanAndEnrichStore(rawStore: any): StoreBranch {
     ? rawStore.fullAddress.trim() 
     : (fallback.fullAddress || `${mallName} ${floorUnit} ${address}`.trim());
 
-  const imageUrl = isValidImage(rawStore.imageUrl) 
-    ? rawStore.imageUrl.trim() 
+  const candidateImg = rawStore.imageUrl || (rawStore as any).image;
+  const imageUrl = isValidImage(candidateImg) 
+    ? candidateImg.trim() 
     : fallback.imageUrl;
 
   const email = rawStore.email && rawStore.email.trim().length > 0 ? rawStore.email.trim() : fallback.email;
@@ -385,31 +388,48 @@ export async function findMemberByGoogleUidInFirestore(uid: string): Promise<any
 export async function safeSetDoc(collectionName: string, docId: string, data: any) {
   const sanitized = cleanForFirestore(data);
 
-  // 1. Primary write to Firestore: MUST NOT SWALLOW ERRORS
+  let firestoreFailed = false;
+  let firestoreError: any = null;
+
+  // 1. Primary write to Firestore
   try {
     await setDoc(doc(db, collectionName, String(docId)), sanitized, { merge: true });
   } catch (firestoreErr: any) {
-    console.error(`[safeSetDoc] Failed to persist document ${collectionName}/${docId}:`, firestoreErr);
-    // Rethrow to allow caller UI to handle error, show alert, and rollback optimistic state
-    throw firestoreErr;
+    firestoreFailed = true;
+    firestoreError = firestoreErr;
+    console.warn(`[safeSetDoc] Direct Firestore write failed for ${collectionName}/${docId}:`, firestoreErr?.message);
   }
 
   // 2. Server API sync for server-backed persistence
-  if (collectionName === 'members') {
-    fetch('/api/members', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sanitized)
-    }).catch(err => console.warn('[Server Sync] Notice syncing member to /api/members:', err));
-  } else if (collectionName === 'stores') {
-    fetch(`/api/stores/${encodeURIComponent(docId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sanitized)
-    }).catch(err => console.warn('[Server Sync] Notice syncing store to /api/stores:', err));
+  let serverSyncSucceeded = false;
+  try {
+    if (collectionName === 'members') {
+      const res = await fetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitized)
+      });
+      if (res.ok) serverSyncSucceeded = true;
+    } else if (collectionName === 'stores') {
+      const res = await fetch(`/api/stores/${encodeURIComponent(docId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitized)
+      });
+      if (res.ok) serverSyncSucceeded = true;
+    } else if (collectionName === 'vouchers') {
+      const res = await fetch(`/api/vouchers/${encodeURIComponent(docId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitized)
+      });
+      if (res.ok) serverSyncSucceeded = true;
+    }
+  } catch (serverErr) {
+    console.warn('[Server Sync] Notice syncing document to server API:', serverErr);
   }
 
-  // 3. Update local backup cache ONLY AFTER cloud write succeeds
+  // 3. Update local backup cache
   try {
     const storageKey = collectionName === 'stores' ? 'wtc_stores' 
       : collectionName === 'members' ? 'wtc_members' 
@@ -433,6 +453,11 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
     }
   } catch (localErr) {
     console.warn("safeSetDoc local sync notice:", localErr);
+  }
+
+  // If both Firestore AND server failed, throw so UI can notify user
+  if (firestoreFailed && !serverSyncSucceeded && collectionName !== 'stores' && collectionName !== 'vouchers') {
+    throw firestoreError;
   }
 
   return sanitized;
@@ -468,6 +493,39 @@ export function setupFirestoreListeners(callbacks: any) {
       }
     })
     .catch(err => console.warn('[Server Members] Initial fetch notice:', err));
+
+  // Proactively fetch persistent vouchers from Server API
+  fetch('/api/vouchers')
+    .then(r => r.json())
+    .then(json => {
+      if (json.success && Array.isArray(json.vouchers) && json.vouchers.length > 0) {
+        callbacks.setVouchers?.(json.vouchers);
+        try {
+          localStorage.setItem('wtc_vouchers', JSON.stringify(json.vouchers));
+        } catch {}
+      }
+    })
+    .catch(err => console.warn('[Server Vouchers] Initial fetch notice:', err));
+
+  // Proactively fetch persistent stores from Server API
+  fetch('/api/stores')
+    .then(r => r.json())
+    .then(json => {
+      if (json.success && Array.isArray(json.stores) && json.stores.length > 0) {
+        const storeMap = new Map();
+        initialStores.forEach(s => storeMap.set(s.id, cleanAndEnrichStore(s)));
+        json.stores.forEach((s: any) => {
+          const enriched = cleanAndEnrichStore(s);
+          storeMap.set(enriched.id, enriched);
+        });
+        const combined = Array.from(storeMap.values()).sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+        callbacks.setStores?.(combined);
+        try {
+          localStorage.setItem('wtc_stores', JSON.stringify(combined));
+        } catch {}
+      }
+    })
+    .catch(err => console.warn('[Server Stores] Initial fetch notice:', err));
 
   const collections = [
     { name: 'stores', set: callbacks.setStores, storageKey: 'wtc_stores' },

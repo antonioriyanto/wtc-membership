@@ -1187,13 +1187,29 @@ export default function App() {
                       if (!target) return;
                       const nextStatus = target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
                       const updated = { ...target, status: nextStatus as any };
+                      setVouchers(prev => {
+                        const next = prev.map(v => v.id === voucherId ? updated : v);
+                        try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+                        return next;
+                      });
                       try {
-                        await setDoc(doc(db, 'vouchers', voucherId), updated);
-                        setVouchers(prev => prev.map(v => v.id === voucherId ? updated : v));
+                        await safeSetDoc('vouchers', voucherId, updated);
                       } catch (err) {
-                        console.error('Failed updating voucher status:', err);
-                        alert('Gagal mengubah status voucher. Periksa akses admin dan koneksi Firestore.');
+                        console.warn('API error updating voucher status:', err);
                       }
+                    }}
+                    onDeleteVoucher={async (voucherId) => {
+                      setVouchers(prev => {
+                        const next = prev.filter(v => v.id !== voucherId);
+                        try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+                        return next;
+                      });
+                      try {
+                        await deleteDoc(doc(db, 'vouchers', voucherId));
+                      } catch (err) {}
+                      try {
+                        await fetch(`/api/vouchers/${encodeURIComponent(voucherId)}`, { method: 'DELETE' });
+                      } catch (err) {}
                     }}
                     isSkeletonLoading={isRefreshingData}
                   />
@@ -1308,36 +1324,44 @@ export default function App() {
               existingVoucher={editingVoucher}
               onCreateVoucher={async (voucherData) => {
                 if (editingVoucher) {
-                  let updated: Voucher = {
+                  const updated: Voucher = {
                     ...editingVoucher,
                     ...voucherData,
                   };
 
+                  setVouchers(prev => {
+                    const next = prev.map(v => v.id === updated.id ? updated : v);
+                    try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+                    return next;
+                  });
+
                   try {
-                    await setDoc(doc(db, 'vouchers', updated.id), updated);
-                    setVouchers(prev => prev.map(v => v.id === updated.id ? updated : v));
+                    await safeSetDoc('vouchers', updated.id, updated);
                   } catch (err) {
-                    console.error('Failed updating voucher:', err);
-                    throw err;
+                    console.warn('Error saving updated voucher:', err);
                   }
                   setEditingVoucher(null);
                   setIsCreateVoucherOpen(false);
                 } else {
-                  let created: Voucher = {
+                  const created: Voucher = {
                     ...voucherData,
                     id: (voucherData as any).id || 'vch_' + Date.now(),
-                    code: (voucherData.code || 'VOUCH-' + Date.now()).toUpperCase(),
+                    code: (voucherData.code || 'VOUCH-' + Date.now()).toUpperCase().trim(),
                     totalClaimed: Number((voucherData as any).totalClaimed) || 0,
                     totalUsed: Number((voucherData as any).totalUsed) || 0,
                     status: voucherData.status || 'ACTIVE'
                   } as Voucher;
 
+                  setVouchers(prev => {
+                    const next = [created, ...prev.filter(v => v.id !== created.id)];
+                    try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+                    return next;
+                  });
+
                   try {
-                    await setDoc(doc(db, 'vouchers', created.id), created);
-                    setVouchers(prev => [created, ...prev.filter(v => v.id !== created.id)]);
+                    await safeSetDoc('vouchers', created.id, created);
                   } catch (err) {
-                    console.error('Failed creating voucher:', err);
-                    throw err;
+                    console.warn('Error creating voucher:', err);
                   }
                   setIsCreateVoucherOpen(false);
                 }

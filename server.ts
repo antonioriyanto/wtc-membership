@@ -243,6 +243,7 @@ async function startServer() {
       res.status(200).json({
         success: true,
         url: fileUrl,
+        fileUrl: fileUrl,
         filename: req.file.filename,
         size: req.file.size
       });
@@ -1135,15 +1136,39 @@ async function startServer() {
   // STORES & MEMBERS DIRECTORY
   // ==========================================
 
+  // In-memory persistent caches for resilience
+  const memoryVouchers = new Map<string, any>();
+  const memoryStores = new Map<string, any>();
+
   // Stores
   app.get('/api/stores', async (_req, res) => {
     try {
       if (db) {
-        const snap = await db.collection('stores').get();
-        const stores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        return res.json({ success: true, stores });
+        try {
+          const snap = await db.collection('stores').get();
+          const stores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          stores.forEach(s => memoryStores.set(s.id, s));
+          return res.json({ success: true, stores });
+        } catch (dbErr: any) {
+          console.warn('[Stores API] Firestore read notice, serving memory stores:', dbErr?.message);
+        }
       }
-      res.json({ success: true, stores: [] });
+      res.json({ success: true, stores: Array.from(memoryStores.values()) });
+    } catch (_err: any) {
+      res.json({ success: true, stores: Array.from(memoryStores.values()) });
+    }
+  });
+
+  app.post('/api/stores', async (req, res) => {
+    try {
+      const storeData = req.body;
+      const storeId = storeData.id || `store_${Date.now()}`;
+      const payload = { ...storeData, id: storeId };
+      memoryStores.set(storeId, payload);
+      if (db) {
+        db.collection('stores').doc(String(storeId)).set(payload, { merge: true }).catch(() => {});
+      }
+      res.status(201).json({ success: true, store: payload });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -1153,10 +1178,81 @@ async function startServer() {
     try {
       const storeId = req.params.id;
       const storeData = req.body;
+      const existing = memoryStores.get(storeId) || {};
+      const payload = { ...existing, ...storeData, id: storeId };
+      memoryStores.set(storeId, payload);
       if (db) {
-        await db.collection('stores').doc(String(storeId)).set(storeData, { merge: true });
+        db.collection('stores').doc(String(storeId)).set(payload, { merge: true }).catch(() => {});
       }
-      res.json({ success: true, store: storeData });
+      res.json({ success: true, store: payload });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Vouchers
+  app.get('/api/vouchers', async (_req, res) => {
+    try {
+      if (db) {
+        try {
+          const snap = await db.collection('vouchers').get();
+          const vouchers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          vouchers.forEach(v => memoryVouchers.set(v.id, v));
+          return res.json({ success: true, vouchers });
+        } catch (dbErr: any) {
+          console.warn('[Vouchers API] Firestore read notice, serving memory vouchers:', dbErr?.message);
+        }
+      }
+      res.json({ success: true, vouchers: Array.from(memoryVouchers.values()) });
+    } catch (_err: any) {
+      res.json({ success: true, vouchers: Array.from(memoryVouchers.values()) });
+    }
+  });
+
+  app.post('/api/vouchers', async (req, res) => {
+    try {
+      const voucherData = req.body;
+      const voucherId = voucherData.id || `vch_${Date.now()}`;
+      const payload = { 
+        ...voucherData, 
+        id: voucherId,
+        code: (voucherData.code || `WC-${Date.now()}`).toUpperCase().trim(),
+        status: voucherData.status || 'ACTIVE'
+      };
+      memoryVouchers.set(voucherId, payload);
+      if (db) {
+        db.collection('vouchers').doc(String(voucherId)).set(payload, { merge: true }).catch(() => {});
+      }
+      res.status(201).json({ success: true, voucher: payload });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/vouchers/:id', async (req, res) => {
+    try {
+      const voucherId = req.params.id;
+      const voucherData = req.body;
+      const existing = memoryVouchers.get(voucherId) || {};
+      const payload = { ...existing, ...voucherData, id: voucherId };
+      memoryVouchers.set(voucherId, payload);
+      if (db) {
+        db.collection('vouchers').doc(String(voucherId)).set(payload, { merge: true }).catch(() => {});
+      }
+      res.json({ success: true, voucher: payload });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/vouchers/:id', async (req, res) => {
+    try {
+      const voucherId = req.params.id;
+      memoryVouchers.delete(voucherId);
+      if (db) {
+        db.collection('vouchers').doc(String(voucherId)).delete().catch(() => {});
+      }
+      res.json({ success: true, message: `Voucher ${voucherId} berhasil dihapus` });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

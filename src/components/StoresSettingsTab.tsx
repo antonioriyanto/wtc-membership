@@ -7,7 +7,8 @@ import { useCustomDialog } from './CustomDialogProvider';
 import { 
   Store, Plus, Search, Edit3, Trash2, MapPin, Phone, Mail, Clock, 
   ArrowLeft, Save, Receipt, RefreshCw, Building, Compass,
-  MoreVertical, X, ExternalLink, Users, Copy, Check, Filter, ChevronRight
+  MoreVertical, X, ExternalLink, Users, Copy, Check, Filter, ChevronRight,
+  CheckCircle2
 } from 'lucide-react';
 import { WhatsAppLogo } from './WhatsAppLogo';
 import { db } from '../lib/firebase';
@@ -564,29 +565,100 @@ export const StoresSettingsTab: React.FC<StoresSettingsTabProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-neutral-600 dark:text-neutral-400 mb-1.5">
-                Foto Profil Cabang (Customer PWA)
-              </label>
-              <div className="flex items-center gap-3">
-                <input 
-                  type="file" 
-                  accept="image/png, image/jpeg, image/jpg, image/webp"
-                  onChange={handleImageUpload}
-                  disabled={isUploading}
-                  className="block w-full text-xs text-neutral-500
-                    file:mr-4 file:py-1.5 file:px-3.5
-                    file:rounded-xl file:border-0
-                    file:text-xs file:font-semibold
-                    file:bg-neutral-100 dark:file:bg-neutral-800 file:text-neutral-700 dark:file:text-neutral-200
-                    hover:file:bg-neutral-200 cursor-pointer"
-                />
-                {isUploading && <span className="text-neutral-500 font-medium text-xs animate-pulse">Mengompres...</span>}
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[11px] font-bold text-neutral-600 dark:text-neutral-400">
+                  Foto Profil Cabang (Muncul di Customer PWA)
+                </label>
+                {formData.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Hapus Foto</span>
+                  </button>
+                )}
               </div>
-              {formData.imageUrl && (
-                <div className="mt-2.5 relative rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-700 w-full max-w-[200px] aspect-[4/3]">
-                  <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+
+              {/* Upload via File or URL */}
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="file" 
+                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    onChange={handleImageUpload}
+                    disabled={isUploading}
+                    className="block w-full text-xs text-neutral-500
+                      file:mr-4 file:py-1.5 file:px-3.5
+                      file:rounded-xl file:border-0
+                      file:text-xs file:font-semibold
+                      file:bg-neutral-100 dark:file:bg-neutral-800 file:text-neutral-700 dark:file:text-neutral-200
+                      hover:file:bg-neutral-200 cursor-pointer"
+                  />
+                  {isUploading && <span className="text-amber-600 font-bold text-xs animate-pulse flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" /> Mengunggah...</span>}
                 </div>
-              )}
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={formData.imageUrl || ''}
+                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    placeholder="Atau tempel link URL foto toko langsung (https://...)"
+                    className="flex-1 px-3 py-1.5 bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white focus:outline-hidden focus:border-neutral-900"
+                  />
+                </div>
+
+                {/* Preset Luxury Store Banners */}
+                <div className="pt-1">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">
+                    Pilihan Cepat Foto Butik Resmi Watch Club:
+                  </span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { name: 'Grand Indonesia', url: 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?w=800&q=80' },
+                      { name: 'Senayan City', url: 'https://images.unsplash.com/photo-1513094735237-8f2714d57c13?w=800&q=80' },
+                      { name: 'Pondok Indah', url: 'https://images.unsplash.com/photo-1582845512747-e42001c95638?w=800&q=80' },
+                      { name: 'Modern Boutique', url: 'https://images.unsplash.com/photo-1548678967-f1fc1ca0c113?w=800&q=80' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, imageUrl: preset.url })}
+                        className={`text-left p-1.5 rounded-xl border transition-all text-[10px] flex flex-col gap-1 cursor-pointer ${
+                          formData.imageUrl === preset.url
+                            ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200 font-bold'
+                            : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 text-neutral-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        <img src={preset.url} alt={preset.name} className="w-full h-10 object-cover rounded-lg" />
+                        <span className="truncate">{preset.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {formData.imageUrl && (
+                  <div className="mt-3 flex items-center gap-3 p-2 bg-neutral-50 dark:bg-neutral-800/40 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                    <div className="relative rounded-lg overflow-hidden border border-neutral-300 dark:border-neutral-600 w-24 h-16 shrink-0 bg-neutral-100">
+                      <img 
+                        src={formData.imageUrl} 
+                        alt="Preview Cabang" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1549429532-6804ff69b22b?w=800&q=80';
+                        }}
+                      />
+                    </div>
+                    <div className="text-xs space-y-0.5 min-w-0">
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Foto Aktif Siap Tampil
+                      </span>
+                      <p className="text-[11px] text-neutral-500 truncate max-w-xs">{formData.imageUrl}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-2.5">
