@@ -414,10 +414,38 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
   const [currentSlide, setCurrentSlide] = useState(0);
   useEffect(() => {
     if (activePromoCampaigns.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentSlide(s => (s + 1) % activePromoCampaigns.length);
-    }, 4000);
-    return () => clearInterval(interval);
+    let interval: any = null;
+
+    const startTimer = () => {
+      if (!interval && typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        interval = setInterval(() => {
+          setCurrentSlide(s => (s + 1) % activePromoCampaigns.length);
+        }, 5000);
+      }
+    };
+
+    const stopTimer = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        startTimer();
+      } else {
+        stopTimer();
+      }
+    };
+
+    startTimer();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      stopTimer();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [activePromoCampaigns]);
 
   const myTickets = useMemo(() => {

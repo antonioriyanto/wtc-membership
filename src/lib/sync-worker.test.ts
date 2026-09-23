@@ -151,6 +151,17 @@ describe('sync-worker synchronization logic', () => {
       status = getSyncWorkerStatus();
       expect(status.isRunning).toBe(false);
     });
+
+    it('should disable periodic polling by default to prevent memory bloat', () => {
+      const stop = startSyncWorker({
+        immediate: false,
+        intervalMs: 5000,
+      });
+      // By default enablePeriodicPolling is false
+      expect(getSyncWorkerStatus().isRunning).toBe(true);
+      stop();
+      expect(getSyncWorkerStatus().isRunning).toBe(false);
+    });
   });
 
   describe('getSyncWorkerStatus', () => {

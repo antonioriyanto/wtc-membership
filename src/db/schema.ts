@@ -106,12 +106,15 @@ export const auditLogs = pgTable('audit_logs', {
 });
 
 export const campaigns = pgTable('campaigns', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: text('id').primaryKey(),
   name: text('name').notNull(),
   type: text('type').notNull(),
   status: text('status').notNull(),
   targetAudience: text('target_audience').notNull(),
   content: text('content').notNull(),
+  bannerImage: text('banner_image'),
+  popupImage: text('popup_image'),
+  showAsPopupOnApp: boolean('show_as_popup_on_app').default(false),
   scheduledAt: timestamp('scheduled_at'),
   sentCount: integer('sent_count').default(0),
   openCount: integer('open_count').default(0)
@@ -128,3 +131,13 @@ export const supportTickets = pgTable('support_tickets', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   messages: jsonb('messages')
 });
+
+export const uploadedFiles = pgTable('uploaded_files', {
+  id: text('id').primaryKey(),
+  filename: text('filename').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  dataBase64: text('data_base64').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+

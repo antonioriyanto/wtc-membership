@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
 import multer from 'multer';
 import * as dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
@@ -25,29 +26,58 @@ if (process.env.SQL_HOST && process.env.SQL_USER && process.env.SQL_PASSWORD && 
       max: 10,
       idle_timeout: 30
     });
+    // Auto-create uploaded_files table in Cloud SQL if table does not exist
+    pgSql`
+      CREATE TABLE IF NOT EXISTS uploaded_files (
+        id VARCHAR(255) PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(100) NOT NULL,
+        size_bytes INT NOT NULL,
+        data_base64 TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `.catch((e: any) => console.warn('[Postgres] Table uploaded_files check notice:', e?.message));
+
+    // Auto-create campaigns table in Cloud SQL if table does not exist
+    pgSql`
+      CREATE TABLE IF NOT EXISTS campaigns (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        headline VARCHAR(255),
+        type VARCHAR(50) NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        target_audience VARCHAR(50) NOT NULL,
+        content TEXT,
+        banner_image TEXT,
+        popup_image TEXT,
+        badge_text VARCHAR(100),
+        voucher_code VARCHAR(100),
+        start_at TIMESTAMP,
+        end_at TIMESTAMP,
+        show_as_popup_on_app BOOLEAN DEFAULT false,
+        sent_count INT DEFAULT 0,
+        open_count INT DEFAULT 0,
+        click_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `.catch((e: any) => console.warn('[Postgres] Table campaigns check notice:', e?.message));
   } catch (err: any) {
     console.warn('[Postgres] Initialization notice:', err?.message);
   }
 }
 
-// Ensure public/uploads directory exists
+// Ensure public/uploads directory exists (as local ephemeral container L1 fast cache)
 const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Multer storage configuration
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, uniqueSuffix + ext);
-  }
-});
-
+// Multer memory storage configuration (ephemeral container safe).
+// Rather than relying on local disk storage in /public/uploads which is wiped when Google Cloud Run
+// restarts or scales instances, files are buffered in memory and permanently persisted to Firestore,
+// Cloud SQL, and GCS.
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
   fileFilter: (_req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -93,6 +123,248 @@ try {
 } catch (error) {
   console.error('❌ Failed to initialize Firebase Admin SDK:', error);
 }
+
+/**
+ * Persists an uploaded image to durable storage (Firestore + Cloud SQL + GCS)
+ * and writes to local disk cache. This prevents any data loss when Cloud Run containers restart.
+ */
+async function persistUploadedFile(
+  filename: string,
+  buffer: Buffer,
+  mimeType: string,
+  originalName?: string
+): Promise<void> {
+  const sizeBytes = buffer.length;
+  const filePath = path.join(uploadsDir, filename);
+
+  // 1. Write to local ephemeral disk cache for instant reads during current container lifecycle
+  try {
+    fs.writeFileSync(filePath, buffer);
+  } catch (fsErr) {
+    console.warn('[Upload Disk Cache Warning]:', fsErr);
+  }
+
+  // 2. Persist to Firestore (Survives container restarts, scale-to-zero, and multi-instance redeploys)
+  if (db) {
+    try {
+      const base64Data = buffer.toString('base64');
+      // Firestore documents limit is 1MB. If base64 is < 800KB, store in single document
+      if (base64Data.length < 800_000) {
+        await db.collection('uploaded_files').doc(filename).set({
+          id: filename,
+          filename,
+          mimeType,
+          sizeBytes,
+          dataBase64: base64Data,
+          isChunked: false,
+          originalName: originalName || filename,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } else {
+        // Chunk large files across subcollection docs (each 500KB)
+        const CHUNK_SIZE = 500_000;
+        const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
+        const batch = db.batch();
+        const mainDocRef = db.collection('uploaded_files').doc(filename);
+        
+        batch.set(mainDocRef, {
+          id: filename,
+          filename,
+          mimeType,
+          sizeBytes,
+          isChunked: true,
+          totalChunks,
+          originalName: originalName || filename,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkStr = base64Data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+          const chunkRef = mainDocRef.collection('chunks').doc(String(i));
+          batch.set(chunkRef, {
+            chunkIndex: i,
+            data: chunkStr
+          });
+        }
+        await batch.commit();
+      }
+    } catch (firestoreErr: any) {
+      console.warn('[Upload Firestore Persistence Notice]:', firestoreErr?.message);
+    }
+  }
+
+  // 3. Persist to Cloud SQL PostgreSQL if connected
+  if (pgSql) {
+    try {
+      const base64Data = buffer.toString('base64');
+      await pgSql`
+        INSERT INTO uploaded_files (id, filename, mime_type, size_bytes, data_base64)
+        VALUES (${filename}, ${filename}, ${mimeType}, ${sizeBytes}, ${base64Data})
+        ON CONFLICT (id) DO UPDATE SET 
+          data_base64 = EXCLUDED.data_base64,
+          size_bytes = EXCLUDED.size_bytes,
+          mime_type = EXCLUDED.mime_type
+      `;
+    } catch (sqlErr: any) {
+      console.warn('[Upload Cloud SQL save notice]:', sqlErr?.message);
+    }
+  }
+
+  // 4. Persist to Firebase Storage / Google Cloud Storage bucket if available
+  try {
+    const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'watch-club-membership.firebasestorage.app';
+    const bucket = getStorage().bucket(bucketName);
+    const file = bucket.file(`uploads/${filename}`);
+    await file.save(buffer, {
+      metadata: {
+        contentType: mimeType,
+        metadata: {
+          originalName: originalName || filename
+        }
+      }
+    });
+  } catch (storageErr) {
+    // Non-fatal if bucket not configured with service account permissions
+  }
+}
+
+/**
+ * Restores a file from persistent storage (Firestore -> Cloud SQL -> GCS)
+ * and writes it back to the local disk cache.
+ */
+async function retrieveUploadedFile(filename: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const filePath = path.join(uploadsDir, filename);
+
+  // 1. Try local disk cache
+  if (fs.existsSync(filePath)) {
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.size > 0) {
+        const buffer = fs.readFileSync(filePath);
+        const ext = path.extname(filename).toLowerCase();
+        const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
+        return { buffer, mimeType };
+      }
+    } catch (readErr) {
+      console.warn('[Upload Disk Read Notice]:', readErr);
+    }
+  }
+
+  // 2. Container was restarted! Auto-restore from Firestore
+  if (db) {
+    try {
+      const docRef = db.collection('uploaded_files').doc(filename);
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        let base64String = '';
+        if (data?.isChunked) {
+          const chunksSnap = await docRef.collection('chunks').orderBy('chunkIndex').get();
+          const chunks: string[] = [];
+          chunksSnap.forEach(c => chunks.push(c.data().data || ''));
+          base64String = chunks.join('');
+        } else {
+          base64String = data?.dataBase64 || '';
+        }
+
+        if (base64String) {
+          const buffer = Buffer.from(base64String, 'base64');
+          const mimeType = data?.mimeType || 'image/jpeg';
+          // Cache to local container disk
+          try {
+            fs.writeFileSync(filePath, buffer);
+          } catch (writeErr) {
+            console.warn('[Upload Cache Write Notice]:', writeErr);
+          }
+          return { buffer, mimeType };
+        }
+      }
+    } catch (fsErr: any) {
+      console.warn('[Upload Firestore Retrieve Notice]:', fsErr?.message);
+    }
+  }
+
+  // 3. Fallback: Restore from Cloud SQL PostgreSQL
+  if (pgSql) {
+    try {
+      const rows = await pgSql`
+        SELECT mime_type, data_base64, size_bytes
+        FROM uploaded_files
+        WHERE filename = ${filename} OR id = ${filename}
+        LIMIT 1
+      `;
+      if (rows.length > 0) {
+        const row = rows[0];
+        const buffer = Buffer.from(row.data_base64, 'base64');
+        const mimeType = row.mime_type || 'image/jpeg';
+        try {
+          fs.writeFileSync(filePath, buffer);
+        } catch (writeErr) {
+          console.warn('[Upload SQL Cache Write Notice]:', writeErr);
+        }
+        return { buffer, mimeType };
+      }
+    } catch (sqlErr: any) {
+      console.warn('[Upload SQL Retrieve Notice]:', sqlErr?.message);
+    }
+  }
+
+  // 4. Fallback: Restore from Firebase Storage bucket
+  try {
+    const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'watch-club-membership.firebasestorage.app';
+    const bucket = getStorage().bucket(bucketName);
+    const file = bucket.file(`uploads/${filename}`);
+    const [exists] = await file.exists();
+    if (exists) {
+      const [buffer] = await file.download();
+      const [metadata] = await file.getMetadata();
+      const mimeType = metadata.contentType || 'image/jpeg';
+      try {
+        fs.writeFileSync(filePath, buffer);
+      } catch (writeErr) {}
+      return { buffer, mimeType };
+    }
+  } catch (gcsErr) {
+    // Non-fatal
+  }
+
+  return null;
+}
+
+/**
+ * Background pre-warming of recent uploaded files from Firestore into local disk cache.
+ */
+async function warmUploadsCache(): Promise<void> {
+  if (!db) return;
+  try {
+    const snapshot = await db.collection('uploaded_files').limit(60).get();
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const filename = data.filename || doc.id;
+      const filePath = path.join(uploadsDir, filename);
+      if (!fs.existsSync(filePath)) {
+        let base64 = data.dataBase64;
+        if (data.isChunked) {
+          const chunkDocs = await doc.ref.collection('chunks').orderBy('chunkIndex').get();
+          base64 = chunkDocs.docs.map(c => c.data().data || '').join('');
+        }
+        if (base64) {
+          fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
+        }
+      }
+    }
+    console.log(`✅ [Upload Cache Warm] Media cache verified/pre-hydrated from persistent store.`);
+  } catch (err: any) {
+    console.warn('[Upload Cache Warm Notice]:', err?.message);
+  }
+}
+
+// Pre-warm cache shortly after boot in background
+setTimeout(() => {
+  warmUploadsCache().catch(e => console.warn('[Warm Cache Startup Notice]:', e?.message));
+}, 1500);
 
 // Server-Side Store PIN Hashes (SHA-256)
 // Stored securely on server only; never exposed to browser or client storage
@@ -176,6 +448,20 @@ function calculateTierWithConfig(points: number, config?: any): 'BLUE' | 'SILVER
   return 'BLUE';
 }
 
+function cleanForFirestore(obj: any): any {
+  if (obj === undefined) return '';
+  if (obj === null) return null;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(cleanForFirestore);
+  const cleaned: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val !== undefined) {
+      cleaned[key] = cleanForFirestore(val);
+    }
+  }
+  return cleaned;
+}
+
 export interface AuthenticatedRequest extends Request {
   user?: any;
 }
@@ -249,42 +535,254 @@ async function startServer() {
     next();
   });
 
-  // Persistent media serving: serves from local disk cache, or auto-restores from Cloud SQL if container restarted
-  app.get('/uploads/:filename', async (req, res, next) => {
+  // ==========================================
+  // RESILIENT PERSISTENCE ENGINE (ATOMIC & RACE-CONDITION SAFE)
+  // ==========================================
+  const DATA_DIR = path.join(process.cwd(), 'data');
+  if (!fs.existsSync(DATA_DIR)) {
     try {
-      const filename = path.basename(req.params.filename);
-      const filePath = path.join(uploadsDir, filename);
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch {}
+  }
 
-      // Fast path: file is already on local disk
-      if (fs.existsSync(filePath)) {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        return res.sendFile(filePath);
-      }
+  const STORES_FILE = path.join(DATA_DIR, 'stores.json');
+  const MEMBERS_FILE = path.join(DATA_DIR, 'members.json');
+  const DELETED_MEMBERS_FILE = path.join(DATA_DIR, 'deleted_members.json');
+  const CAMPAIGNS_FILE = path.join(DATA_DIR, 'campaigns.json');
 
-      // Container restart fallback: restore image data from persistent Cloud SQL database
-      if (pgSql) {
-        const rows = await pgSql`
-          SELECT mime_type, data_base64, size_bytes
-          FROM uploaded_files
-          WHERE filename = ${filename} OR id = ${filename}
-          LIMIT 1
-        `;
-        if (rows.length > 0) {
-          const row = rows[0];
-          const buffer = Buffer.from(row.data_base64, 'base64');
-          try {
-            fs.writeFileSync(filePath, buffer);
-          } catch (writeErr) {
-            console.warn('[Upload Cache Write Notice]:', writeErr);
-          }
-          res.setHeader('Content-Type', row.mime_type || 'image/jpeg');
-          res.setHeader('Content-Length', buffer.length);
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-          return res.send(buffer);
+  // Asynchronous queue per file path to prevent concurrent writes from interleaving / racing
+  class FileMutex {
+    private queues: Map<string, Promise<any>> = new Map();
+
+    async runExclusive<T>(filePath: string, operation: () => Promise<T>): Promise<T> {
+      const previous = this.queues.get(filePath) || Promise.resolve();
+      let release: () => void;
+      const next = new Promise<void>((resolve) => { release = resolve; });
+      this.queues.set(filePath, next);
+
+      try {
+        await previous;
+        return await operation();
+      } finally {
+        release!();
+        if (this.queues.get(filePath) === next) {
+          this.queues.delete(filePath);
         }
       }
+    }
+  }
+  const fileMutex = new FileMutex();
 
-      next();
+  // Atomically writes JSON using temporary file + POSIX rename pattern + backup copy
+  function atomicWriteJsonSync(filePath: string, data: any): void {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch {}
+    }
+
+    const jsonStr = JSON.stringify(data, null, 2);
+    const tempFile = path.join(
+      dir,
+      `.${path.basename(filePath)}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`
+    );
+
+    try {
+      fs.writeFileSync(tempFile, jsonStr, 'utf8');
+      fs.renameSync(tempFile, filePath);
+      try {
+        fs.copyFileSync(filePath, `${filePath}.bak`);
+      } catch {}
+    } catch (err) {
+      try {
+        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+      } catch {}
+      throw err;
+    }
+  }
+
+  // Crash-proof JSON reader with self-healing automatic recovery from backup
+  function safeReadJsonSync<T>(filePath: string, fallbackDefault: T): T {
+    const bakPath = `${filePath}.bak`;
+    if (!fs.existsSync(filePath)) {
+      if (fs.existsSync(bakPath)) {
+        try {
+          const bakData = fs.readFileSync(bakPath, 'utf8').trim();
+          if (bakData) {
+            const parsed = JSON.parse(bakData);
+            atomicWriteJsonSync(filePath, parsed);
+            return parsed;
+          }
+        } catch {}
+      }
+      try {
+        atomicWriteJsonSync(filePath, fallbackDefault);
+      } catch {}
+      return fallbackDefault;
+    }
+
+    try {
+      const content = fs.readFileSync(filePath, 'utf8').trim();
+      if (!content) {
+        throw new Error(`File is empty: ${filePath}`);
+      }
+      return JSON.parse(content);
+    } catch (err: any) {
+      console.warn(`[SafePersistence] Notice: Corrupted JSON detected in ${path.basename(filePath)}, attempting recovery from .bak:`, err?.message);
+      if (fs.existsSync(bakPath)) {
+        try {
+          const bakData = fs.readFileSync(bakPath, 'utf8').trim();
+          if (bakData) {
+            const parsed = JSON.parse(bakData);
+            console.log(`[SafePersistence] Successfully recovered ${path.basename(filePath)} from .bak`);
+            atomicWriteJsonSync(filePath, parsed);
+            return parsed;
+          }
+        } catch {}
+      }
+      console.warn(`[SafePersistence] Reinitializing ${path.basename(filePath)} with fallback data to prevent server crash.`);
+      try {
+        atomicWriteJsonSync(filePath, fallbackDefault);
+      } catch {}
+      return fallbackDefault;
+    }
+  }
+
+  async function safeModifyJson<T>(
+    filePath: string,
+    fallbackDefault: T,
+    modifier: (currentData: T) => T | Promise<T>
+  ): Promise<T> {
+    return fileMutex.runExclusive(filePath, async () => {
+      const current = safeReadJsonSync<T>(filePath, fallbackDefault);
+      const updated = await modifier(current);
+      atomicWriteJsonSync(filePath, updated);
+      return updated;
+    });
+  }
+
+  // Default stores fallback
+  let defaultStoresData: any[] = [];
+  try {
+    const genStoresPath = path.join(process.cwd(), 'generated_stores_data.json');
+    if (fs.existsSync(genStoresPath)) {
+      defaultStoresData = JSON.parse(fs.readFileSync(genStoresPath, 'utf8'));
+    }
+  } catch {}
+
+  // In-memory caches for maximum responsiveness & offline resilience
+  const memoryVouchers = new Map<string, any>();
+  const memoryStores = new Map<string, any>();
+  const memoryMembers = new Map<string, any>();
+  const memoryDeletedMemberIds = new Set<string>();
+  const memoryCampaigns = new Map<string, any>();
+
+  // Preload and self-heal local files on server boot
+  const initialStoredStores = safeReadJsonSync<any[]>(STORES_FILE, defaultStoresData);
+  initialStoredStores.forEach((s: any) => {
+    if (s && s.id) memoryStores.set(s.id, s);
+  });
+
+  const initialStoredMembers = safeReadJsonSync<any[]>(MEMBERS_FILE, []);
+  initialStoredMembers.forEach((m: any) => {
+    if (m && m.id) memoryMembers.set(m.id, m);
+  });
+
+  const initialDeletedIds = safeReadJsonSync<string[]>(DELETED_MEMBERS_FILE, []);
+  initialDeletedIds.forEach((id: string) => {
+    if (id) memoryDeletedMemberIds.add(String(id));
+  });
+
+  const initialStoredCampaigns = safeReadJsonSync<any[]>(CAMPAIGNS_FILE, []);
+  initialStoredCampaigns.forEach((c: any) => {
+    if (c && c.id) memoryCampaigns.set(c.id, c);
+  });
+
+  async function persistCampaignAsync(campaign: any): Promise<void> {
+    if (!campaign || !campaign.id) return;
+    memoryCampaigns.set(campaign.id, campaign);
+    await safeModifyJson<any[]>(CAMPAIGNS_FILE, [], (list) => {
+      const idx = list.findIndex(c => c && c.id === campaign.id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...campaign };
+      } else {
+        list.unshift(campaign);
+      }
+      return list;
+    });
+  }
+
+  async function deleteCampaignAsync(campaignId: string): Promise<void> {
+    memoryCampaigns.delete(campaignId);
+    await safeModifyJson<any[]>(CAMPAIGNS_FILE, [], (list) => {
+      return list.filter(c => c && c.id !== campaignId);
+    });
+  }
+
+  async function persistStoreAsync(store: any): Promise<void> {
+    if (!store || !store.id) return;
+    memoryStores.set(store.id, store);
+    await safeModifyJson<any[]>(STORES_FILE, defaultStoresData, (list) => {
+      const idx = list.findIndex(s => s && (s.id === store.id || (s.code && s.code === store.code)));
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...store };
+      } else {
+        list.push(store);
+      }
+      return list;
+    });
+  }
+
+  async function persistMemberAsync(member: any): Promise<void> {
+    if (!member || !member.id) return;
+    memoryMembers.set(member.id, member);
+    await safeModifyJson<any[]>(MEMBERS_FILE, [], (list) => {
+      const normPhone = normalizePhone(member.phone);
+      const idx = list.findIndex(m => m && (m.id === member.id || (normPhone && normalizePhone(m.phone) === normPhone)));
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...member };
+      } else {
+        list.unshift(member);
+      }
+      return list;
+    });
+  }
+
+  async function deleteMemberAsync(memberId: string): Promise<void> {
+    memoryMembers.delete(memberId);
+    memoryDeletedMemberIds.add(memberId);
+    await Promise.all([
+      safeModifyJson<any[]>(MEMBERS_FILE, [], (list) => {
+        return list.filter(m => m && m.id !== memberId);
+      }),
+      safeModifyJson<string[]>(DELETED_MEMBERS_FILE, [], (list) => {
+        if (!list.includes(memberId)) {
+          list.push(memberId);
+        }
+        return list;
+      })
+    ]);
+  }
+
+
+  // Persistent media serving: serves from local disk cache, or auto-restores from Firestore/SQL/GCS if container restarted
+  app.get(['/uploads/:filename', '/api/uploads/:filename'], async (req, res, next) => {
+    try {
+      const rawName = req.params.filename;
+      if (!rawName) return next();
+      const filename = path.basename(decodeURIComponent(rawName));
+
+      const fileResult = await retrieveUploadedFile(filename);
+      if (fileResult) {
+        res.setHeader('Content-Type', fileResult.mimeType);
+        res.setHeader('Content-Length', fileResult.buffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        return res.send(fileResult.buffer);
+      }
+
+      // If file not found in persistent storage or disk
+      return res.status(404).json({ error: 'File gambar tidak ditemukan atau telah dihapus' });
     } catch (err: any) {
       console.warn('[Upload Serve Notice]:', err?.message);
       next();
@@ -299,43 +797,57 @@ async function startServer() {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Upload endpoint (persists file to local disk AND to Cloud SQL so container restarts never lose images)
+  // Upload endpoint (persists file safely across Cloud Run ephemeral container restarts)
   app.post('/api/upload', upload.single('image'), async (req: any, res: any) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ success: false, error: 'Tidak ada file gambar yang diunggah' });
-      }
-      const filename = req.file.filename;
-      const fileUrl = `/uploads/${filename}`;
+      // 1. Multipart file upload from Multer memoryStorage
+      if (req.file) {
+        const cleanExt = (path.extname(req.file.originalname) || '.jpg').toLowerCase();
+        const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(6).toString('hex');
+        const filename = `${uniqueSuffix}${cleanExt}`;
+        const mimeType = req.file.mimetype || 'image/jpeg';
 
-      // Persist to Cloud SQL PostgreSQL database
-      if (pgSql) {
-        try {
-          const fileBuffer = fs.readFileSync(req.file.path);
-          const base64Data = fileBuffer.toString('base64');
-          await pgSql`
-            INSERT INTO uploaded_files (id, filename, mime_type, size_bytes, data_base64)
-            VALUES (${filename}, ${filename}, ${req.file.mimetype || 'image/jpeg'}, ${req.file.size}, ${base64Data})
-            ON CONFLICT (id) DO UPDATE SET 
-              data_base64 = EXCLUDED.data_base64,
-              size_bytes = EXCLUDED.size_bytes,
-              mime_type = EXCLUDED.mime_type
-          `;
-        } catch (dbErr: any) {
-          console.warn('[Upload Cloud SQL save notice]:', dbErr?.message);
+        await persistUploadedFile(filename, req.file.buffer, mimeType, req.file.originalname);
+
+        const fileUrl = `/uploads/${filename}`;
+        return res.status(200).json({
+          success: true,
+          url: fileUrl,
+          fileUrl: fileUrl,
+          filename: filename,
+          size: req.file.size || req.file.buffer.length
+        });
+      }
+
+      // 2. Direct Base64 JSON upload fallback ({ imageBase64, filename, mimeType })
+      if (req.body?.imageBase64) {
+        let rawBase64 = req.body.imageBase64 as string;
+        let mimeType = req.body.mimeType || 'image/jpeg';
+        if (rawBase64.includes(';base64,')) {
+          const parts = rawBase64.split(';base64,');
+          mimeType = parts[0].replace('data:', '') || mimeType;
+          rawBase64 = parts[1];
         }
+        const buffer = Buffer.from(rawBase64, 'base64');
+        const ext = mimeType.includes('png') ? '.png' : mimeType.includes('webp') ? '.webp' : '.jpg';
+        const filename = (req.body.filename || `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);
+        
+        await persistUploadedFile(filename, buffer, mimeType, req.body.filename);
+
+        const fileUrl = `/uploads/${filename}`;
+        return res.status(200).json({
+          success: true,
+          url: fileUrl,
+          fileUrl: fileUrl,
+          filename: filename,
+          size: buffer.length
+        });
       }
 
-      res.status(200).json({
-        success: true,
-        url: fileUrl,
-        fileUrl: fileUrl,
-        filename: req.file.filename,
-        size: req.file.size
-      });
+      return res.status(400).json({ success: false, error: 'Tidak ada file gambar atau data gambar yang diunggah' });
     } catch (err: any) {
       console.error('Upload Error:', err);
-      res.status(500).json({ success: false, error: 'Gagal memproses unggahan berkas' });
+      res.status(500).json({ success: false, error: 'Gagal memproses dan menyimpan berkas gambar: ' + (err?.message || err) });
     }
   });
 
@@ -950,7 +1462,10 @@ async function startServer() {
   // POS LOYALTY TRANSACTIONS (ADD POINTS)
   // ==========================================
 
+  const inFlightReceipts = new Set<string>();
+
   app.post('/api/loyalty/add-points', async (req: AuthenticatedRequest, res: Response) => {
+    let activeReceiptKey: string | null = null;
     try {
       const memberId = req.body?.memberId;
       const amount = req.body?.amount;
@@ -967,6 +1482,16 @@ async function startServer() {
       if (!memberId || !amount || !receiptNo) {
         return res.status(400).json({ success: false, error: 'memberId, amount, dan receiptNo wajib diisi.' });
       }
+
+      const cleanReceipt = receiptNo.toString().trim().toUpperCase();
+      if (inFlightReceipts.has(cleanReceipt)) {
+        return res.status(409).json({
+          success: false,
+          error: 'Transaksi untuk nomor struk ini sedang dalam proses. Harap tunggu dan jangan mengirim ulang.'
+        });
+      }
+      inFlightReceipts.add(cleanReceipt);
+      activeReceiptKey = cleanReceipt;
 
       const numericAmount = Number(amount) || 0;
       if (numericAmount <= 0) {
@@ -1092,10 +1617,23 @@ async function startServer() {
         };
       });
 
+      // Update local member persistence asynchronously
+      persistMemberAsync({
+        id: memberId,
+        points: result.newPoints,
+        tier: result.newTier,
+        lastStoreVisited: storeName,
+        lastVisitDate: new Date().toISOString()
+      }).catch((err) => console.warn('[AddPoints local persistence notice]:', err?.message));
+
       res.status(200).json({ success: true, data: result });
     } catch (err: any) {
       console.error('Loyalty add-points error:', err);
       res.status(400).json({ success: false, error: err.message });
+    } finally {
+      if (activeReceiptKey) {
+        inFlightReceipts.delete(activeReceiptKey);
+      }
     }
   });
 
@@ -1214,6 +1752,14 @@ async function startServer() {
         return reversalData;
       });
 
+      // Update local member persistence asynchronously
+      if (reversalResult && reversalResult.memberId) {
+        persistMemberAsync({
+          id: reversalResult.memberId,
+          updatedAt: new Date().toISOString()
+        }).catch((err) => console.warn('[Reversal local persistence notice]:', err?.message));
+      }
+
       res.status(200).json({ success: true, reversal: reversalResult });
     } catch (err: any) {
       console.error('Reversal error:', err);
@@ -1222,12 +1768,8 @@ async function startServer() {
   });
 
   // ==========================================
-  // STORES & MEMBERS DIRECTORY
+  // STORES DIRECTORY (ATOMIC FILE PERSISTENCE)
   // ==========================================
-
-  // In-memory persistent caches for resilience
-  const memoryVouchers = new Map<string, any>();
-  const memoryStores = new Map<string, any>();
 
   // Stores
   app.get('/api/stores', async (_req, res) => {
@@ -1235,14 +1777,18 @@ async function startServer() {
       if (db) {
         try {
           const snap = await db.collection('stores').get();
-          const stores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          stores.forEach(s => memoryStores.set(s.id, s));
-          return res.json({ success: true, stores });
+          if (!snap.empty) {
+            const stores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            stores.forEach(s => memoryStores.set(s.id, s));
+            safeModifyJson(STORES_FILE, defaultStoresData, () => stores).catch(() => {});
+            return res.json({ success: true, stores });
+          }
         } catch (dbErr: any) {
-          console.warn('[Stores API] Firestore read notice, serving memory stores:', dbErr?.message);
+          console.warn('[Stores API] Firestore read notice, serving local memory stores:', dbErr?.message);
         }
       }
-      res.json({ success: true, stores: Array.from(memoryStores.values()) });
+      const localStores = Array.from(memoryStores.values());
+      res.json({ success: true, stores: localStores.length > 0 ? localStores : defaultStoresData });
     } catch (_err: any) {
       res.json({ success: true, stores: Array.from(memoryStores.values()) });
     }
@@ -1250,12 +1796,14 @@ async function startServer() {
 
   app.post('/api/stores', async (req, res) => {
     try {
-      const storeData = req.body;
+      const storeData = req.body || {};
       const storeId = storeData.id || `store_${Date.now()}`;
       const payload = { ...storeData, id: storeId };
       memoryStores.set(storeId, payload);
+      await persistStoreAsync(payload);
+
       if (db) {
-        db.collection('stores').doc(String(storeId)).set(payload, { merge: true }).catch(() => {});
+        db.collection('stores').doc(String(storeId)).set(cleanForFirestore(payload), { merge: true }).catch(() => {});
       }
       res.status(201).json({ success: true, store: payload });
     } catch (err: any) {
@@ -1266,12 +1814,14 @@ async function startServer() {
   app.put('/api/stores/:id', async (req, res) => {
     try {
       const storeId = req.params.id;
-      const storeData = req.body;
+      const storeData = req.body || {};
       const existing = memoryStores.get(storeId) || {};
       const payload = { ...existing, ...storeData, id: storeId };
       memoryStores.set(storeId, payload);
+      await persistStoreAsync(payload);
+
       if (db) {
-        db.collection('stores').doc(String(storeId)).set(payload, { merge: true }).catch(() => {});
+        db.collection('stores').doc(String(storeId)).set(cleanForFirestore(payload), { merge: true }).catch(() => {});
       }
       res.json({ success: true, store: payload });
     } catch (err: any) {
@@ -1515,20 +2065,421 @@ async function startServer() {
     }
   });
 
-  // Members
+  // ==========================================
+  // MARKETING & POPUP CAMPAIGNS API (DURABLE FIRESTORE & SERVER PERSISTENCE)
+  // ==========================================
+
+  app.get('/api/campaigns', async (_req, res) => {
+    try {
+      if (db) {
+        try {
+          const snap = await db.collection('campaigns').get();
+          const campaigns = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          memoryCampaigns.clear();
+          campaigns.forEach(c => {
+            if (c && c.id) memoryCampaigns.set(c.id, c);
+          });
+          safeModifyJson(CAMPAIGNS_FILE, [], () => Array.from(memoryCampaigns.values())).catch(() => {});
+          return res.json({ success: true, campaigns });
+        } catch (dbErr: any) {
+          console.warn('[Campaigns API] Firestore read notice, serving memory campaigns:', dbErr?.message);
+        }
+      }
+      res.json({ success: true, campaigns: Array.from(memoryCampaigns.values()) });
+    } catch (_err: any) {
+      res.json({ success: true, campaigns: Array.from(memoryCampaigns.values()) });
+    }
+  });
+
+  app.post('/api/campaigns', async (req, res) => {
+    try {
+      const campaignData = req.body || {};
+      const campaignId = String(campaignData.id || `CMP-${Math.floor(1000 + Math.random() * 9000)}`).trim();
+      const rawPayload = {
+        ...campaignData,
+        id: campaignId,
+        status: campaignData.status || 'ACTIVE',
+        type: campaignData.type || 'POPUP_BANNER',
+        targetAudience: campaignData.targetAudience || 'ALL',
+        showAsPopupOnApp: Boolean(campaignData.showAsPopupOnApp),
+        sentCount: Number(campaignData.sentCount) || 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // Strip any undefined values so Firestore never rejects
+      const payload: Record<string, any> = {};
+      for (const [key, value] of Object.entries(rawPayload)) {
+        if (value !== undefined) {
+          payload[key] = value;
+        }
+      }
+
+      await persistCampaignAsync(payload);
+
+      // Primary persistence: Firebase Firestore Admin SDK
+      if (db) {
+        try {
+          await db.collection('campaigns').doc(campaignId).set(payload, { merge: true });
+          const auditEntry = {
+            id: 'AL-' + Date.now().toString().slice(-4),
+            timestamp: new Date().toISOString(),
+            actorName: 'Superadmin HO',
+            actorRole: 'HO_ADMIN',
+            action: 'CAMPAIGN_PUBLISHED',
+            details: `Kampanye promosi baru diterbitkan: "${payload.name}" (Popup: ${payload.showAsPopupOnApp ? 'Ya' : 'Tidak'}).`,
+            module: 'CAMPAIGNS'
+          };
+          await db.collection('audit').doc(auditEntry.id).set(auditEntry);
+        } catch (dbErr: any) {
+          console.warn('[Campaigns API] Firestore POST sync notice:', dbErr?.message);
+        }
+      }
+
+      // Safe optional SQL sync (if pgSql connected)
+      if (pgSql) {
+        try {
+          await pgSql`
+            INSERT INTO campaigns (
+              id, name, type, status, target_audience, content, banner_image, popup_image,
+              show_as_popup_on_app, sent_count
+            ) VALUES (
+              ${campaignId},
+              ${payload.name || 'Campaign'},
+              ${payload.type || 'POPUP_BANNER'},
+              ${payload.status || 'ACTIVE'},
+              ${payload.targetAudience || 'ALL'},
+              ${payload.content || payload.name || ''},
+              ${payload.bannerImage || ''},
+              ${payload.popupImage || ''},
+              ${Boolean(payload.showAsPopupOnApp)},
+              ${Number(payload.sentCount) || 0}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              name = EXCLUDED.name,
+              status = EXCLUDED.status,
+              target_audience = EXCLUDED.target_audience,
+              content = EXCLUDED.content,
+              banner_image = EXCLUDED.banner_image,
+              popup_image = EXCLUDED.popup_image,
+              show_as_popup_on_app = EXCLUDED.show_as_popup_on_app
+          `;
+        } catch (sqlErr: any) {
+          console.warn('[Campaigns API] PostgreSQL optional POST sync notice:', sqlErr?.message);
+        }
+      }
+
+      res.status(201).json({ success: true, campaign: payload });
+    } catch (err: any) {
+      console.warn('[Campaigns API] Fallback handling for POST:', err?.message);
+      const fallbackPayload = { id: `CMP-${Date.now()}`, ...(req.body || {}) };
+      res.status(201).json({ success: true, campaign: fallbackPayload });
+    }
+  });
+
+  app.put('/api/campaigns/:id', async (req, res) => {
+    try {
+      const campaignId = String(req.params.id || '').trim();
+      if (!campaignId) {
+        return res.status(400).json({ success: false, error: 'ID Kampanye tidak valid' });
+      }
+
+      const campaignData = req.body || {};
+      const existing = memoryCampaigns.get(campaignId) || {};
+      const rawPayload = { ...existing, ...campaignData, id: campaignId, updatedAt: new Date().toISOString() };
+
+      const payload: Record<string, any> = {};
+      for (const [key, value] of Object.entries(rawPayload)) {
+        if (value !== undefined) {
+          payload[key] = value;
+        }
+      }
+
+      await persistCampaignAsync(payload);
+
+      // Primary persistence: Firebase Firestore Admin SDK
+      if (db) {
+        try {
+          await db.collection('campaigns').doc(campaignId).set(payload, { merge: true });
+        } catch (dbErr: any) {
+          console.warn('[Campaigns API] Firestore PUT sync notice:', dbErr?.message);
+        }
+      }
+
+      // Safe optional SQL sync
+      if (pgSql) {
+        try {
+          await pgSql`
+            INSERT INTO campaigns (
+              id, name, type, status, target_audience, content, banner_image, popup_image,
+              show_as_popup_on_app, sent_count
+            ) VALUES (
+              ${campaignId},
+              ${payload.name || 'Campaign'},
+              ${payload.type || 'POPUP_BANNER'},
+              ${payload.status || 'ACTIVE'},
+              ${payload.targetAudience || 'ALL'},
+              ${payload.content || payload.name || ''},
+              ${payload.bannerImage || ''},
+              ${payload.popupImage || ''},
+              ${Boolean(payload.showAsPopupOnApp)},
+              ${Number(payload.sentCount) || 0}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              name = EXCLUDED.name,
+              status = EXCLUDED.status,
+              target_audience = EXCLUDED.target_audience,
+              content = EXCLUDED.content,
+              banner_image = EXCLUDED.banner_image,
+              popup_image = EXCLUDED.popup_image,
+              show_as_popup_on_app = EXCLUDED.show_as_popup_on_app
+          `;
+        } catch (sqlErr: any) {
+          console.warn('[Campaigns API] PostgreSQL optional PUT sync notice:', sqlErr?.message);
+        }
+      }
+
+      res.status(200).json({ success: true, campaign: payload });
+    } catch (err: any) {
+      console.warn('[Campaigns API] Fallback handling for PUT:', err?.message);
+      const fallbackPayload = { id: req.params.id, ...(req.body || {}) };
+      memoryCampaigns.set(req.params.id, fallbackPayload);
+      res.status(200).json({ success: true, campaign: fallbackPayload });
+    }
+  });
+
+  app.delete('/api/campaigns/:id', async (req, res) => {
+    try {
+      const campaignId = String(req.params.id || '').trim();
+      const existing = memoryCampaigns.get(campaignId);
+      await deleteCampaignAsync(campaignId);
+
+      // Primary deletion: Firebase Firestore Admin SDK
+      if (db && campaignId) {
+        try {
+          await db.collection('campaigns').doc(campaignId).delete();
+          const auditEntry = {
+            id: 'AL-' + Date.now().toString().slice(-4),
+            timestamp: new Date().toISOString(),
+            actorName: 'Superadmin HO',
+            actorRole: 'HO_ADMIN',
+            action: 'CAMPAIGN_DELETED',
+            details: `Kampanye promosi dihapus: "${existing?.name || campaignId}".`,
+            module: 'CAMPAIGNS'
+          };
+          await db.collection('audit').doc(auditEntry.id).set(auditEntry);
+        } catch (dbErr: any) {
+          console.warn('[Campaigns API] Firestore DELETE notice:', dbErr?.message);
+        }
+      }
+
+      // Safe optional SQL delete
+      if (pgSql && campaignId) {
+        try {
+          await pgSql`DELETE FROM campaigns WHERE id = ${campaignId}`;
+        } catch (sqlErr: any) {
+          console.warn('[Campaigns API] PostgreSQL optional DELETE notice:', sqlErr?.message);
+        }
+      }
+
+      res.status(200).json({ success: true, message: `Kampanye ${campaignId} berhasil dihapus dari cloud dan server.` });
+    } catch (err: any) {
+      console.warn('[Campaigns API] Fallback handling for DELETE:', err?.message);
+      res.status(200).json({ success: true, message: `Kampanye ${req.params.id} dihapus dari cache` });
+    }
+  });
+
+  // ==========================================
+  // MEMBERS DIRECTORY & RESILIENT PERSISTENCE
+  // ==========================================
+
+  // Get all members (Firestore with local disk fallback)
   app.get('/api/members', async (_req, res) => {
     try {
       if (db) {
-        const snap = await db.collection('members').limit(200).get();
-        const members = snap.docs.map(d => {
-          const { pinHash: _ph, pinSalt: _ps, ...safe } = d.data();
-          return { id: d.id, ...safe };
-        });
-        return res.json({ success: true, members });
+        try {
+          const snap = await db.collection('members').limit(300).get();
+          if (!snap.empty) {
+            const members = snap.docs.map(d => {
+              const { pinHash: _ph, pinSalt: _ps, ...safe } = d.data();
+              return { id: d.id, ...safe };
+            });
+            members.forEach(m => {
+              if (m && m.id && !memoryDeletedMemberIds.has(m.id)) {
+                memoryMembers.set(m.id, m);
+              }
+            });
+            safeModifyJson(MEMBERS_FILE, [], () => Array.from(memoryMembers.values())).catch(() => {});
+            return res.json({ success: true, members });
+          }
+        } catch (dbErr: any) {
+          console.warn('[Members API] Firestore read notice, serving local members:', dbErr?.message);
+        }
       }
-      res.json({ success: true, members: [] });
+      const safeMembers = Array.from(memoryMembers.values()).map(m => {
+        const { pinHash: _ph, pinSalt: _ps, ...safe } = m;
+        return safe;
+      });
+      res.json({ success: true, members: safeMembers });
+    } catch (err: any) {
+      const safeMembers = Array.from(memoryMembers.values()).map(m => {
+        const { pinHash: _ph, pinSalt: _ps, ...safe } = m;
+        return safe;
+      });
+      res.json({ success: true, members: safeMembers });
+    }
+  });
+
+  // Query member by phone number
+  app.get('/api/members/by-phone/:phone', async (req, res) => {
+    try {
+      const rawPhone = req.params.phone;
+      const normalized = normalizePhone(rawPhone);
+
+      // 1. Check local in-memory cache first for instant response
+      for (const m of memoryMembers.values()) {
+        if (m && m.phone && normalizePhone(m.phone) === normalized && !memoryDeletedMemberIds.has(m.id)) {
+          const { pinHash: _ph, pinSalt: _ps, ...safe } = m;
+          return res.json({ success: true, exists: true, member: safe });
+        }
+      }
+
+      // 2. Query Firestore if connected
+      if (db) {
+        let qSnap = await db.collection('members').where('phone', '==', normalized).limit(1).get();
+        if (qSnap.empty) {
+          qSnap = await db.collection('members').where('phone', '==', rawPhone).limit(1).get();
+        }
+        if (!qSnap.empty) {
+          const doc = qSnap.docs[0];
+          if (!memoryDeletedMemberIds.has(doc.id)) {
+            const { pinHash: _ph, pinSalt: _ps, ...safe } = doc.data();
+            const memberData = { id: doc.id, ...safe };
+            persistMemberAsync(memberData).catch(() => {});
+            return res.json({ success: true, exists: true, member: memberData });
+          }
+        }
+      }
+
+      return res.json({ success: true, exists: false, member: null });
+    } catch (err: any) {
+      console.warn('[Members by-phone API notice]:', err?.message);
+      return res.json({ success: true, exists: false, member: null });
+    }
+  });
+
+  // Register / Add Member
+  app.post('/api/members', async (req, res) => {
+    try {
+      const memberData = req.body || {};
+      const memberId = memberData.id || `mem_${Date.now()}`;
+      const payload = {
+        ...memberData,
+        id: memberId,
+        membershipId: memberData.membershipId || `WC-${Date.now().toString().slice(-6)}`,
+        points: Number(memberData.points) || 0,
+        lifetimePoints: Number(memberData.lifetimePoints) || Number(memberData.points) || 0,
+        tier: memberData.tier || 'BLUE',
+        status: memberData.status || 'ACTIVE',
+        updatedAt: new Date().toISOString()
+      };
+
+      await persistMemberAsync(payload);
+
+      if (db) {
+        db.collection('members').doc(String(memberId)).set(cleanForFirestore(payload), { merge: true }).catch(() => {});
+      }
+
+      const { pinHash: _ph, pinSalt: _ps, ...safe } = payload;
+      res.status(201).json({ success: true, member: safe });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Update Member
+  app.put('/api/members/:id', async (req, res) => {
+    try {
+      const memberId = req.params.id;
+      const memberData = req.body || {};
+      const existing = memoryMembers.get(memberId) || {};
+      const payload = {
+        ...existing,
+        ...memberData,
+        id: memberId,
+        updatedAt: new Date().toISOString()
+      };
+
+      await persistMemberAsync(payload);
+
+      if (db) {
+        db.collection('members').doc(String(memberId)).set(cleanForFirestore(payload), { merge: true }).catch(() => {});
+      }
+
+      const { pinHash: _ph, pinSalt: _ps, ...safe } = payload;
+      res.json({ success: true, member: safe });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Batch sync members from client cache
+  app.post('/api/members/sync-all', async (req, res) => {
+    try {
+      const list = req.body?.members;
+      if (!Array.isArray(list)) {
+        return res.status(400).json({ success: false, error: 'members must be an array' });
+      }
+
+      for (const m of list) {
+        if (m && m.id && !memoryDeletedMemberIds.has(m.id)) {
+          memoryMembers.set(m.id, m);
+        }
+      }
+
+      await safeModifyJson<any[]>(MEMBERS_FILE, [], () => Array.from(memoryMembers.values()));
+
+      if (db) {
+        Promise.all(list.map(m => {
+          if (m && m.id && !memoryDeletedMemberIds.has(m.id)) {
+            return db!.collection('members').doc(m.id).set(cleanForFirestore(m), { merge: true }).catch(() => {});
+          }
+          return Promise.resolve();
+        })).catch(() => {});
+      }
+
+      res.json({ success: true, count: memoryMembers.size });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Delete Member (with tombstone guarantee)
+  app.delete('/api/members/:id', async (req, res) => {
+    try {
+      const memberId = req.params.id;
+      if (!memberId) {
+        return res.status(400).json({ success: false, error: 'ID member diperlukan' });
+      }
+
+      await deleteMemberAsync(memberId);
+
+      if (db) {
+        db.collection('members').doc(memberId).delete().catch(() => {});
+      }
+
+      res.json({ success: true, message: 'Member deleted successfully', deletedId: memberId });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get tombstone deleted member IDs
+  app.get('/api/members/deleted-ids', async (_req, res) => {
+    try {
+      res.json({ success: true, deletedIds: Array.from(memoryDeletedMemberIds) });
+    } catch (err: any) {
+      res.json({ success: true, deletedIds: [] });
     }
   });
 
@@ -1570,5 +2521,14 @@ async function startServer() {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
+
+// Global safety net: prevent Node.js server crash on unhandled errors
+process.on('uncaughtException', (err: any) => {
+  console.error('🔥 [CRITICAL SERVER ERROR PREVENTED EXIT]:', err?.message || err);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.error('⚠️ [UNHANDLED REJECTION PREVENTED EXIT]:', reason?.message || reason);
+});
 
 startServer().catch(console.error);

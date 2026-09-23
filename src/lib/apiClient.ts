@@ -22,6 +22,7 @@ export function isBackendConfigured(): boolean {
 
 export interface ApiFetchOptions extends RequestInit {
   skipAuth?: boolean;
+  timeoutMs?: number;
 }
 
 export async function apiFetch<T = any>(endpoint: string, options: ApiFetchOptions = {}): Promise<T> {
@@ -49,17 +50,33 @@ export async function apiFetch<T = any>(endpoint: string, options: ApiFetchOptio
     }
   }
 
+  // Sinyal Lemah / Ghost Fetching Safeguard: 25-second client-side timeout with AbortController
+  const timeoutMs = options.timeoutMs ?? 25000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
   let response: Response;
   try {
     response = await fetch(fullUrl, {
       ...options,
+      signal: options.signal || controller.signal,
       headers,
     });
   } catch (netErr: any) {
+    if (netErr?.name === 'AbortError') {
+      console.error('[apiClient] Request aborted due to timeout:', fullUrl);
+      throw new Error(
+        'Koneksi internet lambat / timeout (sinyal lemah). Transaksi belum dapat dipastikan tersimpan. Harap periksa jaringan kasir sebelum mencoba kembali.'
+      );
+    }
     console.error('[apiClient] Network request failed:', netErr);
     throw new Error(
       'Koneksi ke backend server gagal atau backend tidak tersedia. Operasi dibatalkan demi keamanan data.'
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   // Detect HTML response (e.g. Vercel SPA rewrite fallback returning index.html)

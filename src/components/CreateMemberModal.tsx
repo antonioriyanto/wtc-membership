@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, UserPlus, Phone, User, Mail, Calendar, AlertCircle, Store, Mars, Venus } from 'lucide-react';
 import { Member } from '../types';
 import { findMemberByPhoneInFirestore, isSamePhoneNumber, normalizePhoneNumber } from '../lib/syncFirestore';
@@ -70,6 +70,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
   const [gender, setGender] = useState<'Pria' | 'Wanita'>('Pria');
   const [registeredStore, setRegisteredStore] = useState(defaultStore);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Auto-detect on phone change
@@ -102,6 +103,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || isSubmittingRef.current) return;
     setErrorMessage(null);
     if (!name.trim() || !phone.trim()) {
       setErrorMessage('Nama Lengkap dan Nomor Handphone wajib diisi.');
@@ -114,6 +116,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
       return;
     }
     
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       // 1. Check local state
@@ -126,6 +129,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
       
       if (existing) {
         setIsSubmitting(false);
+        isSubmittingRef.current = false;
         if (onExistingMember) {
           onExistingMember(existing);
           return;
@@ -134,7 +138,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
           return;
         }
       }
-            const generatedMembershipId = await generateSequentialMembershipId(registeredStore, stores);
+      const generatedMembershipId = await generateSequentialMembershipId(registeredStore, stores);
 
       await onCreateMember({
         membershipId: generatedMembershipId,
@@ -162,6 +166,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({
     } catch (err: any) {
       setErrorMessage(err.message || 'Gagal mendaftarkan member. Silakan periksa kembali data Anda.');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { X, Search, Plus, Barcode, Camera, ShoppingCart, List, Tag, CheckCircle, AlertTriangle, KeyRound, ShieldAlert } from 'lucide-react';
+import { X, Search, Plus, Barcode, Camera, ShoppingCart, List, Tag, CheckCircle, AlertTriangle, KeyRound, ShieldAlert, Loader2 } from 'lucide-react';
 import { Member, Transaction, StoreBranch, LoyaltyConfig } from '../types';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { TierBadge } from '../utils/tierBadge';
@@ -20,7 +20,7 @@ interface CashierTabProps {
   cashierName?: string;
   autoSelectMemberId?: string;
   onAddPoints: (memberId: string, amount: number, receiptNo: string) => Promise<boolean | void> | boolean | void;
-  onRedeemVoucher: (memberId: string, voucherCode: string) => void;
+  onRedeemVoucher: (memberId: string, voucherCode: string) => void | Promise<void>;
   onOpenCreateMember: () => void;
   onMemberUpdated?: (updated: Member) => void;
 }
@@ -41,7 +41,13 @@ export const CashierTab: React.FC<CashierTabProps> = ({
   const [searchInput, setSearchInput] = useState('');
   const [activeMember, setActiveMember] = useState<Member | null>(null);
   const [isResetPinOpen, setIsResetPinOpen] = useState(false);
+  const [localSubmitting, setLocalSubmitting] = useState(false);
   const isSubmittingPointsRef = useRef(false);
+  const [isVoucherSubmitting, setIsVoucherSubmitting] = useState(false);
+  const voucherSubmittingRef = useRef(false);
+
+  // Combined synchronous & reactive submitting state
+  const isTransactionInProgress = Boolean(isSubmitting || localSubmitting);
 
   useEffect(() => {
     if (autoSelectMemberId && members.length > 0) {
@@ -166,11 +172,23 @@ export const CashierTab: React.FC<CashierTabProps> = ({
   });
 
   const handleAddPointsSubmit = async () => {
-    if (!activeMember || !receiptInput || parsedAmount <= 0 || isSubmitting || isSubmittingPointsRef.current) return;
+    if (
+      !activeMember || 
+      !receiptInput.trim() || 
+      parsedAmount <= 0 || 
+      isTransactionInProgress || 
+      isSubmittingPointsRef.current
+    ) {
+      return;
+    }
+
+    // Immediately acquire synchronous mutex lock to block fast double clicks
     isSubmittingPointsRef.current = true;
+    setLocalSubmitting(true);
+
     const currentMemberId = activeMember.id;
     const currentAmount = parsedAmount;
-    const currentReceipt = receiptInput;
+    const currentReceipt = receiptInput.trim();
 
     try {
       const res = await onAddPoints(currentMemberId, currentAmount, currentReceipt);
@@ -182,13 +200,31 @@ export const CashierTab: React.FC<CashierTabProps> = ({
     } catch (err) {
       console.error("Point addition failed:", err);
     } finally {
+      setLocalSubmitting(false);
       setTimeout(() => {
         isSubmittingPointsRef.current = false;
-      }, 500);
+      }, 600);
     }
   };
 
-  const executeClaimVoucher = (rawCode: string) => {
+  const handleAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!isTransactionInProgress && activeMember && receiptInput.trim() && parsedAmount > 0) {
+        handleAddPointsSubmit();
+      }
+    }
+  };
+
+  const executeClaimVoucher = async (rawCode: string) => {
+    if (
+      isTransactionInProgress ||
+      isVoucherSubmitting ||
+      voucherSubmittingRef.current
+    ) {
+      return;
+    }
+
     const code = (rawCode || voucherInput).trim().toUpperCase();
     if (!code) {
       setVoucherErrorMsg('Silakan masukkan atau scan kode voucher terlebih dahulu.');
@@ -199,14 +235,31 @@ export const CashierTab: React.FC<CashierTabProps> = ({
     if (code === 'GAGAL') {
       setVoucherErrorMsg('Maaf, kode voucher ini sudah pernah digunakan atau tidak valid.');
       setIsVoucherErrorOpen(true);
-    } else if (activeMember) {
-      onRedeemVoucher(activeMember.id, code);
+      return;
+    } 
+    
+    if (!activeMember) {
+      setVoucherErrorMsg('Pilih atau cari member terlebih dahulu sebelum klaim voucher.');
+      setIsVoucherErrorOpen(true);
+      return;
+    }
+
+    // Acquire voucher lock
+    voucherSubmittingRef.current = true;
+    setIsVoucherSubmitting(true);
+
+    try {
+      await onRedeemVoucher(activeMember.id, code);
       setIsRedeemOpen(false);
       setVoucherInput('');
       triggerScanFeedback(`Voucher Barcode ${code} Terbaca & Berhasil Diklaim!`);
-    } else {
-      setVoucherErrorMsg('Pilih atau cari member terlebih dahulu sebelum klaim voucher.');
-      setIsVoucherErrorOpen(true);
+    } catch (err) {
+      console.error("Voucher redemption failed:", err);
+    } finally {
+      setIsVoucherSubmitting(false);
+      setTimeout(() => {
+        voucherSubmittingRef.current = false;
+      }, 600);
     }
   };
 
@@ -385,25 +438,28 @@ export const CashierTab: React.FC<CashierTabProps> = ({
               <input 
                 type="text" 
                 value={searchInput || ''}
+                disabled={isTransactionInProgress}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={handleSearch}
-                className="w-full pl-11 pr-4 py-3 bg-emerald-50/70 dark:bg-slate-900 border-2 border-emerald-500 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 font-medium"
+                className="w-full pl-11 pr-4 py-3 bg-emerald-50/70 dark:bg-slate-900 border-2 border-emerald-500 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Ketik No HP / Scan QR Code..."
                 autoComplete="off"
               />
             </div>
             <button 
               type="button"
+              disabled={isTransactionInProgress}
               onClick={() => performSearch(searchInput)}
-              className="px-4 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-semibold hover:bg-emerald-700 transition-colors text-sm shrink-0"
+              className="px-4 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-semibold hover:bg-emerald-700 transition-colors text-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Cari Member"
             >
               <Search className="w-4 h-4 mr-1.5" /> Cari
             </button>
             <button 
               type="button"
+              disabled={isTransactionInProgress}
               onClick={() => setIsScannerOpen(true)}
-              className="w-12 bg-slate-900 dark:bg-slate-700 text-white rounded-lg flex justify-center items-center hover:bg-slate-800 dark:hover:bg-slate-600 transition-colors shrink-0"
+              className="w-12 bg-slate-900 dark:bg-slate-700 text-white rounded-lg flex justify-center items-center hover:bg-slate-800 dark:hover:bg-slate-600 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Buka Kamera Scanner"
             >
               <Camera className="w-5 h-5" />
@@ -438,8 +494,9 @@ export const CashierTab: React.FC<CashierTabProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsResetPinOpen(true)}
-                  className="text-[0.72rem] text-amber-700 dark:text-amber-400 hover:text-amber-600 font-bold flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800/80 transition-colors cursor-pointer shadow-xs"
+                  disabled={isTransactionInProgress}
+                  onClick={() => !isTransactionInProgress && setIsResetPinOpen(true)}
+                  className="text-[0.72rem] text-amber-700 dark:text-amber-400 hover:text-amber-600 font-bold flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800/80 transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
                   title="Otorisasi Reset PIN Kasir di Butik"
                 >
                   <KeyRound className="w-3 h-3" />
@@ -447,8 +504,9 @@ export const CashierTab: React.FC<CashierTabProps> = ({
                 </button>
                 <button 
                   type="button" 
-                  onClick={() => setActiveMember(null)}
-                  className="text-[0.75rem] text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 underline transition-colors"
+                  disabled={isTransactionInProgress}
+                  onClick={() => !isTransactionInProgress && setActiveMember(null)}
+                  className="text-[0.75rem] text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 underline transition-colors disabled:opacity-40 disabled:pointer-events-none"
                 >
                   Ganti Member
                 </button>
@@ -477,6 +535,16 @@ export const CashierTab: React.FC<CashierTabProps> = ({
           )}
         </div>
 
+        {isTransactionInProgress && (
+          <div className="mb-4 p-3.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 rounded-xl flex items-center gap-3 text-amber-900 dark:text-amber-200 text-xs font-semibold shadow-xs animate-pulse">
+            <Loader2 className="w-5 h-5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-slate-900 dark:text-white">Sedang Memproses Transaksi & Sinkronisasi Poin...</p>
+              <p className="text-[11px] text-amber-800 dark:text-amber-300 font-normal">Mohon jangan menekan tombol berulang kali atau berpindah halaman kasir. Sistem sedang mengunci dan mengamankan transaksi.</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-4 mb-4">
           <div className="flex-1 min-w-[250px]">
             <div className="flex justify-between items-center mb-2">
@@ -484,8 +552,8 @@ export const CashierTab: React.FC<CashierTabProps> = ({
               <select 
                 value={posType || 'A'} 
                 onChange={(e) => setPosType(e.target.value as PosType)}
-                disabled={!activeMember || isSubmitting}
-                className="text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 outline-none text-slate-700 dark:text-slate-300"
+                disabled={!activeMember || isTransactionInProgress}
+                className="text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 outline-none text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="A">POS A</option>
                 <option value="B">POS B</option>
@@ -495,7 +563,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
               branchName={currentStore?.name || ''} 
               posType={posType} 
               onReceiptChange={setReceiptInput}
-              disabled={!activeMember || isSubmitting}
+              disabled={!activeMember || isTransactionInProgress}
             />
           </div>
           <div className="flex-1 min-w-[150px]">
@@ -503,7 +571,8 @@ export const CashierTab: React.FC<CashierTabProps> = ({
             <input 
               type="text" 
               value={amountInput || ''}
-              disabled={!activeMember}
+              disabled={!activeMember || isTransactionInProgress}
+              onKeyDown={handleAmountKeyDown}
               onChange={(e) => {
                 const val = e.target.value.replace(/[^0-9]/g, '');
                 if (!val) {
@@ -512,7 +581,7 @@ export const CashierTab: React.FC<CashierTabProps> = ({
                 }
                 setAmountInput(parseInt(val).toLocaleString('id-ID'));
               }}
-              className="w-full px-4 py-3 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-emerald-500 disabled:bg-slate-100 dark:disabled:bg-slate-900/40"
+              className="w-full px-4 py-3 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-emerald-500 disabled:bg-slate-100 dark:disabled:bg-slate-900/40 disabled:cursor-not-allowed font-medium"
               placeholder="Contoh: 500.000"
             />
           </div>
@@ -531,16 +600,28 @@ export const CashierTab: React.FC<CashierTabProps> = ({
 
         <div className="flex gap-3">
           <button 
-            disabled={!activeMember || !receiptInput || parsedAmount <= 0 || isSubmitting}
+            type="button"
+            disabled={!activeMember || !receiptInput || parsedAmount <= 0 || isTransactionInProgress}
             onClick={handleAddPointsSubmit}
-            className="flex-1 bg-slate-900 dark:bg-emerald-600 text-white rounded-lg py-3 font-bold disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-slate-800 dark:hover:bg-emerald-700 transition-colors"
+            className="flex-1 bg-slate-900 dark:bg-emerald-600 text-white rounded-lg py-3 font-bold disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-slate-800 dark:hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
-            Submit & Tambah Poin
+            {isTransactionInProgress ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin text-white" />
+                <span>Memproses Transaksi...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                <span>Submit & Tambah Poin</span>
+              </>
+            )}
           </button>
           <button 
-            disabled={!activeMember}
+            type="button"
+            disabled={!activeMember || isTransactionInProgress}
             onClick={() => setIsRedeemOpen(true)}
-            className="flex-1 bg-white dark:bg-slate-800 border-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 rounded-lg py-3 font-bold hover:bg-emerald-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 bg-white dark:bg-slate-800 border-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 rounded-lg py-3 font-bold hover:bg-emerald-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
           >
             <Tag className="w-4 h-4" /> Klaim Voucher
           </button>
@@ -684,9 +765,10 @@ export const CashierTab: React.FC<CashierTabProps> = ({
                     ref={voucherInputRef}
                     type="text" 
                     value={voucherInput || ''}
+                    disabled={isVoucherSubmitting || isTransactionInProgress}
                     onChange={(e) => setVoucherInput(e.target.value)}
                     onKeyDown={handleVoucherKeyDown}
-                    className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-900 border-2 border-emerald-500 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-center font-mono font-bold text-lg tracking-wider"
+                    className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-900 border-2 border-emerald-500 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-center font-mono font-bold text-lg tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Contoh: WTC-0826"
                     autoComplete="off"
                   />
@@ -695,15 +777,17 @@ export const CashierTab: React.FC<CashierTabProps> = ({
                 <div className="flex gap-2">
                   <button
                     type="button"
+                    disabled={isVoucherSubmitting || isTransactionInProgress}
                     onClick={() => setVoucherInput('WTC-0826')}
-                    className="flex-1 py-1.5 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors"
+                    className="flex-1 py-1.5 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     WTC-0826 (17% Promo Kemerdekaan)
                   </button>
                   <button
                     type="button"
+                    disabled={isVoucherSubmitting || isTransactionInProgress}
                     onClick={() => setVoucherInput('WC-WELCOME20')}
-                    className="flex-1 py-1.5 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors"
+                    className="flex-1 py-1.5 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     WC-WELCOME20 (20% Welcome)
                   </button>
@@ -713,18 +797,29 @@ export const CashierTab: React.FC<CashierTabProps> = ({
               <div className="flex gap-3">
                 <button 
                   type="button"
+                  disabled={isVoucherSubmitting}
                   onClick={() => setIsRedeemOpen(false)} 
-                  className="flex-1 py-3 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="flex-1 py-3 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Batal
                 </button>
                 <button 
                   type="button"
-                  disabled={!voucherInput.trim()}
+                  disabled={!voucherInput.trim() || isVoucherSubmitting || isTransactionInProgress}
                   onClick={() => executeClaimVoucher(voucherInput)}
                   className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                 >
-                  <CheckCircle className="w-4 h-4" /> Klaim
+                  {isVoucherSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Mengklaim...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Klaim</span>
+                    </>
+                  )}
                 </button>
               </div>
               <p className="text-[0.75rem] text-slate-400 dark:text-slate-500 mt-3">

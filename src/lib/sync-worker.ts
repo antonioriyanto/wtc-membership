@@ -17,6 +17,7 @@ export interface SyncWorkerOptions {
   getMembers?: () => Member[];
   setMembers?: (members: Member[]) => void;
   intervalMs?: number;
+  enablePeriodicPolling?: boolean;
   immediate?: boolean;
   onSyncComplete?: (report: SyncReport) => void;
   onInitialReconciled?: (report: SyncReport) => void;
@@ -175,6 +176,7 @@ export async function retryWithBackoff<T>(
 let activeSyncPromise: Promise<SyncReport> | null = null;
 let hasQueuedPass = false;
 
+let isWorkerActive = false;
 let syncIntervalTimer: any = null;
 let fastRetryTimer: any = null;
 let isInitialReconciled = false;
@@ -661,12 +663,13 @@ export function startSyncWorker(options: SyncWorkerOptions = {}): () => void {
       return [];
     },
     setMembers,
-    intervalMs = 30000,
+    intervalMs = 0,
+    enablePeriodicPolling = false,
     immediate = true,
     onSyncComplete,
     onInitialReconciled,
-    maxInitialRetries = 3,
-    initialRetryDelayMs = 2000,
+    maxInitialRetries = 2,
+    initialRetryDelayMs = 3000,
   } = options;
 
   let initialRetryCount = 0;
@@ -700,49 +703,57 @@ export function startSyncWorker(options: SyncWorkerOptions = {}): () => void {
       lastSyncError = err?.message || String(err);
       consecutiveFailures++;
 
-      // If initial mount pass failed with a transient error, schedule a fast retry
-      // rather than leaving the app unreconciled for 30 seconds
+      // If initial mount pass failed with a transient error, schedule a single fast retry
+      // rather than looping indefinitely and consuming device memory
       if (!isInitialReconciled && initialRetryCount < maxInitialRetries && isTransientFirebaseError(err)) {
         initialRetryCount++;
         const nextDelay = initialRetryDelayMs * initialRetryCount;
-        console.warn(`[SyncWorker] Initial mount sync encountered transient error. Scheduling fast retry ${initialRetryCount}/${maxInitialRetries} in ${nextDelay}ms...`);
+        console.warn(`[SyncWorker] Initial mount sync encountered transient error. Scheduling retry ${initialRetryCount}/${maxInitialRetries} in ${nextDelay}ms...`);
         if (fastRetryTimer) clearTimeout(fastRetryTimer);
         fastRetryTimer = setTimeout(() => executePass(true), nextDelay);
       } else {
-        console.warn("[SyncWorker] Periodic sync pass completed with notice:", err?.message || err);
+        console.warn("[SyncWorker] Sync pass notice:", err?.message || err);
       }
     }
   };
 
   // Stop any previous running timer or listeners
   stopSyncWorker();
+  isWorkerActive = true;
 
-  // Setup online network recovery listener
+  // Setup online network recovery listener (event-driven, zero polling)
   if (typeof window !== 'undefined') {
     onlineListener = () => {
-      console.info("[SyncWorker] Browser is online. Triggering synchronization pass.");
+      console.info("[SyncWorker] Network online event detected. Running reconciliation pass.");
       executePass(false);
     };
     window.addEventListener('online', onlineListener);
 
+    // Only inspect when tab becomes visible IF there are un-synced offline members
     visibilityListener = () => {
       if (document.visibilityState === 'visible') {
-        const elapsed = Date.now() - lastSyncTimestamp;
-        if (elapsed > 15000) {
-          executePass(false);
-        }
+        try {
+          const current = getMembers();
+          const hasPendingSync = current.some((m: any) => m && m.isPendingSync);
+          if (hasPendingSync) {
+            executePass(false);
+          }
+        } catch {}
       }
     };
     document.addEventListener('visibilitychange', visibilityListener);
   }
 
-  // Run immediate pass on mount
+  // Run immediate pass on mount if requested
   if (immediate) {
     fastRetryTimer = setTimeout(() => executePass(true), 250);
   }
 
-  // Recurring background interval
-  syncIntervalTimer = setInterval(() => executePass(false), intervalMs);
+  // Recurring background interval is STRICTLY DISABLED by default to prevent RAM memory bloat.
+  // Real-time synchronization is natively provided by Firestore onSnapshot push listeners.
+  if (enablePeriodicPolling && intervalMs > 0) {
+    syncIntervalTimer = setInterval(() => executePass(false), intervalMs);
+  }
 
   return () => {
     if (fastRetryTimer) {
@@ -763,6 +774,7 @@ export function startSyncWorker(options: SyncWorkerOptions = {}): () => void {
  * Stops the background sync worker.
  */
 export function stopSyncWorker() {
+  isWorkerActive = false;
   if (syncIntervalTimer) {
     clearInterval(syncIntervalTimer);
     syncIntervalTimer = null;
@@ -790,7 +802,7 @@ export async function triggerImmediateSync(
  */
 export function getSyncWorkerStatus() {
   return {
-    isRunning: syncIntervalTimer !== null,
+    isRunning: isWorkerActive,
     isSyncInProgress: activeSyncPromise !== null,
     isInitialReconciled,
     lastSyncReport,

@@ -129,5 +129,15 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isHoAdmin() || true;
     }
+
+    // 10. Persistent Media Storage (survives Cloud Run container restarts)
+    match /uploaded_files/{fileId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isHoAdmin() || isCashier();
+      match /chunks/{chunkId} {
+        allow read: if true;
+        allow write: if isAuthenticated() || isHoAdmin() || isCashier();
+      }
+    }
   }
 }

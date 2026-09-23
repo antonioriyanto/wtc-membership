@@ -244,7 +244,7 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
   };
 
   const handleRedeemVoucher = (memberId: string, voucherCode: string) => {
-    if (isSubmitting) return;
+    if (isSubmitting || isSubmittingRef.current) return;
     const member = members.find(m => m.id === memberId || m.membershipId === memberId || m.phone === memberId);
     if (!member) {
       showAlert('Pilih member terlebih dahulu sebelum menukarkan voucher.', 'Perhatian', 'warning');
@@ -254,78 +254,56 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
     const cleanCode = voucherCode.trim().toUpperCase().replace(/^VOUCHER-/, '');
     
     // Auto-execute redemption without PIN authorization
-    executeRedeemVoucher(member, cleanCode);
+    return executeRedeemVoucher(member, cleanCode);
   };
 
   const executeRedeemVoucher = async (member: Member, cleanCode: string) => {
-    if (isSubmitting) return;
-    
-    // Atomic Single-Use Voucher Lock check
-    if (loyaltyConfig?.enableStrictVoucherSingleUse && vouchers) {
-       const targetVoucher = vouchers.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
-       if (targetVoucher) {
-         if ((targetVoucher.totalUsed || 0) >= (targetVoucher.maxUsageLimit || 1)) {
-            showAlert('Peringatan Keamanan: Voucher ini sudah diklaim maksimal atau terkunci (Atomic Lock).', 'Gagal', 'error');
-            return;
-         }
-       } else {
-         // If voucher not found in the active list, we might want to block it, but we'll let it pass or show error.
-         // Wait, it might be a general code without a specific record.
-       }
-    }
-
+    if (isSubmitting || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
-    let savedTrx: Transaction = {
-      id: 'tx_' + Date.now(),
-      receiptNo: `VOUCHER-${cleanCode}`,
-      memberId: member.id,
-      membershipId: member.membershipId || '',
-      memberName: member.name,
-      memberPhone: member.phone,
-      memberPhoneNormalized: normalizePhoneNumber(member.phone || ''),
-      storeId: currentStore?.id || currentStore?.code || 'PUR',
-      storeName: currentStore?.name || 'Puri Jakarta',
-      cashierName: cashierName || `Kasir ${currentStore?.name || 'Puri'}`,
-      type: 'REDEEM',
-      amount: 0,
-      pointsDelta: -50,
-      voucherCode: cleanCode,
-      timestamp: new Date().toISOString(),
-      notes: `Klaim voucher ${cleanCode}`
-    };
+    try {
+      // Atomic Single-Use Voucher Lock check
+      if (loyaltyConfig?.enableStrictVoucherSingleUse && vouchers) {
+         const targetVoucher = vouchers.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
+         if (targetVoucher) {
+           if ((targetVoucher.totalUsed || 0) >= (targetVoucher.maxUsageLimit || 1)) {
+              showAlert('Peringatan Keamanan: Voucher ini sudah diklaim maksimal atau terkunci (Atomic Lock).', 'Gagal', 'error');
+              return;
+           }
+         }
+      }
 
-    let updatedMember: Member = {
-      ...member,
-      points: Math.max(0, (member.points || 0) - 50),
-      lastStoreVisited: currentStore?.name || member.lastStoreVisited,
-      lastVisitDate: new Date().toISOString()
-    };
+      let savedTrx: Transaction = {
+        id: 'tx_' + Date.now(),
+        receiptNo: `VOUCHER-${cleanCode}`,
+        memberId: member.id,
+        membershipId: member.membershipId || '',
+        memberName: member.name,
+        memberPhone: member.phone,
+        memberPhoneNormalized: normalizePhoneNumber(member.phone || ''),
+        storeId: currentStore?.id || currentStore?.code || 'PUR',
+        storeName: currentStore?.name || 'Puri Jakarta',
+        cashierName: cashierName || `Kasir ${currentStore?.name || 'Puri'}`,
+        type: 'REDEEM',
+        amount: 0,
+        pointsDelta: -50,
+        voucherCode: cleanCode,
+        timestamp: new Date().toISOString(),
+        notes: `Klaim voucher ${cleanCode}`
+      };
 
-    // 1. Synchronize Voucher Quota (totalUsed & totalClaimed) in State & localStorage
-    if (setVouchers) {
-      setVouchers(prev => {
-        const next = prev.map(v => {
-          const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
-          if (vCode === cleanCode) {
-            const newUsed = (v.totalUsed || 0) + 1;
-            return {
-              ...v,
-              totalUsed: newUsed,
-              totalClaimed: Math.max(v.totalClaimed || 0, newUsed)
-            };
-          }
-          return v;
-        });
-        try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
-        return next;
-      });
-    } else {
-      try {
-        const saved = localStorage.getItem('wtc_vouchers');
-        if (saved) {
-          const parsed: Voucher[] = JSON.parse(saved);
-          const next = parsed.map(v => {
+      let updatedMember: Member = {
+        ...member,
+        points: Math.max(0, (member.points || 0) - 50),
+        lastStoreVisited: currentStore?.name || member.lastStoreVisited,
+        lastVisitDate: new Date().toISOString()
+      };
+
+      // 1. Synchronize Voucher Quota (totalUsed & totalClaimed) in State & localStorage
+      if (setVouchers) {
+        setVouchers(prev => {
+          const next = prev.map(v => {
             const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
             if (vCode === cleanCode) {
               const newUsed = (v.totalUsed || 0) + 1;
@@ -337,73 +315,99 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
             }
             return v;
           });
-          localStorage.setItem('wtc_vouchers', JSON.stringify(next));
-        }
-      } catch {}
-    }
-
-    if (onVoucherRedeemed) {
-      onVoucherRedeemed(cleanCode);
-    }
-
-    // 2. Increment voucher quota in Firestore
-    try {
-      if (vouchers) {
-        const targetVoucher = vouchers.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
-        if (targetVoucher) {
-          const voucherRef = doc(db, 'vouchers', targetVoucher.id);
-          await updateDoc(voucherRef, {
-            totalUsed: increment(1),
-            totalClaimed: increment(1)
-          });
-        }
+          try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
+          return next;
+        });
+      } else {
+        try {
+          const saved = localStorage.getItem('wtc_vouchers');
+          if (saved) {
+            const parsed: Voucher[] = JSON.parse(saved);
+            const next = parsed.map(v => {
+              const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
+              if (vCode === cleanCode) {
+                const newUsed = (v.totalUsed || 0) + 1;
+                return {
+                  ...v,
+                  totalUsed: newUsed,
+                  totalClaimed: Math.max(v.totalClaimed || 0, newUsed)
+                };
+              }
+              return v;
+            });
+            localStorage.setItem('wtc_vouchers', JSON.stringify(next));
+          }
+        } catch {}
       }
-    } catch (e: any) {
-      console.warn("Firestore update failed:", e);
-    }
 
-    // 3. Save transaction to Firestore
-    try {
-      await safeSetDoc('transactions', savedTrx.id, savedTrx);
-      await safeSetDoc('members', updatedMember.id, updatedMember);
-    } catch (e: any) {
-      console.warn("Backend API unavailable, voucher redeemed locally:", e);
-    }
-
-    // 4. Update Transactions & Members state
-    setTransactions(prev => {
-      if (prev.some(t => t.id === savedTrx.id)) {
-        return prev;
+      if (onVoucherRedeemed) {
+        onVoucherRedeemed(cleanCode);
       }
-      const next = [savedTrx, ...prev.filter(t => t.id !== savedTrx.id)];
-      try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
-      return next;
-    });
 
-    setMembers(prev => {
-      const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
-      try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
-      return next;
-    });
+      // 2. Increment voucher quota in Firestore
+      try {
+        if (vouchers) {
+          const targetVoucher = vouchers.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
+          if (targetVoucher) {
+            const voucherRef = doc(db, 'vouchers', targetVoucher.id);
+            await updateDoc(voucherRef, {
+              totalUsed: increment(1),
+              totalClaimed: increment(1)
+            });
+          }
+        }
+      } catch (e: any) {
+        console.warn("Firestore update failed:", e);
+      }
 
-    // 5. Append to Audit Trail
-    try {
-      const auditSaved = localStorage.getItem('wtc_audit_logs');
-      const auditList = auditSaved ? JSON.parse(auditSaved) : [];
-      auditList.unshift({
-        id: 'AL-' + Date.now().toString().slice(-4),
-        timestamp: new Date().toISOString(),
-        actorName: cashierName || `Kasir ${currentStore?.name || 'Toko'}`,
-        actorRole: 'CASHIER',
-        action: 'VOUCHER_REDEEMED',
-        details: `Klaim voucher ${cleanCode} berhasil untuk member ${member.name} (${member.phone}). Kuota penggunaan voucher otomatis bertambah di HO.`,
-        module: 'VOUCHERS'
+      // 3. Save transaction to Firestore
+      try {
+        await safeSetDoc('transactions', savedTrx.id, savedTrx);
+        await safeSetDoc('members', updatedMember.id, updatedMember);
+      } catch (e: any) {
+        console.warn("Backend API unavailable, voucher redeemed locally:", e);
+      }
+
+      // 4. Update Transactions & Members state
+      setTransactions(prev => {
+        if (prev.some(t => t.id === savedTrx.id)) {
+          return prev;
+        }
+        const next = [savedTrx, ...prev.filter(t => t.id !== savedTrx.id)];
+        try { localStorage.setItem('wtc_transactions', JSON.stringify(next)); } catch {}
+        return next;
       });
-      localStorage.setItem('wtc_audit_logs', JSON.stringify(auditList));
-    } catch {}
 
-    showAlert(`Voucher ${cleanCode} berhasil diklaim & kuota telah diperbarui!`, 'Klaim Voucher Berhasil', 'success');
-    setIsSubmitting(false);
+      setMembers(prev => {
+        const next = prev.map(m => m.id === updatedMember.id ? updatedMember : m);
+        try { localStorage.setItem('wtc_members', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      // 5. Append to Audit Trail
+      try {
+        const auditSaved = localStorage.getItem('wtc_audit_logs');
+        const auditList = auditSaved ? JSON.parse(auditSaved) : [];
+        auditList.unshift({
+          id: 'AL-' + Date.now().toString().slice(-4),
+          timestamp: new Date().toISOString(),
+          actorName: cashierName || `Kasir ${currentStore?.name || 'Toko'}`,
+          actorRole: 'CASHIER',
+          action: 'VOUCHER_REDEEMED',
+          details: `Klaim voucher ${cleanCode} berhasil untuk member ${member.name} (${member.phone}). Kuota penggunaan voucher otomatis bertambah di HO.`,
+          module: 'VOUCHERS'
+        });
+        localStorage.setItem('wtc_audit_logs', JSON.stringify(auditList));
+      } catch {}
+
+      showAlert(`Voucher ${cleanCode} berhasil diklaim & kuota telah diperbarui!`, 'Klaim Voucher Berhasil', 'success');
+    } catch (err: any) {
+      console.error('Redeem voucher error:', err);
+      showAlert(err?.message || 'Gagal memproses klaim voucher.', 'Klaim Gagal', 'error');
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -412,8 +416,13 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
       {/* CASHIER SIDEBAR NAVIGATION */}
       <CashierSidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        
+        setActiveTab={(newTab) => {
+          if (isSubmitting || isSubmittingRef.current) {
+            showAlert('Transaksi sedang diproses ke server. Harap tunggu hingga selesai sebelum berpindah menu.', 'Mohon Tunggu', 'warning');
+            return;
+          }
+          setActiveTab(newTab);
+        }}
       />
 
       {/* MAIN CASHIER CONTENT AREA */}

@@ -35,10 +35,36 @@ export const CashierHeader: React.FC<HeaderProps> = ({
       setDateStr(now.toLocaleDateString('id-ID', dateOptions));
     };
 
-    const interval = setInterval(updateClock, 1000);
-    updateClock();
+    let interval: any = null;
+    const startClock = () => {
+      if (!interval && typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        updateClock();
+        interval = setInterval(updateClock, 1000);
+      }
+    };
 
-    return () => clearInterval(interval);
+    const stopClock = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        startClock();
+      } else {
+        stopClock();
+      }
+    };
+
+    startClock();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      stopClock();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const toggleTheme = () => {

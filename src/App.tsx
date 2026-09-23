@@ -15,7 +15,7 @@ import {
   initialCampaigns,
   initialAuditLogs
 } from './data/mockData';
-import { setupFirestoreListeners, seedFirestoreIfEmpty, safeSetDoc, cleanForFirestore, findMemberByPhoneInFirestore, findMemberByGoogleUidInFirestore, normalizePhoneNumber, isSamePhoneNumber, cleanAndEnrichStore } from './lib/syncFirestore';
+import { setupFirestoreListeners, seedFirestoreIfEmpty, safeSetDoc, safeDeleteDoc, cleanForFirestore, findMemberByPhoneInFirestore, findMemberByGoogleUidInFirestore, normalizePhoneNumber, isSamePhoneNumber, cleanAndEnrichStore } from './lib/syncFirestore';
 import { startSyncWorker, runMemberSyncPass, recordDeletedMemberId } from './lib/sync-worker';
 import { apiFetch } from './lib/apiClient';
 
@@ -327,7 +327,7 @@ export default function App() {
       const saved = localStorage.getItem('wtc_campaigns');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
     return initialCampaigns;
@@ -368,17 +368,37 @@ export default function App() {
   // Support Ticket Handlers
   
   const handleDeleteCampaign = async (id: string) => {
+    const target = campaigns.find(c => c.id === id);
+    const campaignName = target?.name || id;
+
+    // 1. Optimistic state and local storage update
+    setCampaigns(prev => {
+      const next = prev.filter(c => c.id !== id);
+      try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    const auditEntry: any = {
+      id: 'AL-' + Date.now().toString().slice(-4),
+      timestamp: new Date().toISOString(),
+      actorName: 'Superadmin HO',
+      actorRole: 'HO_ADMIN',
+      action: 'CAMPAIGN_DELETED',
+      details: `Kampanye promosi dihapus: "${campaignName}".`,
+      module: 'VOUCHERS'
+    };
+    setAuditLogs(prev => [auditEntry, ...prev]);
+
+    // 2. Durable delete in Firestore & Server API
     try {
-      await deleteDoc(doc(db, 'campaigns', id));
-      // Local state will be updated via real-time sync, but we update it optimistically:
-      setCampaigns(prev => {
-        const next = prev.filter(c => c.id !== id);
-        try { localStorage.setItem('wtc_campaigns', JSON.stringify(next)); } catch {}
-        return next;
-      });
+      await safeDeleteDoc('campaigns', id);
     } catch(err) {
-      console.error('Failed to delete campaign:', err);
+      console.warn('Notice deleting campaign from Firestore/Server:', err);
     }
+
+    try {
+      await safeSetDoc('audit', auditEntry.id, auditEntry);
+    } catch {}
   };
   
   const handleUpdateTicket = async (updated: SupportTicket) => {
@@ -486,38 +506,51 @@ export default function App() {
   };
 
   const handleAddCampaign = async (campaign: any) => {
+    const sanitizedCampaign = cleanForFirestore({
+      ...campaign,
+      createdAt: campaign.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
     const auditEntry: any = {
       id: 'AL-' + Date.now().toString().slice(-4),
       timestamp: new Date().toISOString(),
       actorName: 'Superadmin HO',
       actorRole: 'HO_ADMIN',
       action: 'CAMPAIGN_PUBLISHED',
-      details: `Kampanye promosi baru diterbitkan: "${campaign.name}" (Popup Web App: ${campaign.showAsPopupOnApp ? 'Ya' : 'Tidak'}).`,
+      details: `Kampanye promosi baru diterbitkan: "${sanitizedCampaign.name}" (Popup Web App: ${sanitizedCampaign.showAsPopupOnApp ? 'Ya' : 'Tidak'}).`,
       module: 'VOUCHERS'
     };
+
+    // Optimistic UI update
+    setCampaigns(prev => [sanitizedCampaign, ...prev.filter(c => c.id !== sanitizedCampaign.id)]);
+    setAuditLogs(prev => [auditEntry, ...prev]);
+
+    // Primary write to Firestore & Server API
     try {
-      const batch = writeBatch(db);
-      batch.set(doc(db, 'campaigns', campaign.id), campaign);
-      batch.set(doc(db, 'audit', auditEntry.id), auditEntry);
-      await batch.commit();
+      await safeSetDoc('campaigns', sanitizedCampaign.id, sanitizedCampaign);
     } catch (err) {
       console.warn("Firestore error saving campaign:", err);
-      try {
-        await safeSetDoc('campaigns', campaign.id, campaign);
-        await safeSetDoc('audit', auditEntry.id, auditEntry);
-      } catch {}
     }
-    setCampaigns(prev => [campaign, ...prev]);
-    setAuditLogs(prev => [auditEntry, ...prev]);
+
+    try {
+      await safeSetDoc('audit', auditEntry.id, auditEntry);
+    } catch {}
   };
 
   const handleToggleCampaignStatus = async (id: string) => {
     const target = campaigns.find(c => c.id === id);
     if (!target) return false;
-    const newStatus = target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-    setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
+    const newStatus: Campaign['status'] = target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+    const updated: Campaign = { ...target, status: newStatus };
+    
+    setCampaigns(prev => prev.map(c => c.id === id ? updated : c));
     try {
-      await setDoc(doc(db, 'campaigns', id), { ...target, status: newStatus });
+      localStorage.setItem('wtc_campaigns', JSON.stringify(campaigns.map(c => c.id === id ? updated : c)));
+    } catch {}
+
+    try {
+      await safeSetDoc('campaigns', id, cleanForFirestore(updated));
     } catch (err) {
       console.warn("Firestore error toggling campaign status:", err);
     }
@@ -711,7 +744,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Background 30-second Sync Worker: audits & resolves data discrepancies between Cashier & Customer apps
+  // Event-driven initial reconcile on mount (No barbaric setInterval polling).
+  // Real-time synchronization is natively provided by Firestore onSnapshot push listeners.
+  // Polling with setInterval every few seconds causes memory bloat, high CPU, and battery drain on mobile PWA & POS tablets.
   const membersRef = useRef(members);
   useEffect(() => {
     membersRef.current = members;
@@ -723,7 +758,7 @@ export default function App() {
       setMembers: (reconciledMembers) => {
         setMembers(reconciledMembers);
       },
-      intervalMs: 30000,
+      enablePeriodicPolling: false, // Explicitly disabled to eliminate setInterval memory bloat
       immediate: true,
       onInitialReconciled: (report) => {
         console.info("[SyncWorker] Initial state reconciled with Firestore upon mount:", report);

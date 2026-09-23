@@ -1,4 +1,4 @@
-import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, writeBatch, query, where } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, getDocs, writeBatch, query, where } from "firebase/firestore";
 import { db } from "./firebase";
 import { initialStores, initialMembers, initialVouchers, initialTransactions, initialSupportTickets, initialCampaigns, initialAuditLogs, initialLoyaltyConfig } from "../data/mockData";
 import { StoreBranch } from "../types";
@@ -424,6 +424,13 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
+    } else if (collectionName === 'campaigns') {
+      const res = await fetch(`/api/campaigns/${encodeURIComponent(docId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitized)
+      });
+      if (res.ok) serverSyncSucceeded = true;
     }
   } catch (serverErr) {
     console.warn('[Server Sync] Notice syncing document to server API:', serverErr);
@@ -456,11 +463,64 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
   }
 
   // If both Firestore AND server failed, throw so UI can notify user
-  if (firestoreFailed && !serverSyncSucceeded && collectionName !== 'stores' && collectionName !== 'vouchers') {
+  if (firestoreFailed && !serverSyncSucceeded && collectionName !== 'stores' && collectionName !== 'vouchers' && collectionName !== 'campaigns') {
     throw firestoreError;
   }
 
   return sanitized;
+}
+
+export async function safeDeleteDoc(collectionName: string, docId: string): Promise<void> {
+  let firestoreFailed = false;
+  let firestoreError: any = null;
+
+  // 1. Primary delete from Firebase Firestore
+  try {
+    await deleteDoc(doc(db, collectionName, String(docId)));
+  } catch (err: any) {
+    firestoreFailed = true;
+    firestoreError = err;
+    console.warn(`[safeDeleteDoc] Direct Firestore delete failed for ${collectionName}/${docId}:`, err?.message);
+  }
+
+  // 2. Server API sync for server-backed persistence
+  let serverSyncSucceeded = false;
+  try {
+    const res = await fetch(`/api/${collectionName}/${encodeURIComponent(docId)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) serverSyncSucceeded = true;
+  } catch (serverErr) {
+    console.warn(`[safeDeleteDoc] Server API delete notice for ${collectionName}/${docId}:`, serverErr);
+  }
+
+  // 3. Update local backup cache
+  try {
+    const storageKey = collectionName === 'stores' ? 'wtc_stores' 
+      : collectionName === 'members' ? 'wtc_members' 
+      : collectionName === 'vouchers' ? 'wtc_vouchers' 
+      : collectionName === 'transactions' ? 'wtc_transactions' 
+      : collectionName === 'campaigns' ? 'wtc_campaigns' 
+      : collectionName === 'audit' || collectionName === 'audit_logs' ? 'wtc_audit_logs'
+      : null;
+
+    if (storageKey) {
+      const existing = localStorage.getItem(storageKey);
+      if (existing) {
+        let list = JSON.parse(existing);
+        if (Array.isArray(list)) {
+          list = list.filter((item: any) => item && item.id !== docId);
+          localStorage.setItem(storageKey, JSON.stringify(list));
+        }
+      }
+    }
+  } catch (localErr) {
+    console.warn("safeDeleteDoc local sync notice:", localErr);
+  }
+
+  if (firestoreFailed && !serverSyncSucceeded && collectionName !== 'campaigns') {
+    throw firestoreError;
+  }
 }
 
 export function setupFirestoreListeners(callbacks: any) {
@@ -527,6 +587,19 @@ export function setupFirestoreListeners(callbacks: any) {
     })
     .catch(err => console.warn('[Server Stores] Initial fetch notice:', err));
 
+  // Proactively fetch persistent campaigns from Server API (guarantees cross-device & cloud persistence)
+  fetch('/api/campaigns')
+    .then(r => r.json())
+    .then(json => {
+      if (json.success && Array.isArray(json.campaigns)) {
+        callbacks.setCampaigns?.(json.campaigns);
+        try {
+          localStorage.setItem('wtc_campaigns', JSON.stringify(json.campaigns));
+        } catch {}
+      }
+    })
+    .catch(err => console.warn('[Server Campaigns] Initial fetch notice:', err));
+
   const collections = [
     { name: 'stores', set: callbacks.setStores, storageKey: 'wtc_stores' },
     { name: 'members', set: callbacks.setMembers, storageKey: 'wtc_members' },
@@ -575,6 +648,14 @@ export function setupFirestoreListeners(callbacks: any) {
         if (storageKey) {
           try {
             localStorage.setItem(storageKey, JSON.stringify(data));
+          } catch {}
+        }
+      } else if (name === 'campaigns' || name === 'support') {
+        // When collection is deleted down to 0 in Firestore, accurately reflect empty array to all clients
+        set([]);
+        if (storageKey) {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify([]));
           } catch {}
         }
       }
