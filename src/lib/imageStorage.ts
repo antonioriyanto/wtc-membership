@@ -1,7 +1,7 @@
 /**
  * Image Storage & Validation Service
  * Enforces MIME type, magic bytes verification, file size limits, and image dimensions.
- * Uploads assets directly to Firebase Storage (or server multipart upload),
+ * Uploads assets directly to Firebase Storage,
  * ensuring Firestore and localStorage NEVER store raw Base64 data.
  */
 
@@ -148,7 +148,7 @@ export async function validateImageFile(file: File): Promise<ImageValidationResu
 }
 
 /**
- * Uploads an image to Firebase Storage (with fallback to multipart server upload).
+ * Uploads an image to Firebase Storage.
  * Returns the public URL and metadata. NEVER returns or persists Base64 strings.
  */
 export async function uploadImageToStorage(
@@ -165,7 +165,6 @@ export async function uploadImageToStorage(
   const storagePath = `${destinationFolder}/${timestamp}_${cleanBaseName}`;
 
   try {
-    // 1. Attempt upload to Firebase Storage
     const storageRef = ref(storage, storagePath);
     const snapshot = await uploadBytes(storageRef, file, {
       contentType: validation.mimeType,
@@ -187,34 +186,6 @@ export async function uploadImageToStorage(
       uploadedAt: new Date().toISOString()
     };
   } catch (firebaseErr: any) {
-    console.warn('[ImageStorage] Firebase Storage direct upload failed or blocked, attempting server multipart upload:', firebaseErr?.message);
-
-    // 2. Fallback to multipart /api/upload endpoint (saves to server disk, returns relative URL)
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      formData.append('folder', destinationFolder);
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await res.json();
-      if (data.success && data.fileUrl) {
-        return {
-          url: data.fileUrl,
-          path: data.fileUrl,
-          size: file.size,
-          mimeType: validation.mimeType || file.type,
-          width: validation.width || 0,
-          height: validation.height || 0,
-          uploadedAt: new Date().toISOString()
-        };
-      }
-      throw new Error(data.error || 'Upload server gagal');
-    } catch (serverErr: any) {
-      throw new Error(`Gagal mengunggah gambar ke Storage: ${firebaseErr.message || serverErr.message}`);
-    }
+    throw new Error(`Gagal mengunggah gambar ke Firebase Storage: ${firebaseErr?.message || 'periksa login admin dan Storage Rules'}`);
   }
 }
