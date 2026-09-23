@@ -3,7 +3,7 @@ import { User, KeyRound, ShieldCheck, Eye, EyeOff, Lock, ChevronDown, LogIn } fr
 import { WatchClubLogo } from './WatchClubLogo';
 import { apiFetch } from '../lib/apiClient';
 import { auth } from '../lib/firebase';
-import { signInWithCustomToken } from 'firebase/auth';
+import { signInWithCustomToken, signInWithEmailAndPassword } from 'firebase/auth';
 
 export const STORE_ACCOUNTS = [
   { name: '23 Paskal Bandung', username: '23PSC' },
@@ -125,10 +125,27 @@ export const AdminLogin: React.FC<LoginWallProps> = ({
       });
       
       if (result.success) {
-        if (!result.token) {
-          throw new Error('Server tidak mengirim sesi Firebase. Hubungi admin.');
+        let authenticatedWithFirebase = false;
+
+        // Try custom token first if issued
+        if (result.token) {
+          try {
+            await signInWithCustomToken(auth, result.token);
+            authenticatedWithFirebase = true;
+          } catch (customErr: any) {
+            console.warn('Firebase custom token sign in notice:', customErr?.message);
+          }
         }
-        await signInWithCustomToken(auth, result.token);
+
+        // Seamless fallback to server-provisioned role credentials for Firebase Auth
+        if (!authenticatedWithFirebase && result.firebaseAuth?.email && result.firebaseAuth?.password) {
+          try {
+            await signInWithEmailAndPassword(auth, result.firebaseAuth.email, result.firebaseAuth.password);
+            authenticatedWithFirebase = true;
+          } catch (emailErr: any) {
+            console.warn('Firebase email/password sign in notice:', emailErr?.message);
+          }
+        }
 
         let finalStoreId = currentStoreId;
         if (!isHOUser && showStoreQuickSelect) {

@@ -155,7 +155,8 @@ export async function validateImageFile(file: File): Promise<ImageValidationResu
  */
 export async function uploadImageToStorage(
   file: File, 
-  destinationFolder: 'stores' | 'campaigns' | 'vouchers' | 'members'
+  destinationFolder: 'stores' | 'campaigns' | 'vouchers' | 'members',
+  entityId?: string
 ): Promise<UploadedImageMetadata> {
   const validation = await validateImageFile(file);
   if (!validation.valid) {
@@ -164,7 +165,9 @@ export async function uploadImageToStorage(
 
   const cleanBaseName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const timestamp = Date.now();
-  const storagePath = `${destinationFolder}/${timestamp}_${cleanBaseName}`;
+  const storagePath = entityId 
+    ? `${destinationFolder}/${entityId}/${timestamp}_${cleanBaseName}`
+    : `${destinationFolder}/${timestamp}_${cleanBaseName}`;
 
   try {
     // 1. Attempt upload to Firebase Storage
