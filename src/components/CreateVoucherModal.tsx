@@ -14,7 +14,6 @@ import {
   Store,
   Eye
 } from 'lucide-react';
-import { compressImage } from '../utils/imageCompression';
 import { uploadImageToStorage } from '../lib/imageStorage';
 
 interface CreateVoucherModalProps {
@@ -118,8 +117,8 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
   if (!isOpen) return null;
 
   const processAndUploadFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('Harap pilih file gambar (JPG, PNG, WebP, GIF).');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Harap pilih file gambar JPG, PNG, atau WebP.');
       return;
     }
 
@@ -128,23 +127,9 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
     setUploadSuccessInfo(null);
 
     try {
-      // 1. Client-side compress to max 1280px maintaining aspect ratio & high quality
-      const compressed = await compressImage(file, 1280, 720, 0.85);
-      
-      const origSizeMb = (compressed.originalSize / (1024 * 1024)).toFixed(1);
-      const compSizeKb = Math.round(compressed.compressedSize / 1024);
-
-      const imageType = compressed.blob.type || file.type;
-      const extension = imageType === 'image/png' ? 'png' : imageType === 'image/webp' ? 'webp' : 'jpg';
-      const imageFile = new File([compressed.blob], file.name.replace(/\.[^/.]+$/, '') + '.' + extension, { type: imageType });
-      const uploaded = await uploadImageToStorage(imageFile, 'vouchers');
+      const uploaded = await uploadImageToStorage(file, 'vouchers');
       setImagePath(uploaded.url);
-
-      const sizeLabel = compressed.originalSize > 1024 * 1024 
-        ? `${origSizeMb} MB → ${compSizeKb} KB` 
-        : `${compSizeKb} KB`;
-
-      setUploadSuccessInfo(`Gambar berhasil diproses (${sizeLabel})`);
+      setUploadSuccessInfo(`Gambar berhasil diunggah (${Math.round(uploaded.size / 1024)} KB)`);
     } catch (err: any) {
       console.error('Image processing error:', err);
       setError(err?.message || 'Gagal memproses gambar. Pastikan format gambar valid.');
