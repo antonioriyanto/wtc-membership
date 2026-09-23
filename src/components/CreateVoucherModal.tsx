@@ -134,8 +134,10 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
       const origSizeMb = (compressed.originalSize / (1024 * 1024)).toFixed(1);
       const compSizeKb = Math.round(compressed.compressedSize / 1024);
 
-      const jpegFile = new File([compressed.blob], file.name.replace(/\.[^/.]+$/, '') + '.jpg', { type: 'image/jpeg' });
-      const uploaded = await uploadImageToStorage(jpegFile, 'vouchers');
+      const imageType = compressed.blob.type || file.type;
+      const extension = imageType === 'image/png' ? 'png' : imageType === 'image/webp' ? 'webp' : 'jpg';
+      const imageFile = new File([compressed.blob], file.name.replace(/\.[^/.]+$/, '') + '.' + extension, { type: imageType });
+      const uploaded = await uploadImageToStorage(imageFile, 'vouchers');
       setImagePath(uploaded.url);
 
       const sizeLabel = compressed.originalSize > 1024 * 1024 
