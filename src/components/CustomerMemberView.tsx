@@ -210,7 +210,7 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     setIsUploadingAvatar(true);
     try {
       // 1. Upload to Firebase Storage with magic-byte validation and 5MB limit
-      const uploaded = await uploadImageToStorage(file, 'members');
+      const uploaded = await uploadImageToStorage(file, 'members', member.id);
       const storageUrl = uploaded.url;
 
       const updatedMemberData: Member = {
