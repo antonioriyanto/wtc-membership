@@ -1,0 +1,11 @@
+[
+  {
+    "id": "AL-785002",
+    "timestamp": "2026-10-08T03:06:25.002Z",
+    "actorName": "Kasir",
+    "actorRole": "STORE_CASHIER",
+    "action": "POINTS_EARNED",
+    "details": "Kasir menambahkan +1 poin untuk Member (Struk: TEST-DEV-OK-1)",
+    "module": "LOYALTY_PROGRAM"
+  }
+]

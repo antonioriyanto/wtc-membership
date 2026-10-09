@@ -437,6 +437,7 @@ export default function App() {
 
     try {
       const batch = writeBatch(db);
+      batch.set(doc(db, 'support_tickets', ticketId), created);
       batch.set(doc(db, 'support', ticketId), created);
       batch.set(doc(db, 'audit', auditEntry.id), auditEntry);
       await batch.commit();
@@ -446,6 +447,7 @@ export default function App() {
     } catch (err) {
       console.warn("Direct writeBatch notice, applying resilient save:", err);
       try {
+        await safeSetDoc('support_tickets', ticketId, created);
         await safeSetDoc('support', ticketId, created);
         await safeSetDoc('audit', auditEntry.id, auditEntry);
       } catch {}
@@ -490,12 +492,14 @@ export default function App() {
 
     try {
       const batch = writeBatch(db);
+      batch.set(doc(db, 'support_tickets', ticketId), created);
       batch.set(doc(db, 'support', ticketId), created);
       batch.set(doc(db, 'audit', auditEntry.id), auditEntry);
       await batch.commit();
     } catch (err) {
       console.warn("Firestore error saving ticket, updating local state:", err);
       try {
+        await safeSetDoc('support_tickets', ticketId, created);
         await safeSetDoc('support', ticketId, created);
         await safeSetDoc('audit', auditEntry.id, auditEntry);
       } catch {}

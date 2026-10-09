@@ -14,7 +14,7 @@ export default defineConfig(() => {
         includeAssets: ['favicon-32x32.png', 'favicon-16x16.png', 'apple-touch-icon.png', 'watch-club-icon.svg'],
         workbox: {
           maximumFileSizeToCacheInBytes: 5000000, // 5 MB
-          navigateFallbackDenylist: [/\/api\//]
+          navigateFallbackDenylist: [/^\/api\//, /^\/v1\//, /^\/healthz/, /^\/uploads\//]
         },
         manifest: {
           name: 'Watch Club Membership',

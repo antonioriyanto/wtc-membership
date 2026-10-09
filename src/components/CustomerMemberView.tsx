@@ -149,11 +149,28 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
       .map(t => t.voucherCode?.trim().toUpperCase().replace(/^VOUCHER-/, ''))
   );
 
-  const activeCustomerVouchers = vouchers.filter(v => 
-    v.status === 'ACTIVE' && 
-    (v.totalClaimed || 0) < (v.maxUsageLimit || Infinity) &&
-    !redeemedVoucherCodes.has(v.code.trim().toUpperCase().replace(/^VOUCHER-/, ''))
-  );
+  const activeCustomerVouchers = vouchers.filter(v => {
+    if (v.status !== 'ACTIVE') return false;
+    if ((v.totalClaimed || 0) >= (v.maxUsageLimit || Infinity)) return false;
+    if (redeemedVoucherCodes.has(v.code.trim().toUpperCase().replace(/^VOUCHER-/, ''))) return false;
+
+    // Omnichannel Voucher Date Validation
+    const now = new Date();
+    if (v.validFrom) {
+      const fromDate = new Date(v.validFrom);
+      if (!isNaN(fromDate.getTime()) && now < fromDate) return false;
+    }
+    if (v.validUntil) {
+      const untilDate = new Date(v.validUntil);
+      if (!isNaN(untilDate.getTime())) {
+        if (v.validUntil.length <= 10) {
+          untilDate.setHours(23, 59, 59, 999);
+        }
+        if (now > untilDate) return false;
+      }
+    }
+    return true;
+  });
   const [selectedVoucherForQr, setSelectedVoucherForQr] = useState<Voucher | null>(null);
   const [selectedVoucherForTerms, setSelectedVoucherForTerms] = useState<Voucher | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
@@ -649,18 +666,51 @@ export const CustomerMemberView: React.FC<CustomerMemberViewProps> = ({
     }
 
     setIsLoadingTransactions(true);
-    apiFetch('/v1/member/transactions')
-      .then((data) => {
-        if (data?.success && Array.isArray(data.transactions)) {
-          setFirestoreTransactions(data.transactions);
+
+    // 1. Primary Live onSnapshot Listener (instantly reacts to cashier point additions & voucher claims)
+    let unsubscribeFirestore = () => {};
+    try {
+      const q = query(
+        collection(db, 'transactions'),
+        where('memberId', '==', canonicalMemberId)
+      );
+
+      unsubscribeFirestore = onSnapshot(
+        q,
+        (snapshot) => {
+          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction));
+          list.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+          setFirestoreTransactions(list);
+          setIsLoadingTransactions(false);
+        },
+        (err) => {
+          console.warn('[CustomerMemberView] Firestore onSnapshot notice, trying backend fallback:', err?.message);
+          // 2. Secondary fallback via server API
+          apiFetch(`/v1/member/transactions?memberId=${encodeURIComponent(canonicalMemberId)}`)
+            .then((data) => {
+              if (data?.success && Array.isArray(data.transactions)) {
+                setFirestoreTransactions(data.transactions);
+              }
+            })
+            .catch(() => {})
+            .finally(() => setIsLoadingTransactions(false));
         }
-      })
-      .catch((err) => {
-        console.warn('Member transactions fetch notice:', err);
-      })
-      .finally(() => {
-        setIsLoadingTransactions(false);
-      });
+      );
+    } catch {
+      // 3. Resilient fallback
+      apiFetch(`/v1/member/transactions?memberId=${encodeURIComponent(canonicalMemberId)}`)
+        .then((data) => {
+          if (data?.success && Array.isArray(data.transactions)) {
+            setFirestoreTransactions(data.transactions);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setIsLoadingTransactions(false));
+    }
+
+    return () => {
+      unsubscribeFirestore();
+    };
   }, [canonicalMemberId, canonicalMemberPhone]);
 
   // Strict transaction filtering according to requirement 3:

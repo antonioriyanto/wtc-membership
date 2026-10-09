@@ -137,15 +137,16 @@ export const CreateVoucherModal: React.FC<CreateVoucherModalProps> = ({
     setUploadSuccessInfo(null);
 
     try {
-      // 1. Client-side compress to max 1280px maintaining aspect ratio & high quality
-      const compressed = await compressImage(file, 1280, 720, 0.85);
+      // 1. Client-side compress to max 800x400 px, quality 0.8, .webp format (<500KB)
+      const compressed = await compressImage(file, 800, 400, 0.8, 'image/webp');
       
       const origSizeMb = (compressed.originalSize / (1024 * 1024)).toFixed(1);
       const compSizeKb = Math.round(compressed.compressedSize / 1024);
 
       // 2. Try uploading the compressed blob to the server /api/upload
       const formData = new FormData();
-      formData.append('image', compressed.blob, file.name.replace(/\.[^/.]+$/, "") + ".jpg");
+      formData.append('image', compressed.blob, file.name.replace(/\.[^/.]+$/, "") + ".webp");
+      formData.append('folder', 'vouchers');
 
       let uploadedUrl: string | null = null;
 

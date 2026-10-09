@@ -87,19 +87,28 @@ export async function apiFetch<T = any>(endpoint: string, options: ApiFetchOptio
     );
   }
 
-  let data: any;
-  try {
-    data = await response.json();
-  } catch (jsonErr) {
-    if (!response.ok) {
-      throw new Error(`Server returned error ${response.status}: ${response.statusText}`);
+  let data: any = null;
+  const rawText = await response.text();
+  if (rawText && rawText.trim()) {
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      data = null;
     }
-    throw new Error('Respons dari server tidak berformat JSON yang valid.');
   }
 
   if (!response.ok) {
-    const errorMsg = data?.error || data?.message || `Permintaan gagal dengan status ${response.status}`;
+    const errorMsg =
+      data?.error ||
+      data?.message ||
+      (response.status === 404
+        ? `Layanan server API '${normalizedEndpoint}' tidak ditemukan (404 Not Found).`
+        : `Server returned error ${response.status}${response.statusText ? ': ' + response.statusText : ''}`);
     throw new Error(errorMsg);
+  }
+
+  if (data === null) {
+    throw new Error('Respons dari server tidak berformat JSON yang valid.');
   }
 
   return data as T;

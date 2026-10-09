@@ -1,0 +1,18 @@
+[
+  {
+    "id": "tx_1791428785002",
+    "receiptNo": "TEST-DEV-OK-1",
+    "memberId": "1",
+    "membershipId": "",
+    "memberName": "Member",
+    "memberPhone": "",
+    "memberPhoneNormalized": "",
+    "storeId": "PUR",
+    "storeName": "Puri Jakarta",
+    "cashierName": "Kasir",
+    "type": "EARN",
+    "amount": 10000,
+    "pointsDelta": 1,
+    "timestamp": "2026-10-08T03:06:25.002Z"
+  }
+]

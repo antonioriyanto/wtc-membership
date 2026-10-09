@@ -27,6 +27,8 @@ export const CashierSupportTicketsTab: React.FC<CashierSupportTicketsTabProps> =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successNotice, setSuccessNotice] = useState('');
 
+  const [errorNotice, setErrorNotice] = useState('');
+
   // Filter tickets for this store
   const myTickets = supportTickets
     .filter(t => t.storeName === currentStore.name && t.source === 'CASHIER')
@@ -36,8 +38,9 @@ export const CashierSupportTicketsTab: React.FC<CashierSupportTicketsTabProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorNotice('');
     if (hasUnresolvedTicket) {
-      alert('Anda masih memiliki tiket yang belum diselesaikan oleh Head Office. Harap tunggu atau balas tiket tersebut.');
+      setErrorNotice('Anda masih memiliki tiket yang belum diselesaikan oleh Head Office. Harap tunggu atau balas tiket tersebut.');
       return;
     }
     
@@ -66,9 +69,9 @@ export const CashierSupportTicketsTab: React.FC<CashierSupportTicketsTabProps> =
         setSuccessNotice('');
         setActiveTab('HISTORY');
       }, 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Terjadi kesalahan saat mengirim tiket.');
+      setErrorNotice(err?.message || 'Terjadi kesalahan saat mengirim tiket.');
     } finally {
       setIsSubmitting(false);
     }
@@ -122,6 +125,12 @@ export const CashierSupportTicketsTab: React.FC<CashierSupportTicketsTabProps> =
         <div className="p-6 md:p-8">
           {activeTab === 'NEW' ? (
             <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
+              {errorNotice && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 font-bold text-sm flex items-center gap-2 animate-fadeIn">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                  <span>{errorNotice}</span>
+                </div>
+              )}
               {hasUnresolvedTicket && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-sm font-semibold flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />

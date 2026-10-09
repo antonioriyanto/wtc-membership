@@ -263,16 +263,66 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Atomic Single-Use Voucher Lock check
-      if (loyaltyConfig?.enableStrictVoucherSingleUse && vouchers) {
-         const targetVoucher = vouchers.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
-         if (targetVoucher) {
-           if ((targetVoucher.totalUsed || 0) >= (targetVoucher.maxUsageLimit || 1)) {
-              showAlert('Peringatan Keamanan: Voucher ini sudah diklaim maksimal atau terkunci (Atomic Lock).', 'Gagal', 'error');
+      const targetVoucher = vouchers?.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
+
+      if (targetVoucher) {
+        // 1. Status Check
+        if (targetVoucher.status !== 'ACTIVE') {
+          showAlert('Voucher ini sudah tidak aktif atau dinonaktifkan oleh Head Office.', 'Voucher Tidak Aktif', 'error');
+          return;
+        }
+
+        // 2. Date Range Validation (validFrom & validUntil)
+        const now = new Date();
+        if (targetVoucher.validFrom) {
+          const fromDate = new Date(targetVoucher.validFrom);
+          if (!isNaN(fromDate.getTime()) && now < fromDate) {
+            showAlert(`Voucher ini baru berlaku mulai ${new Date(targetVoucher.validFrom).toLocaleDateString('id-ID')}.`, 'Voucher Belum Berlaku', 'warning');
+            return;
+          }
+        }
+        if (targetVoucher.validUntil) {
+          const untilDate = new Date(targetVoucher.validUntil);
+          if (!isNaN(untilDate.getTime())) {
+            if (targetVoucher.validUntil.length <= 10) {
+              untilDate.setHours(23, 59, 59, 999);
+            }
+            if (now > untilDate) {
+              showAlert('Masa berlaku voucher ini sudah berakhir (kadaluarsa).', 'Voucher Kadaluarsa', 'error');
               return;
-           }
-         }
+            }
+          }
+        }
+
+        // 3. Quota Limit Check (maxUsageLimit)
+        const currentUsed = targetVoucher.totalUsed || 0;
+        const maxLimit = targetVoucher.maxUsageLimit || Infinity;
+        if (currentUsed >= maxLimit) {
+          showAlert('Kuota penggunaan voucher ini sudah habis (mencapai batas maksimal).', 'Kuota Voucher Habis', 'error');
+          return;
+        }
+
+        // 4. Single-Use per Member Check
+        const alreadyRedeemed = transactions?.some(t => 
+          (t.memberId === member.id || (t.memberPhone && member.phone && t.memberPhone === member.phone)) &&
+          (t.type === 'REDEEM' || t.type === 'VOUCHER_DISCOUNT') &&
+          t.voucherCode?.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode
+        );
+
+        if (alreadyRedeemed) {
+          showAlert(`Member ${member.name} sudah pernah menggunakan voucher ${cleanCode} ini (Single-Use Restriction).`, 'Voucher Sudah Digunakan', 'warning');
+          return;
+        }
+
+        // 5. Minimum Purchase Notice
+        if (targetVoucher.minPurchase && targetVoucher.minPurchase > 0) {
+          const formattedMin = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(targetVoucher.minPurchase);
+          console.log(`[Voucher Validation] Min purchase requirement: ${formattedMin}`);
+        }
       }
+
+      const pointsCost = (targetVoucher as any)?.pointCost ? Number((targetVoucher as any).pointCost) : 0;
+      const willExceedQuota = targetVoucher && targetVoucher.maxUsageLimit && ((targetVoucher.totalUsed || 0) + 1 >= targetVoucher.maxUsageLimit);
 
       let savedTrx: Transaction = {
         id: 'tx_' + Date.now(),
@@ -287,15 +337,15 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
         cashierName: cashierName || `Kasir ${currentStore?.name || 'Puri'}`,
         type: 'REDEEM',
         amount: 0,
-        pointsDelta: -50,
+        pointsDelta: pointsCost > 0 ? -pointsCost : 0,
         voucherCode: cleanCode,
         timestamp: new Date().toISOString(),
-        notes: `Klaim voucher ${cleanCode}`
+        notes: `Klaim voucher ${targetVoucher?.title || cleanCode}`
       };
 
       let updatedMember: Member = {
         ...member,
-        points: Math.max(0, (member.points || 0) - 50),
+        points: Math.max(0, (member.points || 0) - pointsCost),
         lastStoreVisited: currentStore?.name || member.lastStoreVisited,
         lastVisitDate: new Date().toISOString()
       };
@@ -307,10 +357,12 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
             const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
             if (vCode === cleanCode) {
               const newUsed = (v.totalUsed || 0) + 1;
+              const newStatus = (v.maxUsageLimit && newUsed >= v.maxUsageLimit) ? 'INACTIVE' : v.status;
               return {
                 ...v,
                 totalUsed: newUsed,
-                totalClaimed: Math.max(v.totalClaimed || 0, newUsed)
+                totalClaimed: Math.max(v.totalClaimed || 0, newUsed),
+                status: newStatus
               };
             }
             return v;
@@ -318,26 +370,6 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
           try { localStorage.setItem('wtc_vouchers', JSON.stringify(next)); } catch {}
           return next;
         });
-      } else {
-        try {
-          const saved = localStorage.getItem('wtc_vouchers');
-          if (saved) {
-            const parsed: Voucher[] = JSON.parse(saved);
-            const next = parsed.map(v => {
-              const vCode = v.code.trim().toUpperCase().replace(/^VOUCHER-/, '');
-              if (vCode === cleanCode) {
-                const newUsed = (v.totalUsed || 0) + 1;
-                return {
-                  ...v,
-                  totalUsed: newUsed,
-                  totalClaimed: Math.max(v.totalClaimed || 0, newUsed)
-                };
-              }
-              return v;
-            });
-            localStorage.setItem('wtc_vouchers', JSON.stringify(next));
-          }
-        } catch {}
       }
 
       if (onVoucherRedeemed) {
@@ -346,15 +378,16 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
 
       // 2. Increment voucher quota in Firestore
       try {
-        if (vouchers) {
-          const targetVoucher = vouchers.find(v => v.code.trim().toUpperCase().replace(/^VOUCHER-/, '') === cleanCode);
-          if (targetVoucher) {
-            const voucherRef = doc(db, 'vouchers', targetVoucher.id);
-            await updateDoc(voucherRef, {
-              totalUsed: increment(1),
-              totalClaimed: increment(1)
-            });
+        if (targetVoucher) {
+          const voucherRef = doc(db, 'vouchers', targetVoucher.id);
+          const updates: any = {
+            totalUsed: increment(1),
+            totalClaimed: increment(1)
+          };
+          if (willExceedQuota) {
+            updates.status = 'INACTIVE';
           }
+          await updateDoc(voucherRef, updates);
         }
       } catch (e: any) {
         console.warn("Firestore update failed:", e);

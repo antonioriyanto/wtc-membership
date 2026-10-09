@@ -15,9 +15,10 @@ export interface CompressedImageResult {
 
 export async function compressImage(
   file: File,
-  maxWidth = 1200,
-  maxHeight = 675,
-  quality = 0.85
+  maxWidth = 1080,
+  maxHeight = 1080,
+  quality = 0.8,
+  outputFormat: 'image/webp' | 'image/jpeg' = 'image/webp'
 ): Promise<CompressedImageResult> {
   return new Promise((resolve, reject) => {
     // If not an image, reject
@@ -73,8 +74,9 @@ export async function compressImage(
           ctx.drawImage(img, 0, 0, width, height);
 
           // Get compressed Data URL
-          const mimeType = 'image/jpeg';
-          const compressedDataUrl = canvas.toDataURL(mimeType, quality);
+          const mimeType = outputFormat;
+          let currentQuality = quality;
+          let compressedDataUrl = canvas.toDataURL(mimeType, currentQuality);
 
           // Convert to Blob for multipart upload
           canvas.toBlob(
@@ -100,7 +102,7 @@ export async function compressImage(
               }
             },
             mimeType,
-            quality
+            currentQuality
           );
         } catch (err: any) {
           reject(new Error('Gagal mengompres gambar: ' + (err?.message || 'Unknown error')));

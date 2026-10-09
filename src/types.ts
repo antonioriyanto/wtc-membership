@@ -192,7 +192,7 @@ export interface Voucher {
   totalClaimed: number;
   totalUsed: number;
   maxUsageLimit: number;
-  status: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'PAUSED';
+  status: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'PAUSED' | 'INACTIVE';
   terms: string[];
   imagePath?: string;
 }

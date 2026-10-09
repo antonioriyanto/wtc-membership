@@ -1,5 +1,13 @@
 [
   {
+    "id": "1",
+    "points": 1,
+    "lifetimePoints": 1,
+    "totalSpend": 10000,
+    "tier": "BLUE",
+    "lastVisitDate": "2026-10-08T03:06:25.004Z"
+  },
+  {
     "id": "mem_kokas_0001",
     "membershipId": "KOKAS0001",
     "name": "Aan",

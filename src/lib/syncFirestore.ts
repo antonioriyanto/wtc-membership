@@ -431,6 +431,27 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
+    } else if (collectionName === 'transactions') {
+      const res = await fetch(`/api/transactions/${encodeURIComponent(docId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitized)
+      });
+      if (res.ok) serverSyncSucceeded = true;
+    } else if (collectionName === 'support_tickets' || collectionName === 'support') {
+      const res = await fetch(`/api/support_tickets/${encodeURIComponent(docId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitized)
+      });
+      if (res.ok) serverSyncSucceeded = true;
+    } else if (collectionName === 'audit' || collectionName === 'audit_logs') {
+      const res = await fetch(`/api/audit_logs/${encodeURIComponent(docId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitized)
+      });
+      if (res.ok) serverSyncSucceeded = true;
     }
   } catch (serverErr) {
     console.warn('[Server Sync] Notice syncing document to server API:', serverErr);
@@ -606,6 +627,7 @@ export function setupFirestoreListeners(callbacks: any) {
     { name: 'vouchers', set: callbacks.setVouchers, storageKey: 'wtc_vouchers' },
     { name: 'transactions', set: callbacks.setTransactions, storageKey: 'wtc_transactions' },
     { name: 'support', set: callbacks.setSupportTickets, storageKey: 'wtc_tickets' },
+    { name: 'support_tickets', set: callbacks.setSupportTickets, storageKey: 'wtc_tickets' },
     { name: 'campaigns', set: callbacks.setCampaigns, storageKey: 'wtc_campaigns' },
     { name: 'audit', set: callbacks.setAuditLogs, storageKey: 'wtc_audit_logs' },
   ];

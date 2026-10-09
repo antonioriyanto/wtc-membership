@@ -158,37 +158,49 @@ export async function uploadImageToStorage(
   destinationFolder: 'stores' | 'campaigns' | 'vouchers' | 'members',
   entityId?: string
 ): Promise<UploadedImageMetadata> {
-  const validation = await validateImageFile(file);
-  if (!validation.valid) {
-    throw new Error(validation.error || 'Validasi gambar gagal.');
+  if (!file) {
+    throw new Error('File gambar tidak ditemukan.');
   }
 
-  const cleanBaseName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const timestamp = Date.now();
-  const storagePath = entityId 
-    ? `${destinationFolder}/${entityId}/${timestamp}_${cleanBaseName}`
-    : `${destinationFolder}/${timestamp}_${cleanBaseName}`;
+  // Set proportional dimensions: Stores: max 1080px, Vouchers: 800x400
+  const maxW = destinationFolder === 'vouchers' ? 800 : 1080;
+  const maxH = destinationFolder === 'vouchers' ? 400 : 1080;
 
-  // Pre-compress client-side to ensure high visual fidelity at minimum byte size (speeds up network upload & guarantees instant rendering)
+  // Pre-compress client-side using HTML5 Canvas to <500KB in .webp or .jpeg format
   let uploadBlob: Blob = file;
-  let imgWidth = validation.width || 800;
-  let imgHeight = validation.height || 600;
+  let imgWidth = 800;
+  let imgHeight = 600;
   let fallbackDataUrl = '';
 
   try {
-    const compressed = await compressImage(file, 1280, 850, 0.84);
+    const compressed = await compressImage(file, maxW, maxH, 0.8, 'image/webp');
     uploadBlob = compressed.blob;
     imgWidth = compressed.width;
     imgHeight = compressed.height;
     fallbackDataUrl = compressed.dataUrl;
   } catch (compErr) {
-    console.warn('[ImageStorage] Client compression notice:', compErr);
+    console.warn('[ImageStorage] Client compression notice, trying jpeg fallback:', compErr);
+    try {
+      const compJpeg = await compressImage(file, maxW, maxH, 0.8, 'image/jpeg');
+      uploadBlob = compJpeg.blob;
+      imgWidth = compJpeg.width;
+      imgHeight = compJpeg.height;
+      fallbackDataUrl = compJpeg.dataUrl;
+    } catch {}
   }
 
-  // 1. Primary: Server multipart endpoint with Cloud SQL persistent database backing
+  const cleanBaseName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^/.]+$/, "");
+  const timestamp = Date.now();
+  const ext = uploadBlob.type.includes('webp') ? '.webp' : '.jpg';
+  const finalFilename = `${timestamp}_${cleanBaseName}${ext}`;
+  const storagePath = entityId 
+    ? `${destinationFolder}/${entityId}/${finalFilename}`
+    : `${destinationFolder}/${finalFilename}`;
+
+  // 1. Primary: Server multipart endpoint with persistent database backing
   try {
     const formData = new FormData();
-    formData.append('image', uploadBlob, `${timestamp}_${cleanBaseName}.jpg`);
+    formData.append('image', uploadBlob, finalFilename);
     formData.append('folder', destinationFolder);
     if (entityId) formData.append('entityId', entityId);
 
@@ -200,62 +212,66 @@ export async function uploadImageToStorage(
       body: formData
     });
 
-    const data = await res.json();
-    let returnUrl = data.url || data.fileUrl;
-    if (data.success && returnUrl) {
-      if (returnUrl.startsWith('/uploads/') && apiBase) {
-        returnUrl = `${apiBase}${returnUrl}`;
-      }
-      return {
-        url: returnUrl,
-        path: returnUrl,
-        size: data.size || uploadBlob.size,
-        mimeType: 'image/jpeg',
-        width: imgWidth,
-        height: imgHeight,
-        uploadedAt: new Date().toISOString()
-      };
-    }
-    throw new Error(data.error || 'Upload server gagal');
-  } catch (serverErr: any) {
-    console.warn('[ImageStorage] Server upload notice, trying Firebase Storage fallback:', serverErr?.message);
-
-    // 2. Secondary fallback: Firebase Storage (if bucket is active)
-    try {
-      const storageRef = ref(storage, storagePath);
-      const snapshot = await uploadBytes(storageRef, uploadBlob, {
-        contentType: 'image/jpeg',
-        customMetadata: {
-          originalName: file.name,
-          uploadedAt: new Date().toISOString()
+    if (res.ok) {
+      const data = await res.json();
+      let returnUrl = data.url || data.fileUrl;
+      if (data.success && returnUrl) {
+        if (returnUrl.startsWith('/uploads/') && apiBase) {
+          returnUrl = `${apiBase}${returnUrl}`;
         }
-      });
-
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-
-      return {
-        url: downloadUrl,
-        path: storagePath,
-        size: uploadBlob.size,
-        mimeType: 'image/jpeg',
-        width: imgWidth,
-        height: imgHeight,
-        uploadedAt: new Date().toISOString()
-      };
-    } catch (firebaseErr: any) {
-      console.warn('[ImageStorage] Storage fallback unavailable, using compressed dataUrl:', firebaseErr?.message);
-      if (fallbackDataUrl) {
         return {
-          url: fallbackDataUrl,
-          path: `local/${cleanBaseName}`,
-          size: uploadBlob.size,
-          mimeType: 'image/jpeg',
+          url: returnUrl,
+          path: returnUrl,
+          size: data.size || uploadBlob.size,
+          mimeType: uploadBlob.type || 'image/webp',
           width: imgWidth,
           height: imgHeight,
           uploadedAt: new Date().toISOString()
         };
       }
-      throw new Error(`Gagal memproses unggahan gambar: ${serverErr?.message || firebaseErr?.message}`);
     }
+  } catch (serverErr: any) {
+    console.warn('[ImageStorage] Server upload notice, trying Firebase Storage fallback:', serverErr?.message);
   }
+
+  // 2. Secondary fallback: Firebase Storage (if bucket is active)
+  try {
+    const storageRef = ref(storage, storagePath);
+    const snapshot = await uploadBytes(storageRef, uploadBlob, {
+      contentType: uploadBlob.type || 'image/webp',
+      customMetadata: {
+        originalName: file.name,
+        uploadedAt: new Date().toISOString()
+      }
+    });
+
+    const downloadUrl = await getDownloadURL(snapshot.ref);
+
+    return {
+      url: downloadUrl,
+      path: storagePath,
+      size: uploadBlob.size,
+      mimeType: uploadBlob.type || 'image/webp',
+      width: imgWidth,
+      height: imgHeight,
+      uploadedAt: new Date().toISOString()
+    };
+  } catch (firebaseErr: any) {
+    console.warn('[ImageStorage] Storage fallback unavailable, using compressed dataUrl:', firebaseErr?.message);
+  }
+
+  // 3. Resilient fallback: Return compressed DataURL so user is never blocked
+  if (fallbackDataUrl) {
+    return {
+      url: fallbackDataUrl,
+      path: `local/${cleanBaseName}`,
+      size: uploadBlob.size,
+      mimeType: uploadBlob.type || 'image/webp',
+      width: imgWidth,
+      height: imgHeight,
+      uploadedAt: new Date().toISOString()
+    };
+  }
+
+  throw new Error('Gagal memproses unggahan gambar');
 }
