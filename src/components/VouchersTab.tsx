@@ -18,6 +18,7 @@ import {
   Trash2,
   Image as ImageIcon
 } from 'lucide-react';
+import { useCustomDialog } from './CustomDialogProvider';
 
 interface VouchersTabProps {
   vouchers: Voucher[];
@@ -55,6 +56,7 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
       </div>
     );
   }
+  const { showConfirm } = useCustomDialog();
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -266,9 +268,11 @@ export const VouchersTab: React.FC<VouchersTabProps> = ({
                   {onDeleteVoucher && (
                     <button
                       onClick={() => {
-                        if (window.confirm(`Hapus voucher "${voucher.title}" (${voucher.code})?`)) {
-                          onDeleteVoucher(voucher.id);
-                        }
+                        showConfirm(
+                          `Hapus voucher "${voucher.title}" (${voucher.code}) secara permanen?`,
+                          'Konfirmasi Hapus Voucher',
+                          () => onDeleteVoucher(voucher.id)
+                        );
                       }}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                       title="Hapus Voucher"

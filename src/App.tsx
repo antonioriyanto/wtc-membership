@@ -1024,12 +1024,7 @@ export default function App() {
 
                 // 2. Validate phone number presence
                 if (!targetPhone) {
-                  const input = window.prompt("Lengkapi Profil Member:\n\nMasukkan nomor WhatsApp / Handphone Anda untuk menghubungkan data dan poin:");
-                  targetPhone = (input || '').trim();
-                }
-
-                if (!targetPhone) {
-                  showAlert('Pendaftaran dibatalkan. Nomor handphone wajib diisi untuk mengamankan data dan poin Anda.', 'Perhatian', 'warning');
+                  showAlert('Nomor WhatsApp / handphone wajib diisi sebelum menghubungkan akun Google untuk mengamankan data dan poin Anda.', 'Nomor HP Diperlukan', 'warning');
                   return;
                 }
 

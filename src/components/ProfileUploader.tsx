@@ -3,6 +3,7 @@ import { Camera, Loader2 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Member } from '../types';
+import { useCustomDialog } from './CustomDialogProvider';
 
 interface ProfileUploaderProps {
   member: Member;
@@ -10,6 +11,7 @@ interface ProfileUploaderProps {
 }
 
 export const ProfileUploader: React.FC<ProfileUploaderProps> = ({ member, onUpdate }) => {
+  const { showAlert } = useCustomDialog();
   const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,9 +53,10 @@ export const ProfileUploader: React.FC<ProfileUploaderProps> = ({ member, onUpda
             
             // Update local state
             onUpdate(base64String);
+            showAlert("Foto profil berhasil diperbarui.", "Berhasil", "success");
           } catch (error) {
             console.error("Error saving profile image:", error);
-            alert("Gagal menyimpan foto profil.");
+            showAlert("Gagal menyimpan foto profil ke database.", "Gagal", "error");
           } finally {
             setIsCompressing(false);
           }
@@ -65,7 +68,7 @@ export const ProfileUploader: React.FC<ProfileUploaderProps> = ({ member, onUpda
     };
     reader.onerror = () => {
       setIsCompressing(false);
-      alert("Gagal membaca file gambar.");
+      showAlert("Gagal membaca file gambar yang dipilih.", "Gagal", "error");
     };
     reader.readAsDataURL(file);
   };

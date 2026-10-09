@@ -547,11 +547,21 @@ export async function safeDeleteDoc(collectionName: string, docId: string): Prom
 export function setupFirestoreListeners(callbacks: any) {
   const unsubscribes: any[] = [];
 
+  const safeJsonFetch = async (url: string) => {
+    try {
+      const r = await fetch(url);
+      const ct = r.headers.get('content-type') || '';
+      if (r.ok && ct.includes('application/json')) {
+        return await r.json();
+      }
+    } catch {}
+    return null;
+  };
+
   // Proactively fetch persistent members from Server API (guarantees availability on new devices and incognito)
-  fetch('/api/members')
-    .then(r => r.json())
+  safeJsonFetch('/api/members')
     .then(json => {
-      if (json.success && Array.isArray(json.members) && json.members.length > 0) {
+      if (json && json.success && Array.isArray(json.members) && json.members.length > 0) {
         callbacks.setMembers?.(json.members);
         try {
           localStorage.setItem('wtc_members', JSON.stringify(json.members));
@@ -573,26 +583,24 @@ export function setupFirestoreListeners(callbacks: any) {
         } catch {}
       }
     })
-    .catch(err => console.warn('[Server Members] Initial fetch notice:', err));
+    .catch(() => {});
 
   // Proactively fetch persistent vouchers from Server API
-  fetch('/api/vouchers')
-    .then(r => r.json())
+  safeJsonFetch('/api/vouchers')
     .then(json => {
-      if (json.success && Array.isArray(json.vouchers) && json.vouchers.length > 0) {
+      if (json && json.success && Array.isArray(json.vouchers) && json.vouchers.length > 0) {
         callbacks.setVouchers?.(json.vouchers);
         try {
           localStorage.setItem('wtc_vouchers', JSON.stringify(json.vouchers));
         } catch {}
       }
     })
-    .catch(err => console.warn('[Server Vouchers] Initial fetch notice:', err));
+    .catch(() => {});
 
   // Proactively fetch persistent stores from Server API
-  fetch('/api/stores')
-    .then(r => r.json())
+  safeJsonFetch('/api/stores')
     .then(json => {
-      if (json.success && Array.isArray(json.stores) && json.stores.length > 0) {
+      if (json && json.success && Array.isArray(json.stores) && json.stores.length > 0) {
         const storeMap = new Map();
         initialStores.forEach(s => storeMap.set(s.id, cleanAndEnrichStore(s)));
         json.stores.forEach((s: any) => {
@@ -606,20 +614,19 @@ export function setupFirestoreListeners(callbacks: any) {
         } catch {}
       }
     })
-    .catch(err => console.warn('[Server Stores] Initial fetch notice:', err));
+    .catch(() => {});
 
   // Proactively fetch persistent campaigns from Server API (guarantees cross-device & cloud persistence)
-  fetch('/api/campaigns')
-    .then(r => r.json())
+  safeJsonFetch('/api/campaigns')
     .then(json => {
-      if (json.success && Array.isArray(json.campaigns)) {
+      if (json && json.success && Array.isArray(json.campaigns)) {
         callbacks.setCampaigns?.(json.campaigns);
         try {
           localStorage.setItem('wtc_campaigns', JSON.stringify(json.campaigns));
         } catch {}
       }
     })
-    .catch(err => console.warn('[Server Campaigns] Initial fetch notice:', err));
+    .catch(() => {});
 
   const collections = [
     { name: 'stores', set: callbacks.setStores, storageKey: 'wtc_stores' },
