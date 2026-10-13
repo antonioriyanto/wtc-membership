@@ -1,5 +1,14 @@
 [
   {
+    "id": "MBR-001",
+    "points": 5,
+    "lifetimePoints": 5,
+    "totalSpend": 50000,
+    "tier": "BLUE",
+    "lastStoreVisited": "23 Paskal Bandung",
+    "lastVisitDate": "2026-10-13T06:14:18.110Z"
+  },
+  {
     "id": "1",
     "points": 1,
     "lifetimePoints": 1,
@@ -16,16 +25,16 @@
     "birthDate": "",
     "gender": "Pria",
     "registeredStore": "Kota Kasablanka Jakarta",
-    "lastStoreVisited": "Kota Kasablanka Jakarta",
-    "lastVisitDate": "2026-09-21T07:00:00.000Z",
+    "lastVisitDate": "2026-10-13T06:30:52.805Z",
     "joinDate": "2026-09-17T00:00:00.000Z",
-    "points": 857,
-    "lifetimePoints": 857,
-    "totalSpend": 8570000,
+    "points": 877,
+    "lifetimePoints": 877,
+    "totalSpend": 8770000,
     "tier": "BLUE",
     "status": "ACTIVE",
     "address": "",
-    "isPinSet": false
+    "isPinSet": false,
+    "lastStoreVisited": "23 Paskal Bandung"
   },
   {
     "id": "mem_kokas_0002",

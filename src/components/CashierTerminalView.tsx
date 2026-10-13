@@ -176,7 +176,11 @@ export const CashierTerminalView: React.FC<CashierTerminalViewProps> = ({
         };
       } catch (err: any) {
         console.error('Add points error:', err);
-        showAlert(err?.message || 'Gagal memproses transaksi poin pada server.', 'Transaksi Gagal', 'error');
+        const msg = err?.message || 'Gagal memproses transaksi poin pada server.';
+        const detailedMsg = msg.includes('404')
+          ? `${msg} Pastikan server backend aktif atau konfigurasi VITE_API_BASE_URL telah diatur.`
+          : msg;
+        showAlert(detailedMsg, 'Transaksi Gagal', 'error');
         return false;
       }
 

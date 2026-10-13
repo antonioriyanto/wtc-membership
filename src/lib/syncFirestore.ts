@@ -2,6 +2,9 @@ import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, getDocs, writeB
 import { db } from "./firebase";
 import { initialStores, initialMembers, initialVouchers, initialTransactions, initialSupportTickets, initialCampaigns, initialAuditLogs, initialLoyaltyConfig } from "../data/mockData";
 import { StoreBranch } from "../types";
+import { getApiBaseUrl } from "./apiClient";
+
+const apiEndpoint = (p: string) => `${getApiBaseUrl()}${p.startsWith('/') ? p : '/' + p}`;
 
 export function cleanForFirestore<T>(obj: T): T {
   if (obj === undefined) return '' as any;
@@ -249,7 +252,7 @@ export async function findMemberByPhoneInFirestore(phone: string): Promise<any |
 
   // 0. Primary check: Query persistent Server API (works across ALL devices, incognito, new phones)
   try {
-    const res = await fetch(`/api/members/by-phone/${encodeURIComponent(normalized)}`);
+    const res = await fetch(apiEndpoint(`/api/members/by-phone/${encodeURIComponent(normalized)}`));
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.exists && json.member) {
@@ -272,7 +275,7 @@ export async function findMemberByPhoneInFirestore(phone: string): Promise<any |
 
   // 0b. Also check all members from Server API if by-phone lookup missed format variations
   try {
-    const allRes = await fetch('/api/members');
+    const allRes = await fetch(apiEndpoint('/api/members'));
     if (allRes.ok) {
       const allJson = await allRes.json();
       if (allJson.success && Array.isArray(allJson.members)) {
@@ -404,49 +407,49 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
   let serverSyncSucceeded = false;
   try {
     if (collectionName === 'members') {
-      const res = await fetch('/api/members', {
+      const res = await fetch(apiEndpoint('/api/members'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'stores') {
-      const res = await fetch(`/api/stores/${encodeURIComponent(docId)}`, {
+      const res = await fetch(apiEndpoint(`/api/stores/${encodeURIComponent(docId)}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'vouchers') {
-      const res = await fetch(`/api/vouchers/${encodeURIComponent(docId)}`, {
+      const res = await fetch(apiEndpoint(`/api/vouchers/${encodeURIComponent(docId)}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'campaigns') {
-      const res = await fetch(`/api/campaigns/${encodeURIComponent(docId)}`, {
+      const res = await fetch(apiEndpoint(`/api/campaigns/${encodeURIComponent(docId)}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'transactions') {
-      const res = await fetch(`/api/transactions/${encodeURIComponent(docId)}`, {
+      const res = await fetch(apiEndpoint(`/api/transactions/${encodeURIComponent(docId)}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'support_tickets' || collectionName === 'support') {
-      const res = await fetch(`/api/support_tickets/${encodeURIComponent(docId)}`, {
+      const res = await fetch(apiEndpoint(`/api/support_tickets/${encodeURIComponent(docId)}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'audit' || collectionName === 'audit_logs') {
-      const res = await fetch(`/api/audit_logs/${encodeURIComponent(docId)}`, {
+      const res = await fetch(apiEndpoint(`/api/audit_logs/${encodeURIComponent(docId)}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)

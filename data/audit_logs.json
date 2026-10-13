@@ -1,5 +1,41 @@
 [
   {
+    "id": "AL-052803",
+    "timestamp": "2026-10-13T06:30:52.803Z",
+    "actorName": "Cashier 1",
+    "actorRole": "STORE_CASHIER",
+    "action": "POINTS_EARNED",
+    "details": "Kasir menambahkan +5 poin untuk Aan (Struk: VERIFY-REC-FINAL)",
+    "module": "LOYALTY_PROGRAM"
+  },
+  {
+    "id": "AL-733513",
+    "timestamp": "2026-10-13T06:25:33.513Z",
+    "actorName": "Cashier 1",
+    "actorRole": "STORE_CASHIER",
+    "action": "POINTS_EARNED",
+    "details": "Kasir menambahkan +10 poin untuk Aan (Struk: TEST-RECEIPT-VERIFY-1)",
+    "module": "LOYALTY_PROGRAM"
+  },
+  {
+    "id": "AL-058109",
+    "timestamp": "2026-10-13T06:14:18.109Z",
+    "actorName": "Cashier 1",
+    "actorRole": "STORE_CASHIER",
+    "action": "POINTS_EARNED",
+    "details": "Kasir menambahkan +5 poin untuk Member (Struk: TEST-RECEIPT-AUTO-1)",
+    "module": "LOYALTY_PROGRAM"
+  },
+  {
+    "id": "AL-627123",
+    "timestamp": "2026-10-13T06:07:07.123Z",
+    "actorName": "Kasir",
+    "actorRole": "STORE_CASHIER",
+    "action": "POINTS_EARNED",
+    "details": "Kasir menambahkan +5 poin untuk Aan (Struk: TEST-RECEIPT-VERCEL-1)",
+    "module": "LOYALTY_PROGRAM"
+  },
+  {
     "id": "AL-785002",
     "timestamp": "2026-10-08T03:06:25.002Z",
     "actorName": "Kasir",

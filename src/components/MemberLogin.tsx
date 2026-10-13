@@ -138,7 +138,18 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
       }
     } catch (err: any) {
       console.error('Pre-check error:', err);
-      setError('Gagal memverifikasi status akun member. Periksa koneksi internet.');
+      const msg = err?.message || '';
+      if (msg.includes('404')) {
+        setError(msg || 'Layanan server API \'/v1/auth/member/precheck\' tidak ditemukan (404 Not Found). Pastikan VITE_API_BASE_URL telah dikonfigurasi ke backend yang aktif.');
+      } else if (msg.includes('timeout') || msg.includes('lambat')) {
+        setError('Koneksi internet lambat / timeout. Periksa koneksi internet Anda dan coba lagi.');
+      } else if (msg.includes('tidak tersedia') || msg.includes('tidak dapat dijangkau') || msg.includes('HTML')) {
+        setError('Layanan backend API tidak tersedia atau belum terhubung. Pastikan API backend aktif.');
+      } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Koneksi')) {
+        setError('Gagal menghubungi backend server. Periksa koneksi jaringan atau ketersediaan server API.');
+      } else {
+        setError(msg || 'Gagal memverifikasi status akun member.');
+      }
     } finally {
       setLoading(false);
     }

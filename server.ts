@@ -525,9 +525,8 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-async function startServer() {
+export async function createApp(): Promise<express.Application> {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
@@ -906,8 +905,10 @@ async function startServer() {
       const idx = list.findIndex(m => m && (m.id === member.id || (normPhone && normalizePhone(m.phone) === normPhone)));
       if (idx >= 0) {
         list[idx] = { ...list[idx], ...member };
+        memoryMembers.set(member.id, list[idx]);
       } else {
         list.unshift(member);
+        memoryMembers.set(member.id, member);
       }
       return list;
     });
@@ -1100,7 +1101,7 @@ async function startServer() {
   });
 
   // Member Precheck (Check existence, PIN setup, and brute-force lockout server-side)
-  app.post('/v1/auth/member/precheck', async (req, res) => {
+  app.post(['/v1/auth/member/precheck', '/api/v1/auth/member/precheck'], async (req, res) => {
     try {
       const phone = req.body?.phone;
       if (!phone) {
@@ -1108,13 +1109,26 @@ async function startServer() {
       }
 
       const normalized = normalizePhone(phone);
+      const cleanInput = (phone || '').toString().trim();
+      const phoneDigits = cleanInput.replace(/\D/g, '');
+      const rawWithoutLeadingZero = normalized.replace(/^0/, '');
+      const phoneVariants = Array.from(new Set([
+        normalized,
+        cleanInput,
+        phoneDigits,
+        `+62${rawWithoutLeadingZero}`,
+        `62${rawWithoutLeadingZero}`,
+        `0${rawWithoutLeadingZero}`,
+        rawWithoutLeadingZero
+      ])).filter(Boolean);
+
       let memberData: any = null;
       let memberId: string = '';
 
       if (db) {
         try {
           const querySnap = await db.collection('members')
-            .where('phone', '==', normalized)
+            .where('phone', 'in', phoneVariants.slice(0, 10))
             .limit(2)
             .get();
 
@@ -1122,13 +1136,13 @@ async function startServer() {
             memberData = querySnap.docs[0].data();
             memberId = querySnap.docs[0].id;
           } else {
-            const snap2 = await db.collection('members')
-              .where('phone', '==', phone.trim())
-              .limit(2)
+            const normSnap = await db.collection('members')
+              .where('phoneNormalized', '==', normalized)
+              .limit(1)
               .get();
-            if (!snap2.empty) {
-              memberData = snap2.docs[0].data();
-              memberId = snap2.docs[0].id;
+            if (!normSnap.empty) {
+              memberData = normSnap.docs[0].data();
+              memberId = normSnap.docs[0].id;
             }
           }
         } catch (dbErr: any) {
@@ -1138,11 +1152,31 @@ async function startServer() {
 
       // Local memory fallback if Firestore returned nothing or was unavailable
       if (!memberData) {
+        try {
+          const diskMembers = safeReadJsonSync<any[]>(MEMBERS_FILE, []);
+          for (const m of diskMembers) {
+            if (m && m.id) {
+              const existing = memoryMembers.get(m.id) || {};
+              memoryMembers.set(m.id, { ...existing, ...m });
+            }
+          }
+        } catch {}
+
         for (const m of memoryMembers.values()) {
-          if (m && m.phone && (normalizePhone(m.phone) === normalized || m.phone.trim() === phone.trim()) && !memoryDeletedMemberIds.has(m.id)) {
-            memberData = m;
-            memberId = m.id;
-            break;
+          if (m && !memoryDeletedMemberIds.has(m.id)) {
+            const mPhone = (m.phone || '').toString().trim();
+            const mNorm = normalizePhone(mPhone);
+            const mDigits = mPhone.replace(/\D/g, '');
+            if (
+              (mNorm && mNorm === normalized) ||
+              phoneVariants.includes(mPhone) ||
+              (phoneDigits && mDigits === phoneDigits) ||
+              (m.phoneNormalized && m.phoneNormalized === normalized)
+            ) {
+              memberData = m;
+              memberId = m.id;
+              break;
+            }
           }
         }
       }
@@ -1185,7 +1219,7 @@ async function startServer() {
   });
 
   // Member PIN Login (Verifies PIN, applies brute-force lockout, and mints custom token with claim memberId)
-  app.post('/v1/auth/member/login-pin', authLimiter, async (req, res) => {
+  app.post(['/v1/auth/member/login-pin', '/api/v1/auth/member/login-pin'], authLimiter, async (req, res) => {
     try {
       const phone = req.body?.phone;
       const pin = req.body?.pin;
@@ -1195,6 +1229,19 @@ async function startServer() {
       }
 
       const normalized = normalizePhone(phone);
+      const cleanInput = (phone || '').toString().trim();
+      const phoneDigits = cleanInput.replace(/\D/g, '');
+      const rawWithoutLeadingZero = normalized.replace(/^0/, '');
+      const phoneVariants = Array.from(new Set([
+        normalized,
+        cleanInput,
+        phoneDigits,
+        `+62${rawWithoutLeadingZero}`,
+        `62${rawWithoutLeadingZero}`,
+        `0${rawWithoutLeadingZero}`,
+        rawWithoutLeadingZero
+      ])).filter(Boolean);
+
       let memberDocSnap: any = null;
       let memberRef: any = null;
       let memberData: any = null;
@@ -1202,15 +1249,27 @@ async function startServer() {
 
       if (db) {
         try {
-          let qSnap = await db.collection('members').where('phone', '==', normalized).limit(1).get();
-          if (qSnap.empty) {
-            qSnap = await db.collection('members').where('phone', '==', phone.trim()).limit(1).get();
-          }
+          const qSnap = await db.collection('members')
+            .where('phone', 'in', phoneVariants.slice(0, 10))
+            .limit(1)
+            .get();
+
           if (!qSnap.empty) {
             memberDocSnap = qSnap.docs[0];
             memberRef = memberDocSnap.ref;
             memberData = memberDocSnap.data();
             memberId = memberDocSnap.id;
+          } else {
+            const normSnap = await db.collection('members')
+              .where('phoneNormalized', '==', normalized)
+              .limit(1)
+              .get();
+            if (!normSnap.empty) {
+              memberDocSnap = normSnap.docs[0];
+              memberRef = memberDocSnap.ref;
+              memberData = memberDocSnap.data();
+              memberId = memberDocSnap.id;
+            }
           }
         } catch (dbErr: any) {
           console.warn('[Member login-pin] Firestore notice, falling back to local memory:', dbErr?.message);
@@ -1218,11 +1277,31 @@ async function startServer() {
       }
 
       if (!memberData) {
+        try {
+          const diskMembers = safeReadJsonSync<any[]>(MEMBERS_FILE, []);
+          for (const m of diskMembers) {
+            if (m && m.id) {
+              const existing = memoryMembers.get(m.id) || {};
+              memoryMembers.set(m.id, { ...existing, ...m });
+            }
+          }
+        } catch {}
+
         for (const m of memoryMembers.values()) {
-          if (m && m.phone && (normalizePhone(m.phone) === normalized || m.phone.trim() === phone.trim()) && !memoryDeletedMemberIds.has(m.id)) {
-            memberData = m;
-            memberId = m.id;
-            break;
+          if (m && !memoryDeletedMemberIds.has(m.id)) {
+            const mPhone = (m.phone || '').toString().trim();
+            const mNorm = normalizePhone(mPhone);
+            const mDigits = mPhone.replace(/\D/g, '');
+            if (
+              (mNorm && mNorm === normalized) ||
+              phoneVariants.includes(mPhone) ||
+              (phoneDigits && mDigits === phoneDigits) ||
+              (m.phoneNormalized && m.phoneNormalized === normalized)
+            ) {
+              memberData = m;
+              memberId = m.id;
+              break;
+            }
           }
         }
       }
@@ -1324,7 +1403,7 @@ async function startServer() {
   });
 
   // Member Set PIN (First-time PIN setup or direct creation)
-  app.post('/v1/auth/member/set-pin', authLimiter, async (req, res) => {
+  app.post(['/v1/auth/member/set-pin', '/api/v1/auth/member/set-pin'], authLimiter, async (req, res) => {
     try {
       const { rawPhone, pin, recoveryEmail, googleUid, googleEmail } = req.body || {};
       if (!rawPhone || !pin || pin.length !== 6) {
@@ -1393,7 +1472,7 @@ async function startServer() {
   });
 
   // Member Reset PIN via Google OAuth verification
-  app.post('/v1/auth/member/reset-pin-google', authLimiter, async (req, res) => {
+  app.post(['/v1/auth/member/reset-pin-google', '/api/v1/auth/member/reset-pin-google'], authLimiter, async (req, res) => {
     try {
       const { rawPhone, googleUid, googleEmail, newPin } = req.body || {};
       if (!rawPhone || !newPin || newPin.length !== 6) {
@@ -1475,7 +1554,7 @@ async function startServer() {
   });
 
   // Cashier-Assisted PIN Reset
-  app.post('/v1/cashier/reset-pin', verifyFirebaseToken, requireCashier, async (req: AuthenticatedRequest, res: Response) => {
+  app.post(['/v1/cashier/reset-pin', '/api/v1/cashier/reset-pin'], verifyFirebaseToken, requireCashier, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const {
         memberId,
@@ -1553,7 +1632,7 @@ async function startServer() {
   // ==========================================
 
   // GET /v1/member/transactions - Member transactions fetched strictly from verified claim
-  app.get('/v1/member/transactions', verifyFirebaseToken, async (req: AuthenticatedRequest, res: Response) => {
+  app.get(['/v1/member/transactions', '/api/v1/member/transactions'], verifyFirebaseToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const verifiedMemberId = (req.query.memberId as string) || req.user?.memberId || req.user?.uid;
       const results: any[] = [];
@@ -1952,7 +2031,7 @@ async function startServer() {
   // HEAD OFFICE TRANSACTION REVERSAL (IDEMPOTENT)
   // ==========================================
 
-  app.post('/v1/ho/transactions/reversal', verifyFirebaseToken, requireHoAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  app.post(['/v1/ho/transactions/reversal', '/api/v1/ho/transactions/reversal'], verifyFirebaseToken, requireHoAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const originalTransactionId = req.body?.originalTransactionId;
       const reason = req.body?.reason || 'Koreksi transaksi oleh Head Office Admin';
@@ -3000,15 +3079,22 @@ async function startServer() {
     });
   });
 
+    return app;
+}
+
+export async function startServer() {
+  const app = await createApp();
+  const PORT = Number(process.env.PORT) || 3000;
+
   // Serve SPA in local dev / production mode if bundled
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), 'dist');
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
@@ -3037,6 +3123,8 @@ async function startServer() {
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+
+  return server;
 }
 
 // Global safety net: prevent Node.js server crash on unhandled errors
@@ -3048,4 +3136,14 @@ process.on('unhandledRejection', (reason: any) => {
   console.error('⚠️ [UNHANDLED REJECTION PREVENTED EXIT]:', reason?.message || reason);
 });
 
-startServer().catch(console.error);
+const isMain = !process.env.VERCEL && Boolean(
+  process.argv[1] && (
+    process.argv[1].endsWith('server.ts') ||
+    process.argv[1].endsWith('server.cjs') ||
+    process.argv[1].endsWith('server.js')
+  )
+);
+
+if (isMain) {
+  startServer().catch(console.error);
+}
