@@ -105,7 +105,7 @@ try {
         }),
       });
       console.log('✅ Firebase Admin SDK initialized with service account.');
-    } else {
+    } else if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
       initializeApp({
         projectId: process.env.FIREBASE_PROJECT_ID || 'watch-club-membership',
       });
@@ -474,39 +474,86 @@ export interface AuthenticatedRequest extends Request {
 export async function verifyFirebaseToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // Soft fallback for development / demo sessions
-    req.user = { uid: 'DEFAULT_USER', role: 'HO_ADMIN' };
-    return next();
+    return res.status(401).json({ success: false, error: 'Autentikasi diperlukan. Header Authorization Bearer token tidak ditemukan.' });
   }
 
   const token = authHeader.split('Bearer ')[1].trim();
-  if (!adminAuth) {
-    req.user = { uid: 'DEFAULT_USER', role: 'HO_ADMIN' };
-    return next();
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Token autentikasi tidak valid atau kosong.' });
   }
 
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    req.user = decoded;
-    next();
-  } catch (err: any) {
-    req.user = { uid: 'SESSION_USER', role: 'HO_ADMIN' };
-    next();
+  // 1. Support automated test tokens during test runs
+  if ((process.env.NODE_ENV === 'test' || process.env.VITEST) && token.startsWith('TEST_TOKEN_')) {
+    if (token.startsWith('TEST_TOKEN_CASHIER')) {
+      const parts = token.split('_');
+      const storeId = parts[3] || 'PUR';
+      req.user = { uid: `cashier_${storeId}`, role: 'CASHIER', storeId };
+      return next();
+    }
+    if (token === 'TEST_TOKEN_HO_ADMIN') {
+      req.user = { uid: 'ho_admin', role: 'HO_ADMIN' };
+      return next();
+    }
+    if (token === 'TEST_TOKEN_CUSTOMER') {
+      req.user = { uid: 'customer_1', role: 'CUSTOMER', memberId: 'mem_customer' };
+      return next();
+    }
+    return res.status(401).json({ success: false, error: 'Token test tidak valid.' });
   }
+
+  // 2. Production Firebase Admin Token Verification
+  if (adminAuth) {
+    try {
+      const decoded = await adminAuth.verifyIdToken(token);
+      let role = decoded.role;
+      if (!role) {
+        if (decoded.email === 'admin@wtc-membership.internal') role = 'HO_ADMIN';
+        else if (decoded.email === 'cashier@wtc-membership.internal') role = 'CASHIER';
+      }
+      req.user = {
+        ...decoded,
+        role: role || 'CUSTOMER'
+      };
+      return next();
+    } catch (err: any) {
+      return res.status(401).json({ success: false, error: 'Token autentikasi tidak valid atau telah kadaluarsa.' });
+    }
+  }
+
+  // 3. Fallback in development mode when Firebase Admin service account is not supplied
+  if (process.env.NODE_ENV !== 'production') {
+    if (token === 'DEV_MOCK_HO' || token.startsWith('DEV_TOKEN_HO')) {
+      req.user = { uid: 'DEV_HO_ADMIN', role: 'HO_ADMIN' };
+      return next();
+    }
+    if (token === 'DEV_MOCK_CASHIER' || token.startsWith('DEV_TOKEN_CASHIER')) {
+      req.user = { uid: 'DEV_CASHIER', role: 'CASHIER', storeId: 'PUR' };
+      return next();
+    }
+    return res.status(401).json({ success: false, error: 'Token autentikasi dev tidak valid.' });
+  }
+
+  return res.status(503).json({ success: false, error: 'Layanan autentikasi backend belum terkonfigurasi dengan Firebase Admin SDK.' });
 }
 
-export function requireHoAdmin(req: AuthenticatedRequest, _res: Response, next: NextFunction) {
-  if (req.user && (req.user.role === 'HO_ADMIN' || req.user.role === 'ADMIN' || !adminAuth)) {
+export function requireHoAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: 'Autentikasi diperlukan. Silakan login terlebih dahulu.' });
+  }
+  if (req.user.role === 'HO_ADMIN' || req.user.role === 'ADMIN') {
     return next();
   }
-  next();
+  return res.status(403).json({ success: false, error: 'Akses ditolak. Memerlukan hak akses Head Office Admin.' });
 }
 
-export function requireCashier(req: AuthenticatedRequest, _res: Response, next: NextFunction) {
-  if (req.user && (req.user.role === 'CASHIER' || req.user.role === 'HO_ADMIN' || !adminAuth)) {
+export function requireCashier(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: 'Autentikasi diperlukan. Silakan login terlebih dahulu.' });
+  }
+  if (req.user.role === 'CASHIER' || req.user.role === 'HO_ADMIN' || req.user.role === 'ADMIN') {
     return next();
   }
-  next();
+  return res.status(403).json({ success: false, error: 'Akses ditolak. Memerlukan hak akses kasir.' });
 }
 
 export function requireMember(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -525,9 +572,8 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-async function startServer() {
+export async function createApp() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
@@ -1100,14 +1146,15 @@ async function startServer() {
   });
 
   // Member Precheck (Check existence, PIN setup, and brute-force lockout server-side)
-  app.post('/v1/auth/member/precheck', async (req, res) => {
+  app.post('/v1/auth/member/precheck', authLimiter, async (req, res) => {
     try {
-      const phone = req.body?.phone;
-      if (!phone) {
-        return res.status(400).json({ success: false, error: 'Nomor telepon wajib diisi.' });
+      const rawPhone = (req.body?.phone || '').toString().trim();
+      const digits = rawPhone.replace(/[^0-9]/g, '');
+      if (digits.length < 8) {
+        return res.status(400).json({ success: false, error: 'Nomor telepon tidak valid (minimal 8 digit angka).' });
       }
 
-      const normalized = normalizePhone(phone);
+      const normalized = normalizePhone(rawPhone);
       let memberData: any = null;
       let memberId: string = '';
 
@@ -1123,7 +1170,7 @@ async function startServer() {
             memberId = querySnap.docs[0].id;
           } else {
             const snap2 = await db.collection('members')
-              .where('phone', '==', phone.trim())
+              .where('phone', '==', rawPhone)
               .limit(2)
               .get();
             if (!snap2.empty) {
@@ -1139,7 +1186,7 @@ async function startServer() {
       // Local memory fallback if Firestore returned nothing or was unavailable
       if (!memberData) {
         for (const m of memoryMembers.values()) {
-          if (m && m.phone && (normalizePhone(m.phone) === normalized || m.phone.trim() === phone.trim()) && !memoryDeletedMemberIds.has(m.id)) {
+          if (m && m.phone && (normalizePhone(m.phone) === normalized || m.phone.trim() === rawPhone) && !memoryDeletedMemberIds.has(m.id)) {
             memberData = m;
             memberId = m.id;
             break;
@@ -1683,22 +1730,22 @@ async function startServer() {
 
   const inFlightReceipts = new Set<string>();
 
-  app.post('/api/loyalty/add-points', async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/loyalty/add-points', verifyFirebaseToken, requireCashier, async (req: AuthenticatedRequest, res: Response) => {
     let activeReceiptKey: string | null = null;
     try {
-      const memberId = req.body?.memberId;
+      const memberId = (req.body?.memberId || '').toString().trim();
       const amount = req.body?.amount;
-      const receiptNo = req.body?.receiptNo;
+      const receiptNo = (req.body?.receiptNo || '').toString().trim();
       const storeName = req.body?.storeName;
       const cashierName = req.body?.cashierName;
 
-      // Extract storeId: if authenticated user is CASHIER, use verified storeId from token
-      let storeId = req.body?.storeId;
+      // Extract storeId: if authenticated user is CASHIER, enforce verified storeId from token
+      let storeId = (req.body?.storeId || '').toString().trim() || 'PUR';
       if (req.user && req.user.role === 'CASHIER' && req.user.storeId) {
         storeId = req.user.storeId;
       }
 
-      if (!memberId || !amount || !receiptNo) {
+      if (!memberId || amount === undefined || amount === null || !receiptNo) {
         return res.status(400).json({ success: false, error: 'memberId, amount, dan receiptNo wajib diisi.' });
       }
 
@@ -1712,8 +1759,8 @@ async function startServer() {
       inFlightReceipts.add(cleanReceipt);
       activeReceiptKey = cleanReceipt;
 
-      const numericAmount = Number(amount) || 0;
-      if (numericAmount <= 0) {
+      const numericAmount = Number(amount);
+      if (isNaN(numericAmount) || numericAmount <= 0) {
         return res.status(400).json({ success: false, error: 'Nominal transaksi harus lebih besar dari 0.' });
       }
 
@@ -1850,6 +1897,12 @@ async function startServer() {
             };
           });
         } catch (dbErr: any) {
+          if (dbErr?.message === 'Dokumen member tidak ditemukan.') {
+            return res.status(404).json({
+              success: false,
+              error: 'Member dengan ID tersebut tidak ditemukan di database.'
+            });
+          }
           console.warn('[AddPoints] Firestore transaction notice, falling back to local processing:', dbErr?.message);
         }
       }
@@ -1864,6 +1917,13 @@ async function startServer() {
               break;
             }
           }
+        }
+
+        if (!memberObj) {
+          return res.status(404).json({
+            success: false,
+            error: 'Member dengan ID tersebut tidak ditemukan di database.'
+          });
         }
 
         const effectiveTier = memberObj?.tier || 'BLUE';
@@ -3000,15 +3060,22 @@ async function startServer() {
     });
   });
 
+  return app;
+}
+
+export async function startServer(customPort?: number) {
+  const app = await createApp();
+  const PORT = customPort || Number(process.env.PORT) || 3000;
+
   // Serve SPA in local dev / production mode if bundled
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VITEST) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (process.env.NODE_ENV === 'production') {
     const distPath = path.join(process.cwd(), 'dist');
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
@@ -3037,6 +3104,8 @@ async function startServer() {
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+
+  return { app, server };
 }
 
 // Global safety net: prevent Node.js server crash on unhandled errors
@@ -3048,4 +3117,6 @@ process.on('unhandledRejection', (reason: any) => {
   console.error('⚠️ [UNHANDLED REJECTION PREVENTED EXIT]:', reason?.message || reason);
 });
 
-startServer().catch(console.error);
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  startServer().catch(console.error);
+}

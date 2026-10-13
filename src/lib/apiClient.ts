@@ -7,16 +7,32 @@
 import { auth } from './firebase';
 
 export function getApiBaseUrl(): string {
-  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+  const envUrl =
+    (typeof process !== 'undefined' && process.env?.VITE_API_BASE_URL) ||
+    (import.meta as any).env?.VITE_API_BASE_URL;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
-    return envUrl.trim().replace(/\/+$/, '');
+    let clean = envUrl.trim().replace(/\/+$/, '');
+    // If user mistakenly configured URL ending with '/api', strip it
+    // because API client endpoints already include '/api/...' or '/v1/...'
+    if (clean.endsWith('/api')) {
+      clean = clean.slice(0, -4).replace(/\/+$/, '');
+    }
+    return clean;
   }
   return '';
 }
 
 export function isBackendConfigured(): boolean {
-  // In development, empty VITE_API_BASE_URL uses Vite proxy / relative routes.
-  // In production outside local dev, VITE_API_BASE_URL points to Cloud Run.
+  const baseUrl = getApiBaseUrl();
+  if (baseUrl) return true;
+  // In development, empty VITE_API_BASE_URL uses Vite dev proxy / relative routes.
+  // In hosted environments (e.g. Vercel deployment), empty VITE_API_BASE_URL means backend is not connected.
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1' && host !== '0.0.0.0') {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -26,6 +42,12 @@ export interface ApiFetchOptions extends RequestInit {
 }
 
 export async function apiFetch<T = any>(endpoint: string, options: ApiFetchOptions = {}): Promise<T> {
+  if (!isBackendConfigured()) {
+    throw new Error(
+      'Server backend belum terhubung: Variabel VITE_API_BASE_URL belum dikonfigurasi di environment Vercel. Pastikan VITE_API_BASE_URL telah diatur pada Vercel Project Settings dan mengarah ke URL backend Cloud Run yang aktif.'
+    );
+  }
+
   const baseUrl = getApiBaseUrl();
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const fullUrl = `${baseUrl}${normalizedEndpoint}`;
@@ -102,7 +124,7 @@ export async function apiFetch<T = any>(endpoint: string, options: ApiFetchOptio
       data?.error ||
       data?.message ||
       (response.status === 404
-        ? `Layanan server API '${normalizedEndpoint}' tidak ditemukan (404 Not Found).`
+        ? `Layanan server API '${normalizedEndpoint}' tidak ditemukan (404 Not Found). Pastikan endpoint tersedia dan konfigurasi VITE_API_BASE_URL mengarah ke backend yang tepat.`
         : `Server returned error ${response.status}${response.statusText ? ': ' + response.statusText : ''}`);
     throw new Error(errorMsg);
   }

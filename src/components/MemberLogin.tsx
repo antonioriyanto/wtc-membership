@@ -138,7 +138,8 @@ export const MemberLogin: React.FC<MemberLoginProps> = ({ onLogin, onRegisterGoo
       }
     } catch (err: any) {
       console.error('Pre-check error:', err);
-      setError('Gagal memverifikasi status akun member. Periksa koneksi internet.');
+      const msg = err?.message || 'Gagal memverifikasi status akun member. Periksa koneksi internet atau coba beberapa saat lagi.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

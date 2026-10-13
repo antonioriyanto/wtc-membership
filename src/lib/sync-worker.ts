@@ -1,7 +1,7 @@
 import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { Member, MemberTier } from "../types";
-import { cleanForFirestore, safeSetDoc, normalizePhoneNumber, isSamePhoneNumber } from "./syncFirestore";
+import { cleanForFirestore, safeSetDoc, normalizePhoneNumber, isSamePhoneNumber, serverFetch } from "./syncFirestore";
 import { calculateTier } from "./loyalty";
 
 export interface SyncReport {
@@ -203,7 +203,7 @@ async function executeMemberSyncPassInternal(
 
     // Query backend for centrally deleted IDs
     try {
-      const delRes = await fetch('/api/members/deleted-ids');
+      const delRes = await serverFetch('/api/members/deleted-ids');
       if (delRes.ok) {
         const delJson = await delRes.json();
         if (Array.isArray(delJson.deletedIds)) {

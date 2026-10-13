@@ -2,6 +2,13 @@ import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, getDocs, writeB
 import { db } from "./firebase";
 import { initialStores, initialMembers, initialVouchers, initialTransactions, initialSupportTickets, initialCampaigns, initialAuditLogs, initialLoyaltyConfig } from "../data/mockData";
 import { StoreBranch } from "../types";
+import { getApiBaseUrl } from "./apiClient";
+
+export function serverFetch(endpoint: string, init?: RequestInit): Promise<Response> {
+  const baseUrl = getApiBaseUrl();
+  const url = baseUrl && endpoint.startsWith('/') ? `${baseUrl}${endpoint}` : endpoint;
+  return fetch(url, init);
+}
 
 export function cleanForFirestore<T>(obj: T): T {
   if (obj === undefined) return '' as any;
@@ -249,7 +256,7 @@ export async function findMemberByPhoneInFirestore(phone: string): Promise<any |
 
   // 0. Primary check: Query persistent Server API (works across ALL devices, incognito, new phones)
   try {
-    const res = await fetch(`/api/members/by-phone/${encodeURIComponent(normalized)}`);
+    const res = await serverFetch(`/api/members/by-phone/${encodeURIComponent(normalized)}`);
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.exists && json.member) {
@@ -272,7 +279,7 @@ export async function findMemberByPhoneInFirestore(phone: string): Promise<any |
 
   // 0b. Also check all members from Server API if by-phone lookup missed format variations
   try {
-    const allRes = await fetch('/api/members');
+    const allRes = await serverFetch('/api/members');
     if (allRes.ok) {
       const allJson = await allRes.json();
       if (allJson.success && Array.isArray(allJson.members)) {
@@ -404,49 +411,49 @@ export async function safeSetDoc(collectionName: string, docId: string, data: an
   let serverSyncSucceeded = false;
   try {
     if (collectionName === 'members') {
-      const res = await fetch('/api/members', {
+      const res = await serverFetch('/api/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'stores') {
-      const res = await fetch(`/api/stores/${encodeURIComponent(docId)}`, {
+      const res = await serverFetch(`/api/stores/${encodeURIComponent(docId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'vouchers') {
-      const res = await fetch(`/api/vouchers/${encodeURIComponent(docId)}`, {
+      const res = await serverFetch(`/api/vouchers/${encodeURIComponent(docId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'campaigns') {
-      const res = await fetch(`/api/campaigns/${encodeURIComponent(docId)}`, {
+      const res = await serverFetch(`/api/campaigns/${encodeURIComponent(docId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'transactions') {
-      const res = await fetch(`/api/transactions/${encodeURIComponent(docId)}`, {
+      const res = await serverFetch(`/api/transactions/${encodeURIComponent(docId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'support_tickets' || collectionName === 'support') {
-      const res = await fetch(`/api/support_tickets/${encodeURIComponent(docId)}`, {
+      const res = await serverFetch(`/api/support_tickets/${encodeURIComponent(docId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
       });
       if (res.ok) serverSyncSucceeded = true;
     } else if (collectionName === 'audit' || collectionName === 'audit_logs') {
-      const res = await fetch(`/api/audit_logs/${encodeURIComponent(docId)}`, {
+      const res = await serverFetch(`/api/audit_logs/${encodeURIComponent(docId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitized)
@@ -507,7 +514,7 @@ export async function safeDeleteDoc(collectionName: string, docId: string): Prom
   // 2. Server API sync for server-backed persistence
   let serverSyncSucceeded = false;
   try {
-    const res = await fetch(`/api/${collectionName}/${encodeURIComponent(docId)}`, {
+    const res = await serverFetch(`/api/${collectionName}/${encodeURIComponent(docId)}`, {
       method: 'DELETE'
     });
     if (res.ok) serverSyncSucceeded = true;
@@ -549,7 +556,7 @@ export function setupFirestoreListeners(callbacks: any) {
 
   const safeJsonFetch = async (url: string) => {
     try {
-      const r = await fetch(url);
+      const r = await serverFetch(url);
       const ct = r.headers.get('content-type') || '';
       if (r.ok && ct.includes('application/json')) {
         return await r.json();
@@ -573,7 +580,7 @@ export function setupFirestoreListeners(callbacks: any) {
           if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed) && parsed.length > json.members.length) {
-              fetch('/api/members/sync-all', {
+              serverFetch('/api/members/sync-all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ members: parsed })

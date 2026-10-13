@@ -176,7 +176,7 @@ export const AdminLogin: React.FC<LoginWallProps> = ({
       }
       const matchedStore = STORE_ACCOUNTS.find(s => 
         s.username.toUpperCase() === u && (
-          s.pin === p ||
+          (s as any).pin === p ||
           cleanPin === 'WTC26' ||
           p === '12345' ||
           p === '123456' ||
