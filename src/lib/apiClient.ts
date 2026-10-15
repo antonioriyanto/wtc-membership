@@ -98,9 +98,12 @@ export async function apiFetch<T = any>(endpoint: string, options: ApiFetchOptio
   }
 
   if (!response.ok) {
+    const serverError = typeof data?.error === 'string'
+      ? data.error
+      : (data?.error?.message || data?.error?.code || (typeof data?.message === 'string' ? data.message : null));
+
     const errorMsg =
-      data?.error ||
-      data?.message ||
+      serverError ||
       (response.status === 404
         ? `Layanan server API '${normalizedEndpoint}' tidak ditemukan (404 Not Found).`
         : `Server returned error ${response.status}${response.statusText ? ': ' + response.statusText : ''}`);

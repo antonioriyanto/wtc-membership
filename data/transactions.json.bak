@@ -1,5 +1,21 @@
 [
   {
+    "id": "tx_1791886959835",
+    "receiptNo": "TEST-REC-NEW-HANDLER-1",
+    "memberId": "mem_kokas_0001",
+    "membershipId": "KOKAS0001",
+    "memberName": "Aan",
+    "memberPhone": "+6281903987051",
+    "memberPhoneNormalized": "081903987051",
+    "storeId": "PUR",
+    "storeName": "23 Paskal Bandung",
+    "cashierName": "Cashier 1",
+    "type": "EARN",
+    "amount": 50000,
+    "pointsDelta": 5,
+    "timestamp": "2026-10-13T10:22:39.835Z"
+  },
+  {
     "id": "tx_1791873052802",
     "receiptNo": "VERIFY-REC-FINAL",
     "memberId": "mem_kokas_0001",

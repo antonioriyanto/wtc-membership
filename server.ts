@@ -69,8 +69,12 @@ if (process.env.SQL_HOST && process.env.SQL_USER && process.env.SQL_PASSWORD && 
 
 // Ensure public/uploads directory exists (as local ephemeral container L1 fast cache)
 const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch {
+  // Read-only filesystem in serverless environments (e.g. Vercel / AWS Lambda)
 }
 
 // Multer memory storage configuration (ephemeral container safe).
@@ -523,10 +527,20 @@ const authLimiter = rateLimit({
   message: { success: false, error: 'Terlalu banyak percobaan autentikasi. Silakan tunggu 1 menit.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    return (
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      (req.headers['x-real-ip'] as string) ||
+      req.socket?.remoteAddress ||
+      '127.0.0.1'
+    );
+  },
+  validate: { xForwardedForHeader: false }
 });
 
 export async function createApp(): Promise<express.Application> {
   const app = express();
+  app.set('trust proxy', 1);
 
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
@@ -605,10 +619,14 @@ export async function createApp(): Promise<express.Application> {
       try {
         fs.copyFileSync(filePath, `${filePath}.bak`);
       } catch {}
-    } catch (err) {
+    } catch (err: any) {
       try {
         if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
       } catch {}
+      if (err?.code === 'EROFS' || String(err?.message).includes('read-only')) {
+        console.warn(`[Read-Only FS Notice] Could not write to disk at ${filePath}, keeping state in-memory.`);
+        return;
+      }
       throw err;
     }
   }
@@ -1127,15 +1145,18 @@ export async function createApp(): Promise<express.Application> {
 
       if (db) {
         try {
-          const querySnap = await db.collection('members')
-            .where('phone', 'in', phoneVariants.slice(0, 10))
-            .limit(2)
-            .get();
+          if (phoneVariants.length > 0) {
+            const querySnap = await db.collection('members')
+              .where('phone', 'in', phoneVariants.slice(0, 10))
+              .limit(2)
+              .get();
 
-          if (!querySnap.empty) {
-            memberData = querySnap.docs[0].data();
-            memberId = querySnap.docs[0].id;
-          } else {
+            if (!querySnap.empty) {
+              memberData = querySnap.docs[0].data();
+              memberId = querySnap.docs[0].id;
+            }
+          }
+          if (!memberData && normalized) {
             const normSnap = await db.collection('members')
               .where('phoneNormalized', '==', normalized)
               .limit(1)
@@ -1249,17 +1270,20 @@ export async function createApp(): Promise<express.Application> {
 
       if (db) {
         try {
-          const qSnap = await db.collection('members')
-            .where('phone', 'in', phoneVariants.slice(0, 10))
-            .limit(1)
-            .get();
+          if (phoneVariants.length > 0) {
+            const qSnap = await db.collection('members')
+              .where('phone', 'in', phoneVariants.slice(0, 10))
+              .limit(1)
+              .get();
 
-          if (!qSnap.empty) {
-            memberDocSnap = qSnap.docs[0];
-            memberRef = memberDocSnap.ref;
-            memberData = memberDocSnap.data();
-            memberId = memberDocSnap.id;
-          } else {
+            if (!qSnap.empty) {
+              memberDocSnap = qSnap.docs[0];
+              memberRef = memberDocSnap.ref;
+              memberData = memberDocSnap.data();
+              memberId = memberDocSnap.id;
+            }
+          }
+          if (!memberData && normalized) {
             const normSnap = await db.collection('members')
               .where('phoneNormalized', '==', normalized)
               .limit(1)

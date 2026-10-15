@@ -1,5 +1,14 @@
 [
   {
+    "id": "AL-959835",
+    "timestamp": "2026-10-13T10:22:39.835Z",
+    "actorName": "Cashier 1",
+    "actorRole": "STORE_CASHIER",
+    "action": "POINTS_EARNED",
+    "details": "Kasir menambahkan +5 poin untuk Aan (Struk: TEST-REC-NEW-HANDLER-1)",
+    "module": "LOYALTY_PROGRAM"
+  },
+  {
     "id": "AL-052803",
     "timestamp": "2026-10-13T06:30:52.803Z",
     "actorName": "Cashier 1",

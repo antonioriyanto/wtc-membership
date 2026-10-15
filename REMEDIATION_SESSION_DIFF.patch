@@ -1,0 +1,160 @@
+=== 1. NEW FILE: api/index.ts ===
+--- /dev/null
++++ b/api/index.ts
+@@ -0,0 +1,28 @@
++import { createApp } from '../server.ts';
++
++let cachedApp: any = null;
++
++/**
++ * Vercel Serverless Function entry point for Watch Club Loyalty API.
++ * Handles all /api/*, /v1/*, and /healthz requests directly on Vercel
++ * when VITE_API_BASE_URL is not set or points to the Vercel origin.
++ */
++export default async function handler(req: any, res: any) {
++  if (!cachedApp) {
++    cachedApp = await createApp();
++  }
++
++  // When Vercel rewrites /api/(.*) to /api, restore the full path if stripped
++  if (!req.url.startsWith('/api') && !req.url.startsWith('/v1') && !req.url.startsWith('/healthz')) {
++    const matchedPath =
++      (req.headers['x-matched-path'] as string) ||
++      (req.headers['x-forwarded-uri'] as string) ||
++      (req.headers['x-now-route-matches'] ? decodeURIComponent(req.headers['x-now-route-matches'] as string) : '');
++
++    if (matchedPath && (matchedPath.startsWith('/api') || matchedPath.startsWith('/v1') || matchedPath.startsWith('/healthz'))) {
++      req.url = matchedPath;
++    }
++  }
++
++  return cachedApp(req, res);
++}
+
+=== 2. vercel.json ===
+--- a/vercel.json
++++ b/vercel.json
+@@ -1,7 +1,20 @@
+ {
++  "version": 2,
+   "rewrites": [
++    {
++      "source": "/api/(.*)",
++      "destination": "/api"
++    },
++    {
++      "source": "/v1/(.*)",
++      "destination": "/api"
++    },
++    {
++      "source": "/healthz",
++      "destination": "/api"
++    },
+     {
+       "source": "/((?!api/|v1/|healthz).*)",
+       "destination": "/index.html"
+     }
+   ]
+ }
+
+=== 3. src/components/LoginWall.tsx ===
+--- a/src/components/LoginWall.tsx
++++ b/src/components/LoginWall.tsx
+@@ -176,7 +176,7 @@
+       }
+       const matchedStore = STORE_ACCOUNTS.find(s => 
+         s.username.toUpperCase() === u && (
+-          s.pin === p ||
++          (s as any).pin === p ||
+           cleanPin === 'WTC26' ||
+           p === '12345' ||
+           p === '123456' ||
+
+=== 4. src/components/MemberLogin.tsx ===
+--- a/src/components/MemberLogin.tsx
++++ b/src/components/MemberLogin.tsx
+@@ -143,8 +143,10 @@
+         setError(msg || 'Layanan server API '/v1/auth/member/precheck' tidak ditemukan (404 Not Found). Pastikan VITE_API_BASE_URL telah dikonfigurasi ke backend yang aktif.');
+       } else if (msg.includes('timeout') || msg.includes('lambat')) {
+         setError('Koneksi internet lambat / timeout. Periksa koneksi internet Anda dan coba lagi.');
+-      } else if (msg.includes('Koneksi') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+-        setError('Gagal memverifikasi status akun member. Periksa koneksi internet.');
++      } else if (msg.includes('tidak tersedia') || msg.includes('tidak dapat dijangkau') || msg.includes('HTML')) {
++        setError('Layanan backend API tidak tersedia atau belum terhubung. Pastikan API backend aktif.');
++      } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Koneksi')) {
++        setError('Gagal menghubungi backend server. Periksa koneksi jaringan atau ketersediaan server API.');
+       } else {
+         setError(msg || 'Gagal memverifikasi status akun member.');
+       }
+
+=== 5. server.ts ===
+--- a/server.ts
++++ b/server.ts
+@@ -528,2 +528,2 @@
+-async function startServer() {
+-  const PORT = Number(process.env.PORT) || 3000;
++export async function createApp(): Promise<express.Application> {
++  const app = express();
+
+@@ -905,3 +905,4 @@
+       if (idx >= 0) {
+         list[idx] = { ...list[idx], ...member };
++        memoryMembers.set(member.id, list[idx]);
+       } else {
+         list.unshift(member);
++        memoryMembers.set(member.id, member);
+
+@@ -1100,2 +1100,2 @@
+-  app.post('/v1/auth/member/precheck', async (req, res) => {
++  app.post(['/v1/auth/member/precheck', '/api/v1/auth/member/precheck'], async (req, res) => {
++    // Added multi-variant phone matching (08..., +62..., 62..., raw digits)
++    // Added Firestore 'in' query for variants and phoneNormalized
++    // Added disk MEMBERS_FILE reload & merge into memoryMembers
+
+@@ -1220,2 +1220,2 @@
+-  app.post('/v1/auth/member/login-pin', authLimiter, async (req, res) => {
++  app.post(['/v1/auth/member/login-pin', '/api/v1/auth/member/login-pin'], authLimiter, async (req, res) => {
++    // Added multi-variant phone matching and disk MEMBERS_FILE reload & merge
+
+@@ -1400,2 +1400,2 @@
+-  app.post('/v1/auth/member/set-pin', authLimiter, async (req, res) => {
++  app.post(['/v1/auth/member/set-pin', '/api/v1/auth/member/set-pin'], authLimiter, async (req, res) => {
+
+@@ -1470,2 +1470,2 @@
+-  app.post('/v1/auth/member/reset-pin-google', authLimiter, async (req, res) => {
++  app.post(['/v1/auth/member/reset-pin-google', '/api/v1/auth/member/reset-pin-google'], authLimiter, async (req, res) => {
+
+@@ -1550,2 +1550,2 @@
+-  app.post('/v1/cashier/reset-pin', verifyFirebaseToken, requireCashier, async (req: AuthenticatedRequest, res: Response) => {
++  app.post(['/v1/cashier/reset-pin', '/api/v1/cashier/reset-pin'], verifyFirebaseToken, requireCashier, async (req: AuthenticatedRequest, res: Response) => {
+
+@@ -1630,2 +1630,2 @@
+-  app.get('/v1/member/transactions', verifyFirebaseToken, async (req: AuthenticatedRequest, res: Response) => {
++  app.get(['/v1/member/transactions', '/api/v1/member/transactions'], verifyFirebaseToken, async (req: AuthenticatedRequest, res: Response) => {
+
+@@ -2030,2 +2030,2 @@
+-  app.post('/v1/ho/transactions/reversal', verifyFirebaseToken, requireHoAdmin, async (req: AuthenticatedRequest, res: Response) => {
++  app.post(['/v1/ho/transactions/reversal', '/api/v1/ho/transactions/reversal'], verifyFirebaseToken, requireHoAdmin, async (req: AuthenticatedRequest, res: Response) => {
+
+@@ -3075,10 +3075,34 @@
++  return app;
++}
++
++export async function startServer() {
++  const app = await createApp();
++  const PORT = Number(process.env.PORT) || 3000;
++  // ... listen only when running as server
++  return server;
++}
++
++const isMain = !process.env.VERCEL && Boolean(
++  process.argv[1] && (
++    process.argv[1].endsWith('server.ts') ||
++    process.argv[1].endsWith('server.cjs') ||
++    process.argv[1].endsWith('server.js')
++  )
++);
++
++if (isMain) {
++  startServer().catch(console.error);
++}
